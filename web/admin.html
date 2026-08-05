@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin · Ojo al Precio</title>
+<style>
+  :root{--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--brand:#0ea5e9;--brand-dk:#0369a1;--bad:#dc2626;--ok:#16a34a}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f1f5f9;color:var(--ink)}
+  .wrap{max-width:900px;margin:0 auto;padding:24px 16px 60px}
+  header{background:#0f172a;color:#fff;padding:20px 0}
+  header .wrap{padding-top:0;padding-bottom:0;display:flex;justify-content:space-between;align-items:center}
+  h1{font-size:1.2rem;margin:0}
+  h2{font-size:.95rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin:0 0 14px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin-top:22px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  label{display:block;font-size:.82rem;font-weight:600;color:var(--muted);margin:12px 0 4px}
+  input,textarea,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:.95rem;font-family:inherit}
+  textarea{min-height:70px;resize:vertical}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:180px}
+  button{background:var(--brand);color:#fff;border:0;padding:11px 18px;border-radius:9px;font-weight:700;cursor:pointer;font-size:.95rem}
+  button:hover{background:#0284c7}
+  button.ghost{background:#fff;color:var(--brand-dk);border:1px solid var(--line)}
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+  th{font-size:.72rem;text-transform:uppercase;color:var(--muted)}
+  td select{width:auto;padding:6px 8px}
+  .msg{padding:10px 12px;border-radius:8px;font-size:.88rem;margin-top:12px;display:none}
+  .msg.ok{background:#d1fae5;color:#065f46;display:block}
+  .msg.err{background:#fee2e2;color:#991b1b;display:block}
+  .center{max-width:400px;margin:60px auto;text-align:center}
+  a{color:var(--brand-dk)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>⚙️ Panel de administración</h1><a href="./" style="color:#cbd5e1;font-size:.85rem">← Ver sitio</a></div></header>
+
+<div class="wrap">
+  <!-- Login (si no hay sesión admin) -->
+  <div id="loginView" class="hidden">
+    <div class="card center">
+      <h2>Acceso de administrador</h2>
+      <div id="loginError" class="msg err"></div>
+      <label>Correo</label><input id="lemail" type="email" autocomplete="email">
+      <label>Contraseña</label><input id="lpass" type="password" autocomplete="current-password">
+      <div style="margin-top:16px"><button id="loginBtn">Entrar</button></div>
+      <p style="color:var(--muted);font-size:.82rem;margin-top:14px">Debés entrar con el correo definido como <code>admin_email</code> en config.php.</p>
+    </div>
+  </div>
+
+  <!-- Panel (admin) -->
+  <div id="adminView" class="hidden">
+    <div class="card">
+      <h2>Ajustes del sitio</h2>
+      <div id="setMsg" class="msg"></div>
+      <label>Nombre del sitio</label><input id="site_name">
+      <div class="row">
+        <div><label>Logo (emoji)</label><input id="logo_emoji" maxlength="8"></div>
+        <div><label>Tagline (subtítulo)</label><input id="tagline"></div>
+      </div>
+      <label>Texto del hero</label><textarea id="hero_text"></textarea>
+      <div class="row">
+        <div><label>Link Ko-fi</label><input id="donate_kofi" placeholder="https://ko-fi.com/tuusuario"></div>
+        <div><label>Link PayPal</label><input id="donate_paypal" placeholder="https://paypal.me/tuusuario"></div>
+      </div>
+      <label>Nota del footer</label><textarea id="footer_note"></textarea>
+      <div style="margin-top:16px"><button id="saveBtn">Guardar ajustes</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Usuarios</h2>
+      <div id="userMsg" class="msg"></div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Correo</th><th>Nivel</th><th>Alertas</th><th>Registrado</th></tr></thead>
+          <tbody id="usersBody"><tr><td colspan="4" style="color:var(--muted)">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = './api';
+const SET_KEYS = ['site_name','tagline','hero_text','logo_emoji','donate_kofi','donate_paypal','footer_note'];
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function api(path, opts){ const r = await fetch(`${API}/${path}`, opts); return r.json(); }
+
+async function init(){
+  let me;
+  try{ me = await api('auth/me.php'); }catch(e){ me = {user:null}; }
+  if(me.user && me.user.is_admin){
+    $('loginView').classList.add('hidden'); $('adminView').classList.remove('hidden');
+    loadSettings(); loadUsers();
+  } else {
+    $('adminView').classList.add('hidden'); $('loginView').classList.remove('hidden');
+    if(me.user){ $('loginError').textContent = 'Esa cuenta no es administrador.'; $('loginError').style.display='block'; }
+  }
+}
+
+// Login
+$('loginBtn').addEventListener('click', async () => {
+  const err = $('loginError'); err.style.display='none';
+  const j = await api('auth/login.php', {method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email:$('lemail').value.trim(), password:$('lpass').value})});
+  if(!j.ok){ err.textContent = j.error||'Error'; err.style.display='block'; return; }
+  init();
+});
+$('lpass').addEventListener('keydown', e => { if(e.key==='Enter') $('loginBtn').click(); });
+
+// Ajustes
+async function loadSettings(){
+  const j = await api('settings.php');
+  if(j.ok) SET_KEYS.forEach(k => { if($(k)) $(k).value = j.settings[k] ?? ''; });
+}
+$('saveBtn').addEventListener('click', async () => {
+  const payload = {}; SET_KEYS.forEach(k => payload[k] = $(k).value);
+  const msg = $('setMsg'); msg.className='msg';
+  const j = await api('admin/settings_save.php', {method:'POST',headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  msg.textContent = j.ok ? 'Guardado ✔' : (j.error||'Error');
+  msg.className = 'msg ' + (j.ok?'ok':'err');
+});
+
+// Usuarios
+async function loadUsers(){
+  const j = await api('admin/users.php');
+  const body = $('usersBody');
+  if(!j.ok){ body.innerHTML = `<tr><td colspan="4" style="color:var(--bad)">${esc(j.error)}</td></tr>`; return; }
+  if(!j.users.length){ body.innerHTML = `<tr><td colspan="4" style="color:var(--muted)">Aún no hay usuarios.</td></tr>`; return; }
+  body.innerHTML = j.users.map(u => `<tr>
+    <td>${esc(u.email)}</td>
+    <td><select data-id="${u.id}" class="tierSel">
+      <option value="free" ${u.tier==='free'?'selected':''}>Gratis</option>
+      <option value="donor" ${u.tier==='donor'?'selected':''}>Donante</option>
+    </select></td>
+    <td>${u.alerts}</td>
+    <td>${esc((u.created_at||'').slice(0,10))}</td>
+  </tr>`).join('');
+  body.querySelectorAll('.tierSel').forEach(sel => sel.addEventListener('change', async e => {
+    const msg = $('userMsg'); msg.className='msg';
+    const j = await api('admin/user_tier.php', {method:'POST',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user_id: +e.target.dataset.id, tier: e.target.value})});
+    msg.textContent = j.ok ? 'Nivel actualizado ✔' : (j.error||'Error');
+    msg.className = 'msg ' + (j.ok?'ok':'err');
+  }));
+}
+
+init();
+</script>
+</body>
+</html>

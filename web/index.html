@@ -182,7 +182,7 @@
 
 <footer>
   <div class="wrap">
-    <div>Hecho en Nicaragua 🇳🇮 · Los precios son referenciales y pueden variar. Verificá en la tienda antes de comprar.</div>
+    <div id="footerNote">Hecho en Nicaragua 🇳🇮 · Los precios son referenciales y pueden variar. Verificá en la tienda antes de comprar.</div>
     <div class="donate">
       <a href="#" id="kofi" target="_blank" rel="noopener">☕ Apoyá el proyecto (Ko-fi)</a>
       <a href="#" id="paypal" target="_blank" rel="noopener">💙 Donar (PayPal)</a>
@@ -494,6 +494,26 @@ document.getElementById('authSwitch').addEventListener('click', () => openAuth(A
 document.getElementById('authSubmit').addEventListener('click', submitAuth);
 document.getElementById('authPass').addEventListener('keydown', e => { if(e.key==='Enter') submitAuth(); });
 
+// --- Branding configurable desde el panel admin ---
+async function applySettings(){
+  try{
+    const j = await (await fetch(`${API}/settings.php`)).json();
+    if(!j.ok) return;
+    const s = j.settings;
+    if(s.site_name) document.title = `${s.site_name} — Historial de precios en tiendas de Nicaragua`;
+    const brand = document.querySelector('.brand');
+    if(brand) brand.innerHTML = `${s.logo_emoji||'👁️'} ${escapeHtml(s.site_name||'Ojo al Precio')} <small>${escapeHtml(s.tagline||'')}</small>`;
+    const tl = document.querySelector('.tagline');
+    if(tl && s.hero_text) tl.textContent = s.hero_text;
+    const fn = document.getElementById('footerNote');
+    if(fn && s.footer_note) fn.textContent = s.footer_note;
+    const kofi = document.getElementById('kofi'), paypal = document.getElementById('paypal');
+    if(kofi){ if(s.donate_kofi){ kofi.href = s.donate_kofi; kofi.style.display=''; } else kofi.style.display='none'; }
+    if(paypal){ if(s.donate_paypal){ paypal.href = s.donate_paypal; paypal.style.display=''; } else paypal.style.display='none'; }
+  }catch(e){}
+}
+
+applySettings();
 checkAuth();
 loadChanges();
 loadGrid();

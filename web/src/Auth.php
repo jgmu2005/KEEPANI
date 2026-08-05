@@ -98,11 +98,15 @@ final class Auth
         if (!$u) {
             return null;
         }
+        $adminEmail = strtolower(trim((string) (Db::config()['admin_email'] ?? '')));
+        $isAdmin = $adminEmail !== '' && strtolower($u['email']) === $adminEmail;
+
         return [
             'id'          => (int) $u['id'],
             'email'       => $u['email'],
             'tier'        => $u['tier'],
             'alert_limit' => self::LIMITS[$u['tier']] ?? self::LIMITS['free'],
+            'is_admin'    => $isAdmin,
             'donated_at'  => $u['donated_at'],
             'created_at'  => $u['created_at'],
         ];
@@ -116,6 +120,19 @@ final class Auth
             http_response_code(401);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['ok' => false, 'error' => 'Necesitás iniciar sesión']);
+            exit;
+        }
+        return $u;
+    }
+
+    /** Exige que el usuario sea administrador; si no, responde 403 y corta. */
+    public static function requireAdmin(PDO $db): array
+    {
+        $u = self::requireUser($db);
+        if (empty($u['is_admin'])) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'Solo administradores']);
             exit;
         }
         return $u;

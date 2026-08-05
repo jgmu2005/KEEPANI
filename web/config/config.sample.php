@@ -25,4 +25,8 @@ return [
     // El scraper debe mandar este mismo valor en el header X-Api-Key.
     // Genera una larga y aleatoria, p.ej.:  bin2hex(random_bytes(24))
     'ingest_api_key' => 'CAMBIA_ESTO_POR_UNA_CLAVE_LARGA_Y_ALEATORIA',
+
+    // --- Administrador ---
+    // El usuario registrado con ESTE correo es admin (accede al panel /admin.html).
+    'admin_email' => 'tucorreo@ejemplo.com',
 ];
