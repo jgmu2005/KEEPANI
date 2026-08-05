@@ -507,9 +507,10 @@ async function applySettings(){
     if(tl && s.hero_text) tl.textContent = s.hero_text;
     const fn = document.getElementById('footerNote');
     if(fn && s.footer_note) fn.textContent = s.footer_note;
+    const normUrl = u => { u=(u||'').trim(); return u ? (/^https?:\/\//i.test(u) ? u : 'https://'+u) : ''; };
     const kofi = document.getElementById('kofi'), paypal = document.getElementById('paypal');
-    if(kofi){ if(s.donate_kofi){ kofi.href = s.donate_kofi; kofi.style.display=''; } else kofi.style.display='none'; }
-    if(paypal){ if(s.donate_paypal){ paypal.href = s.donate_paypal; paypal.style.display=''; } else paypal.style.display='none'; }
+    if(kofi){ const k=normUrl(s.donate_kofi); if(k){ kofi.href=k; kofi.style.display=''; } else kofi.style.display='none'; }
+    if(paypal){ const p=normUrl(s.donate_paypal); if(p){ paypal.href=p; paypal.style.display=''; } else paypal.style.display='none'; }
   }catch(e){}
 }
 
