@@ -6,8 +6,11 @@
   "content_scripts": [
     {
       "matches": [
+        "https://sinsa.com.ni/*",
         "https://*.sinsa.com.ni/*",
         "https://ni.siman.com/*",
+        "https://siman.com/*",
+        "https://copasa.com.ni/*",
         "https://*.copasa.com.ni/*"
       ],
       "js": ["content.js"],

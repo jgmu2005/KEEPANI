@@ -14,6 +14,7 @@
     'copasa.com.ni': { platform: 'copasa', anchor: '.name-product' },
   }[host];
   if (!CONF) return;
+  console.log('[Ojo al Precio] extensión activa en', host);
 
   const money = (v, cur) => v == null ? '—'
     : (cur === 'USD' ? '$' : 'C$') + new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
