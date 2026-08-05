@@ -80,6 +80,12 @@
   .filters input,.filters select{padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:.88rem;background:#fff}
   .filters #fq{flex:1;min-width:180px}
   .filters input[type=number]{width:120px}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .auth-area{display:flex;align-items:center;gap:10px;font-size:.82rem;color:#cbd5e1;white-space:nowrap}
+  .btn-auth{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);color:#fff;
+    padding:7px 14px;border-radius:8px;font-weight:600;font-size:.82rem;cursor:pointer}
+  .btn-auth:hover{background:rgba(255,255,255,.22)}
+  .auth-form input{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px;font-size:.95rem}
   .delta{align-self:flex-start;font-size:.74rem;font-weight:800;padding:2px 8px;border-radius:999px}
   .delta.down{color:#065f46;background:#d1fae5}
   .delta.up{color:#991b1b;background:#fee2e2}
@@ -93,7 +99,10 @@
 <body>
 <header>
   <div class="wrap">
-    <div class="brand">👁️ Ojo al Precio <small>Historial de precios · Tiendas de Nicaragua</small></div>
+    <div class="topbar">
+      <div class="brand">👁️ Ojo al Precio <small>Historial de precios · Tiendas de Nicaragua</small></div>
+      <div id="authArea" class="auth-area"></div>
+    </div>
     <p class="tagline">¿Esa "oferta" es real? Pegá el enlace de un producto o buscá entre los que seguimos y mirá cómo se ha movido su precio en el tiempo.</p>
     <div class="search">
       <input id="q" type="text" placeholder="Pegá una URL para rastrear, o escribí un nombre (ej: smart tv)…"
@@ -150,6 +159,24 @@
   <div class="panel" style="position:relative">
     <button class="close" id="close">✕</button>
     <div id="detail"></div>
+  </div>
+</div>
+
+<div class="overlay" id="authOverlay">
+  <div class="panel" style="position:relative;max-width:420px">
+    <button class="close" id="authClose">✕</button>
+    <div class="auth-form" style="padding:26px">
+      <h3 id="authTitle" style="margin:0 0 4px">Iniciar sesión</h3>
+      <p class="note" style="margin:0 0 16px">Necesario para crear alertas de precio.</p>
+      <div id="authError" style="display:none;color:var(--bad);font-size:.85rem;margin-bottom:10px"></div>
+      <input id="authEmail" type="email" placeholder="Correo" autocomplete="email">
+      <input id="authPass" type="password" placeholder="Contraseña (mín. 8)" autocomplete="current-password">
+      <button id="authSubmit" class="btn-store" style="width:100%;border:0;margin-top:4px">Entrar</button>
+      <p class="note" style="margin:14px 0 0;text-align:center">
+        <span id="authSwitchText">¿No tenés cuenta?</span>
+        <a id="authSwitch" style="cursor:pointer;font-weight:700">Registrate</a>
+      </p>
+    </div>
   </div>
 </div>
 
@@ -410,6 +437,64 @@ document.getElementById('fclear').addEventListener('click', () => {
   applyFilters();
 });
 
+// --- Cuentas / sesión ---
+const AUTH = { user: null, mode: 'login' };
+
+async function checkAuth(){
+  try{ const j = await (await fetch(`${API}/auth/me.php`)).json(); AUTH.user = j.user || null; }
+  catch(e){ AUTH.user = null; }
+  renderAuth();
+}
+function renderAuth(){
+  const a = document.getElementById('authArea');
+  if(AUTH.user){
+    const tier = AUTH.user.tier === 'donor' ? 'Donante' : 'Gratis';
+    a.innerHTML = `<span>${escapeHtml(AUTH.user.email)} · <b>${tier}</b></span>
+      <button class="btn-auth" id="logoutBtn">Salir</button>`;
+    document.getElementById('logoutBtn').addEventListener('click', doLogout);
+  } else {
+    a.innerHTML = `<button class="btn-auth" id="loginBtn">Iniciar sesión</button>`;
+    document.getElementById('loginBtn').addEventListener('click', () => openAuth('login'));
+  }
+}
+function openAuth(mode){
+  AUTH.mode = mode;
+  const login = mode === 'login';
+  document.getElementById('authTitle').textContent = login ? 'Iniciar sesión' : 'Crear cuenta';
+  document.getElementById('authSubmit').textContent = login ? 'Entrar' : 'Registrarme';
+  document.getElementById('authSwitchText').textContent = login ? '¿No tenés cuenta?' : '¿Ya tenés cuenta?';
+  document.getElementById('authSwitch').textContent = login ? 'Registrate' : 'Iniciá sesión';
+  document.getElementById('authError').style.display = 'none';
+  document.getElementById('authOverlay').classList.add('open');
+}
+async function submitAuth(){
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPass').value;
+  const err = document.getElementById('authError');
+  const endpoint = AUTH.mode === 'login' ? 'login.php' : 'register.php';
+  try{
+    const r = await fetch(`${API}/auth/${endpoint}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const j = await r.json();
+    if(!j.ok){ err.textContent = j.error || 'Error'; err.style.display = 'block'; return; }
+    AUTH.user = j.user; renderAuth();
+    document.getElementById('authOverlay').classList.remove('open');
+    document.getElementById('authPass').value = '';
+  }catch(e){ err.textContent = 'Error de red'; err.style.display = 'block'; }
+}
+async function doLogout(){
+  try{ await fetch(`${API}/auth/logout.php`, { method: 'POST' }); }catch(e){}
+  AUTH.user = null; renderAuth();
+}
+document.getElementById('authClose').addEventListener('click', () => document.getElementById('authOverlay').classList.remove('open'));
+document.getElementById('authOverlay').addEventListener('click', e => { if(e.target.id==='authOverlay') e.target.classList.remove('open'); });
+document.getElementById('authSwitch').addEventListener('click', () => openAuth(AUTH.mode === 'login' ? 'register' : 'login'));
+document.getElementById('authSubmit').addEventListener('click', submitAuth);
+document.getElementById('authPass').addEventListener('keydown', e => { if(e.key==='Enter') submitAuth(); });
+
+checkAuth();
 loadChanges();
 loadGrid();
 </script>
