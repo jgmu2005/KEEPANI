@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Ojo al Precio",
+  "version": "0.1.0",
+  "description": "Muestra el historial de precios (Sinsa, Siman, Copasa) directo en la página del producto.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.sinsa.com.ni/*",
+        "https://ni.siman.com/*",
+        "https://*.copasa.com.ni/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://agrotecnicaragua.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Ojo al Precio"
+  }
+}

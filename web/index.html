@@ -592,7 +592,11 @@ async function applySettings(){
 }
 
 applySettings();
-checkAuth();
+checkAuth().then(() => {
+  // Deep-link desde la extensión / al compartir: ?p=ID abre la ficha del producto.
+  const pid = new URLSearchParams(location.search).get('p');
+  if(pid) openDetail({ product_id: pid });
+});
 loadChanges();
 loadGrid();
 </script>
