@@ -12,7 +12,11 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
 try {
-    echo json_encode(['ok' => true, 'settings' => Settings::publicView(Db::conn())],
+    $db = Db::conn();
+    $settings = Settings::publicView($db);
+    // Site key de Turnstile (pública) para renderizar el captcha en el registro.
+    $settings['turnstile_site_key'] = (string) (Db::config()['turnstile_site_key'] ?? '');
+    echo json_encode(['ok' => true, 'settings' => $settings],
         JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (\Throwable $e) {
     http_response_code(500);

@@ -6,6 +6,8 @@
 <title>Ojo al Precio — Historial de precios en tiendas de Nicaragua</title>
 <meta name="description" content="Consulta el historial de precios de productos en tiendas de Nicaragua y descubre si una oferta es real.">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<script>window.onTurnstileLoad=function(){window.TURNSTILE_READY=true;if(typeof maybeRenderTurnstile==='function')maybeRenderTurnstile();};</script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad&render=explicit" async defer></script>
 <style>
   :root{
     --bg:#0f172a; --bg2:#1e293b; --card:#ffffff; --ink:#0f172a; --muted:#64748b;
@@ -191,6 +193,7 @@
       <input id="authWebsite" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
       <input id="authEmail" type="email" placeholder="Correo" autocomplete="email">
       <input id="authPass" type="password" placeholder="Contraseña (mín. 8)" autocomplete="current-password">
+      <div id="turnstileBox" style="margin-top:12px;display:none"></div>
       <button id="authSubmit" class="btn-store" style="width:100%;border:0;margin-top:4px">Entrar</button>
       <p class="note" style="margin:10px 0 0;text-align:center"><a id="authForgot" style="cursor:pointer">¿Olvidaste tu contraseña?</a></p>
       <p class="note" style="margin:14px 0 0;text-align:center">
@@ -528,6 +531,18 @@ document.getElementById('fclear').addEventListener('click', () => {
 // --- Cuentas / sesión ---
 const AUTH = { user: null, mode: 'login' };
 
+let tsWidgetId = null;
+function maybeRenderTurnstile(){
+  const box = document.getElementById('turnstileBox');
+  if(!box) return;
+  if(AUTH.mode !== 'register' || !window.TURNSTILE_SITEKEY){ box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  if(window.TURNSTILE_READY && window.turnstile){
+    if(tsWidgetId === null) tsWidgetId = window.turnstile.render(box, { sitekey: window.TURNSTILE_SITEKEY });
+    else window.turnstile.reset(tsWidgetId);
+  }
+}
+
 async function checkAuth(){
   try{ const j = await (await fetch(`${API}/auth/me.php`)).json(); AUTH.user = j.user || null; }
   catch(e){ AUTH.user = null; }
@@ -560,18 +575,21 @@ function openAuth(mode){
   document.getElementById('authSwitch').textContent = login ? 'Registrate' : 'Iniciá sesión';
   document.getElementById('authError').style.display = 'none';
   document.getElementById('authOverlay').classList.add('open');
+  maybeRenderTurnstile();
 }
 async function submitAuth(){
   const email = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPass').value;
   const err = document.getElementById('authError');
   const endpoint = AUTH.mode === 'login' ? 'login.php' : 'register.php';
+  const tsToken = (AUTH.mode === 'register' && window.turnstile && tsWidgetId !== null) ? window.turnstile.getResponse(tsWidgetId) : '';
   try{
     const r = await fetch(`${API}/auth/${endpoint}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, website: document.getElementById('authWebsite').value })
+      body: JSON.stringify({ email, password, website: document.getElementById('authWebsite').value, turnstile_token: tsToken })
     });
     const j = await r.json();
+    if(window.turnstile && tsWidgetId !== null) window.turnstile.reset(tsWidgetId);
     if(!j.ok){ err.textContent = j.error || 'Error'; err.style.display = 'block'; return; }
     AUTH.user = j.user; renderAuth();
     document.getElementById('authOverlay').classList.remove('open');
@@ -613,6 +631,7 @@ async function applySettings(){
     const j = await (await fetch(`${API}/settings.php`)).json();
     if(!j.ok) return;
     const s = j.settings;
+    window.TURNSTILE_SITEKEY = s.turnstile_site_key || '';
     if(s.site_name) document.title = `${s.site_name} — Historial de precios en tiendas de Nicaragua`;
     const bt = document.querySelector('.brand-text');
     if(bt) bt.innerHTML = `${escapeHtml(s.site_name||'Ojo al Precio')} <small>${escapeHtml(s.tagline||'')}</small>`;

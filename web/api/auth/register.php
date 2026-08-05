@@ -9,6 +9,7 @@ use OjoAlPrecio\Web\Db;
 use OjoAlPrecio\Web\Auth;
 use OjoAlPrecio\Web\RateLimiter;
 use OjoAlPrecio\Web\Verification;
+use OjoAlPrecio\Web\Turnstile;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -34,6 +35,14 @@ $ip = RateLimiter::clientIp();
 if (!RateLimiter::allow($db, $ip, 'register', 5, 3600)) {
     http_response_code(429);
     echo json_encode(['ok' => false, 'error' => 'Demasiados registros desde tu red. Probá de nuevo en un rato.']);
+    exit;
+}
+
+// Captcha Turnstile (si está configurado en config.php).
+$tsSecret = (string) (Db::config()['turnstile_secret_key'] ?? '');
+if (!Turnstile::verify($tsSecret, (string) ($in['turnstile_token'] ?? ''), $ip)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Verificación anti-bot fallida. Recargá la página e intentá de nuevo.']);
     exit;
 }
 

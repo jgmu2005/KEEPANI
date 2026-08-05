@@ -29,4 +29,10 @@ return [
     // --- Administrador ---
     // El usuario registrado con ESTE correo es admin (accede al panel /admin.html).
     'admin_email' => 'tucorreo@ejemplo.com',
+
+    // --- Cloudflare Turnstile (CAPTCHA anti-bot en el registro) ---
+    // Site key = pública (va al navegador). Secret key = privada (nunca se expone).
+    // Dejá ambas vacías ('') para DESACTIVAR el captcha.
+    'turnstile_site_key'   => '',
+    'turnstile_secret_key' => '',
 ];
