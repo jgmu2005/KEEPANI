@@ -59,7 +59,7 @@ final class Auth
 
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $ins = $db->prepare(
-            "INSERT INTO users (email, password_hash, tier, is_verified) VALUES (?, ?, 'free', 1)"
+            "INSERT INTO users (email, password_hash, tier, is_verified) VALUES (?, ?, 'free', 0)"
         );
         $ins->execute([$email, $hash]);
 
@@ -104,7 +104,7 @@ final class Auth
         if (!$id) {
             return null;
         }
-        $st = $db->prepare('SELECT id, email, tier, donated_at, created_at FROM users WHERE id = ?');
+        $st = $db->prepare('SELECT id, email, tier, is_verified, donated_at, created_at FROM users WHERE id = ?');
         $st->execute([$id]);
         $u = $st->fetch();
         if (!$u) {
@@ -119,6 +119,7 @@ final class Auth
             'tier'        => $u['tier'],
             'alert_limit' => self::LIMITS[$u['tier']] ?? self::LIMITS['free'],
             'is_admin'    => $isAdmin,
+            'is_verified' => (bool) $u['is_verified'],
             'donated_at'  => $u['donated_at'],
             'created_at'  => $u['created_at'],
         ];

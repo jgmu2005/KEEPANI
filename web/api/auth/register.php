@@ -8,6 +8,7 @@ require dirname(__DIR__, 2) . '/bootstrap.php';
 use OjoAlPrecio\Web\Db;
 use OjoAlPrecio\Web\Auth;
 use OjoAlPrecio\Web\RateLimiter;
+use OjoAlPrecio\Web\Verification;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -38,7 +39,13 @@ if (!RateLimiter::allow($db, $ip, 'register', 5, 3600)) {
 
 try {
     $user = Auth::register($db, (string) ($in['email'] ?? ''), (string) ($in['password'] ?? ''));
-    echo json_encode(['ok' => true, 'user' => $user]);
+    $sent = Verification::issueAndSend($db, $user['id'], $user['email']);
+    if (!$sent) {
+        // Sin SMTP no hay forma de verificar → auto-verificar para no bloquear la cuenta.
+        $db->prepare('UPDATE users SET is_verified = 1, verify_token = NULL WHERE id = ?')->execute([$user['id']]);
+        $user['is_verified'] = true;
+    }
+    echo json_encode(['ok' => true, 'user' => $user, 'verify_sent' => $sent]);
 } catch (\Throwable $e) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);

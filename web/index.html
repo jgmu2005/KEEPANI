@@ -536,9 +536,13 @@ function renderAuth(){
   const a = document.getElementById('authArea');
   if(AUTH.user){
     const tier = AUTH.user.tier === 'donor' ? 'Donante' : 'Gratis';
-    a.innerHTML = `<button class="btn-auth" id="myAlertsBtn">🔔 Mis alertas</button>
+    const warn = AUTH.user.is_verified ? '' :
+      `<button class="btn-auth" id="verifyBtn" style="background:rgba(234,179,8,.22);border-color:rgba(234,179,8,.5)">⚠️ Verificá tu correo</button>`;
+    a.innerHTML = `${warn}
+      <button class="btn-auth" id="myAlertsBtn">🔔 Mis alertas</button>
       <span>${escapeHtml(AUTH.user.email)} · <b>${tier}</b></span>
       <button class="btn-auth" id="logoutBtn">Salir</button>`;
+    if(!AUTH.user.is_verified) document.getElementById('verifyBtn').addEventListener('click', resendVerification);
     document.getElementById('myAlertsBtn').addEventListener('click', openMyAlerts);
     document.getElementById('logoutBtn').addEventListener('click', doLogout);
   } else {
@@ -571,11 +575,21 @@ async function submitAuth(){
     AUTH.user = j.user; renderAuth();
     document.getElementById('authOverlay').classList.remove('open');
     document.getElementById('authPass').value = '';
+    if(AUTH.mode === 'register' && j.user && !j.user.is_verified){
+      alert('¡Cuenta creada! Te enviamos un correo para verificar tu dirección. Confirmalo (revisá spam) para poder crear alertas.');
+    }
   }catch(e){ err.textContent = 'Error de red'; err.style.display = 'block'; }
 }
 async function doLogout(){
   try{ await fetch(`${API}/auth/logout.php`, { method: 'POST' }); }catch(e){}
   AUTH.user = null; renderAuth();
+}
+async function resendVerification(){
+  try{
+    const j = await (await fetch(`${API}/auth/resend.php`, { method:'POST' })).json();
+    if(j.already){ alert('Tu correo ya está verificado.'); checkAuth(); return; }
+    alert(j.ok ? 'Te reenviamos el correo de verificación. Revisá tu bandeja (y spam).' : (j.error || 'No se pudo enviar.'));
+  }catch(e){ alert('Error de red.'); }
 }
 document.getElementById('authClose').addEventListener('click', () => document.getElementById('authOverlay').classList.remove('open'));
 document.getElementById('authOverlay').addEventListener('click', e => { if(e.target.id==='authOverlay') e.target.classList.remove('open'); });
@@ -605,9 +619,12 @@ async function applySettings(){
 
 applySettings();
 checkAuth().then(() => {
-  // Deep-link desde la extensión / al compartir: ?p=ID abre la ficha del producto.
-  const pid = new URLSearchParams(location.search).get('p');
-  if(pid) openDetail({ product_id: pid });
+  const params = new URLSearchParams(location.search);
+  const pid = params.get('p');
+  if(pid) openDetail({ product_id: pid });   // deep-link ?p=ID abre la ficha
+  const v = params.get('verified');
+  if(v === '1') alert('✅ ¡Correo verificado! Ya podés crear alertas.');
+  else if(v === '0') alert('El enlace de verificación no es válido o ya fue usado.');
 });
 loadChanges();
 loadGrid();

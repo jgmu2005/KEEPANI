@@ -16,6 +16,13 @@ header('Content-Type: application/json; charset=utf-8');
 $db = Db::conn();
 $u  = Auth::requireUser($db);
 
+if (!$u['is_verified']) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'verify_required' => true,
+        'error' => 'Verificá tu correo para crear alertas (revisá tu bandeja y el spam).']);
+    exit;
+}
+
 $in = json_decode(file_get_contents('php://input') ?: '', true) ?: [];
 $productId = (int) ($in['product_id'] ?? 0);
 $target    = (float) ($in['target_price'] ?? 0);
