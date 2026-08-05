@@ -19,7 +19,8 @@ Esfuerzo: S (chico) · M (medio) · L (grande)
 - 🔴 S — **Verificación de email** en el registro (doble opt-in) para no mandar alertas a correos inválidos y evitar abuso.
 - 🔴 S — **Link de "desuscribirse"** en los emails de alerta (buena práctica y anti-spam).
 - 🔴 S — **Política de privacidad + Términos** (manejás correos y contraseñas).
-- 🔴 S — **Rate limiting** en login/registro/track (anti fuerza bruta y abuso).
+- 🔴 S — **Rate limiting** en login, registro, **recuperación de contraseña** y track (límites por IP + por cuenta).
+- 🔴 M — **Anti-abuso de registro** (que no revienten la BD con cuentas basura): verificación de email obligatoria antes de activar, **CAPTCHA/Cloudflare Turnstile** en registro y recuperación, bloqueo de **dominios de correo desechables**, límite de registros por IP/hora, y honeypot.
 - 🟡 S — **Protección CSRF** en los POST con sesión (ya hay SameSite=Lax, que mitiga; token lo cierra).
 - 🟢 M — 2FA opcional para el admin.
 
