@@ -192,6 +192,7 @@
       <input id="authEmail" type="email" placeholder="Correo" autocomplete="email">
       <input id="authPass" type="password" placeholder="Contraseña (mín. 8)" autocomplete="current-password">
       <button id="authSubmit" class="btn-store" style="width:100%;border:0;margin-top:4px">Entrar</button>
+      <p class="note" style="margin:10px 0 0;text-align:center"><a id="authForgot" style="cursor:pointer">¿Olvidaste tu contraseña?</a></p>
       <p class="note" style="margin:14px 0 0;text-align:center">
         <span id="authSwitchText">¿No tenés cuenta?</span>
         <a id="authSwitch" style="cursor:pointer;font-weight:700">Registrate</a>
@@ -591,10 +592,19 @@ async function resendVerification(){
     alert(j.ok ? 'Te reenviamos el correo de verificación. Revisá tu bandeja (y spam).' : (j.error || 'No se pudo enviar.'));
   }catch(e){ alert('Error de red.'); }
 }
+async function forgotPassword(){
+  const email = document.getElementById('authEmail').value.trim();
+  const err = document.getElementById('authError');
+  if(!email){ err.textContent = 'Escribí tu correo arriba primero.'; err.style.color = 'var(--bad)'; err.style.display = 'block'; document.getElementById('authEmail').focus(); return; }
+  try{ await fetch(`${API}/auth/forgot.php`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email }) }); }catch(e){}
+  err.textContent = 'Si ese correo tiene cuenta, te enviamos un enlace para restablecer la contraseña. Revisá tu bandeja (y spam).';
+  err.style.color = 'var(--ok)'; err.style.display = 'block';
+}
 document.getElementById('authClose').addEventListener('click', () => document.getElementById('authOverlay').classList.remove('open'));
 document.getElementById('authOverlay').addEventListener('click', e => { if(e.target.id==='authOverlay') e.target.classList.remove('open'); });
 document.getElementById('authSwitch').addEventListener('click', () => openAuth(AUTH.mode === 'login' ? 'register' : 'login'));
 document.getElementById('authSubmit').addEventListener('click', submitAuth);
+document.getElementById('authForgot').addEventListener('click', forgotPassword);
 document.getElementById('authPass').addEventListener('keydown', e => { if(e.key==='Enter') submitAuth(); });
 
 // --- Branding configurable desde el panel admin ---

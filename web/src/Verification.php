@@ -16,12 +16,9 @@ final class Verification
     {
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        // Los endpoints de auth están en /api/auth/xxx.php → subimos 3 niveles a la raíz de la app.
-        $root = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/', 3)), '/');
-        if ($root === '.' ) {
-            $root = '';
-        }
-        return $scheme . '://' . $host . $root;
+        // Raíz de la app = SCRIPT_NAME sin el tramo /api/... o /cron/... (sirve para cualquier endpoint).
+        $root = preg_replace('#/(api|cron)/.*$#', '', str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? ''));
+        return $scheme . '://' . $host . rtrim((string) $root, '/');
     }
 
     /**

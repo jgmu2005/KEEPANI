@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Restablecer contraseña · Ojo al Precio</title>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<style>
+  :root{--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--brand:#0ea5e9;--brand-dk:#0369a1;--bad:#dc2626;--ok:#16a34a}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f1f5f9;color:var(--ink);
+    display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px;max-width:400px;width:calc(100% - 32px);
+    box-shadow:0 1px 3px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.06)}
+  h1{font-size:1.2rem;margin:0 0 4px}
+  p.note{color:var(--muted);font-size:.9rem;margin:0 0 18px}
+  label{display:block;font-size:.82rem;font-weight:600;color:var(--muted);margin:12px 0 4px}
+  input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font-size:1rem}
+  button{width:100%;background:var(--brand);color:#fff;border:0;padding:12px;border-radius:9px;font-weight:700;
+    font-size:1rem;cursor:pointer;margin-top:18px}
+  button:hover{background:#0284c7}
+  .msg{padding:10px 12px;border-radius:8px;font-size:.9rem;margin-top:14px;display:none}
+  .msg.ok{background:#d1fae5;color:#065f46;display:block}
+  .msg.err{background:#fee2e2;color:#991b1b;display:block}
+  a{color:var(--brand-dk)}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>👁️ Nueva contraseña</h1>
+    <p class="note">Elegí una contraseña nueva para tu cuenta de Ojo al Precio.</p>
+    <div id="msg" class="msg"></div>
+    <div id="form">
+      <label>Nueva contraseña (mín. 8)</label>
+      <input id="p1" type="password" autocomplete="new-password">
+      <label>Repetir contraseña</label>
+      <input id="p2" type="password" autocomplete="new-password">
+      <button id="save">Guardar contraseña</button>
+    </div>
+  </div>
+<script>
+  const API = './api';
+  const token = new URLSearchParams(location.search).get('token') || '';
+  const $ = id => document.getElementById(id);
+  function show(cls, text){ const m=$('msg'); m.className='msg '+cls; m.textContent=text; }
+
+  if(!token){ $('form').style.display='none'; show('err','Falta el token. Abrí el enlace desde tu correo.'); }
+
+  $('save').addEventListener('click', async () => {
+    const p1=$('p1').value, p2=$('p2').value;
+    if(p1.length < 8){ show('err','La contraseña debe tener al menos 8 caracteres.'); return; }
+    if(p1 !== p2){ show('err','Las contraseñas no coinciden.'); return; }
+    try{
+      const j = await (await fetch(`${API}/auth/reset.php`, {method:'POST',headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ token, password: p1 })})).json();
+      if(j.ok){ $('form').style.display='none'; show('ok','✅ ¡Contraseña actualizada! Ya podés iniciar sesión.'); }
+      else { show('err', j.error || 'No se pudo actualizar.'); }
+    }catch(e){ show('err','Error de red. Intentá de nuevo.'); }
+  });
+  $('p2').addEventListener('keydown', e => { if(e.key==='Enter') $('save').click(); });
+</script>
+</body>
+</html>

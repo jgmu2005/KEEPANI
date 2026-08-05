@@ -17,6 +17,7 @@ use OjoAlPrecio\Web\Db;
 use OjoAlPrecio\Web\Alerts;
 use OjoAlPrecio\Web\Mailer;
 use OjoAlPrecio\Web\Settings;
+use OjoAlPrecio\Web\Verification;
 
 header('Content-Type: application/json; charset=utf-8');
 @set_time_limit(0);
@@ -33,6 +34,7 @@ if ($expected === '' || !is_string($sent) || !hash_equals($expected, $sent)) {
 
 $mailer   = Mailer::fromSettings($db);
 $siteName = Settings::all($db)['site_name'] ?? 'Ojo al Precio';
+$base = Verification::baseUrl();
 $fmt = fn($v) => 'C$' . number_format((float) $v, 2);
 
 $alerts = Alerts::allActiveWithPrice($db);
@@ -49,6 +51,9 @@ foreach ($alerts as $a) {
         if ($already) { continue; }            // ya avisó y sigue bajo → no re-spamear
         if (!$mailer) { $pending++; continue; } // SMTP sin configurar → reintentar luego
 
+        $unsubUrl = $base . '/api/alerts/unsubscribe.php?a=' . (int) $a['id']
+            . '&t=' . hash_hmac('sha256', 'unsub:' . (int) $a['id'], (string) ($cfg['ingest_api_key'] ?? ''));
+
         $html = '<div style="font-family:system-ui,sans-serif;max-width:520px">'
             . '<h2 style="color:#16a34a;margin:0 0 8px">📉 ¡Bajó de precio!</h2>'
             . '<p style="margin:0 0 4px"><b>' . htmlspecialchars((string) $a['title']) . '</b></p>'
@@ -56,7 +61,8 @@ foreach ($alerts as $a) {
             . '<span style="color:#64748b;font-size:.9rem">(tu objetivo: ' . $fmt($target) . ')</span></p>'
             . '<p><a href="' . htmlspecialchars((string) $a['url']) . '" '
             . 'style="background:#0ea5e9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Ver el producto ↗</a></p>'
-            . '<p style="color:#94a3b8;font-size:.8rem;margin-top:20px">Recibís esto por una alerta que creaste en ' . htmlspecialchars((string) $siteName) . '.</p></div>';
+            . '<p style="color:#94a3b8;font-size:.8rem;margin-top:20px">Recibís esto por una alerta que creaste en ' . htmlspecialchars((string) $siteName) . '. '
+            . '<a href="' . htmlspecialchars($unsubUrl) . '" style="color:#94a3b8">Dejar de recibir estas alertas</a>.</p></div>';
 
         $res = $mailer->send((string) $a['email'], '📉 Bajó de precio: ' . $a['title'], $html);
         if ($res['ok']) {
