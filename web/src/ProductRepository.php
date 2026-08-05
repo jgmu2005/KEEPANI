@@ -190,32 +190,77 @@ final class ProductRepository
         ];
     }
 
-    /** Total de productos rastreados (para la paginación). */
-    public function countProducts(): int
+    /** Tiendas activas (para el dropdown de filtro). */
+    public function activeStores(): array
     {
-        return (int) $this->db->query('SELECT COUNT(*) FROM products WHERE is_active = 1')->fetchColumn();
+        return array_map(
+            static fn(array $r): array => ['slug' => $r['slug'], 'name' => $r['name']],
+            $this->db->query('SELECT slug, name FROM stores WHERE is_active = 1 ORDER BY name')->fetchAll()
+        );
     }
 
-    /** Página de productos rastreados con su último precio (para el home). */
-    public function listWithLatest(int $limit = 50, int $offset = 0): array
+    /**
+     * Búsqueda/filtrado COMBINADO de productos rastreados (todo junto):
+     *   q (nombre), store (slug), min/max (precio final), sort, limit, offset.
+     * Devuelve ['total' => int, 'items' => array] — total respeta los filtros.
+     */
+    public function search(array $f): array
     {
-        $limit  = max(1, min($limit, 10000));
-        $offset = max(0, $offset);
+        $where  = ['p.is_active = 1'];
+        $params = [];
+
+        if (!empty($f['q'])) {
+            $where[] = 'p.title LIKE :q';
+            $params[':q'] = '%' . $f['q'] . '%';
+        }
+        if (!empty($f['store'])) {
+            $where[] = 's.slug = :store';
+            $params[':store'] = $f['store'];
+        }
+        if (isset($f['min']) && $f['min'] !== '' && $f['min'] !== null) {
+            $where[] = 'ph.price_final >= :min';
+            $params[':min'] = (float) $f['min'];
+        }
+        if (isset($f['max']) && $f['max'] !== '' && $f['max'] !== null) {
+            $where[] = 'ph.price_final <= :max';
+            $params[':max'] = (float) $f['max'];
+        }
+        $whereSql = implode(' AND ', $where);
+
+        // Orden: lista blanca (nunca interpolar entrada del usuario).
+        $sortMap = [
+            'name'       => 'p.title ASC',
+            'price_asc'  => 'ph.price_final ASC',
+            'price_desc' => 'ph.price_final DESC',
+            'discount'   => 'ph.discount_pct DESC',
+        ];
+        $orderSql = $sortMap[$f['sort'] ?? 'name'] ?? $sortMap['name'];
+
+        $limit  = max(1, min((int) ($f['limit'] ?? 50), 10000));
+        $offset = max(0, (int) ($f['offset'] ?? 0));
+
+        // FROM + WHERE compartido entre el conteo y la página.
+        $base = 'FROM products p
+                 JOIN stores s ON s.id = p.store_id
+                 LEFT JOIN price_history ph ON ph.id = (
+                     SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1
+                 )
+                 WHERE ' . $whereSql;
+
+        $countStmt = $this->db->prepare('SELECT COUNT(*) ' . $base);
+        $countStmt->execute($params);
+        $total = (int) $countStmt->fetchColumn();
+
         $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
                        s.slug AS store, s.name AS store_name,
                        ph.price_final, ph.currency, ph.in_stock, ph.captured_date AS last_date
-                  FROM products p
-                  JOIN stores s ON s.id = p.store_id
-                  LEFT JOIN price_history ph ON ph.id = (
-                        SELECT id FROM price_history
-                         WHERE product_id = p.id
-                         ORDER BY captured_at DESC LIMIT 1
-                  )
-                 WHERE p.is_active = 1
-                 ORDER BY p.title ASC
-                 LIMIT ' . $limit . ' OFFSET ' . $offset;
+                ' . $base . '
+                ORDER BY ' . $orderSql . '
+                LIMIT ' . $limit . ' OFFSET ' . $offset;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
 
-        return array_map(static function (array $r): array {
+        $items = array_map(static function (array $r): array {
             return [
                 'id'          => (int) $r['id'],
                 'title'       => $r['title'],
@@ -229,7 +274,9 @@ final class ProductRepository
                 'in_stock'    => (bool) $r['in_stock'],
                 'last_date'   => $r['last_date'],
             ];
-        }, $this->db->query($sql)->fetchAll());
+        }, $stmt->fetchAll());
+
+        return ['total' => $total, 'items' => $items];
     }
 
     /**

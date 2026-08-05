@@ -75,6 +75,11 @@
   .pg-btn{padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font-size:.85rem}
   .pg-btn:disabled{opacity:.4;cursor:default}
   .page-info{min-width:130px;text-align:center;font-variant-numeric:tabular-nums}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;
+    background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
+  .filters input,.filters select{padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:.88rem;background:#fff}
+  .filters #fq{flex:1;min-width:180px}
+  .filters input[type=number]{width:120px}
   .delta{align-self:flex-start;font-size:.74rem;font-weight:800;padding:2px 8px;border-radius:999px}
   .delta.down{color:#065f46;background:#d1fae5}
   .delta.up{color:#991b1b;background:#fee2e2}
@@ -91,11 +96,11 @@
     <div class="brand">👁️ Ojo al Precio <small>Historial de precios · Tiendas de Nicaragua</small></div>
     <p class="tagline">¿Esa "oferta" es real? Pegá el enlace de un producto o buscá entre los que seguimos y mirá cómo se ha movido su precio en el tiempo.</p>
     <div class="search">
-      <input id="q" type="text" placeholder="Pegá la URL de un producto (Sinsa, Siman, Copasa)…"
+      <input id="q" type="text" placeholder="Pegá una URL para rastrear, o escribí un nombre (ej: smart tv)…"
              autocomplete="off" spellcheck="false">
-      <button id="go">Ver historial</button>
+      <button id="go">Buscar</button>
     </div>
-    <div class="hint">Ej: https://www.sinsa.com.ni/…-140513297/p — o hacé clic en un producto de abajo.</div>
+    <div class="hint">URL de un producto (Sinsa, Siman, Copasa) → lo rastrea · palabras → busca entre los rastreados.</div>
   </div>
 </header>
 
@@ -123,6 +128,19 @@
         <span id="pageInfo" class="page-info"></span>
         <button id="next" class="pg-btn">Siguiente ›</button>
       </div>
+    </div>
+    <div class="filters">
+      <input id="fq" type="text" placeholder="Buscar por nombre (ej: smart tv)" autocomplete="off">
+      <select id="fstore"><option value="">Todas las tiendas</option></select>
+      <input id="fmin" type="number" min="0" placeholder="Precio mín">
+      <input id="fmax" type="number" min="0" placeholder="Precio máx">
+      <select id="fsort">
+        <option value="name">Ordenar: Nombre A–Z</option>
+        <option value="price_asc">Precio: menor a mayor</option>
+        <option value="price_desc">Precio: mayor a menor</option>
+        <option value="discount">Mayor descuento</option>
+      </select>
+      <button id="fclear" class="pg-btn">Limpiar</button>
     </div>
     <div id="grid" class="grid"><div class="spinner">Cargando…</div></div>
   </section>
@@ -200,18 +218,48 @@ async function loadChanges(){
   }catch(e){ sec.style.display = 'none'; }
 }
 
+let storesLoaded = false;
+
+function getFilters(){
+  return {
+    q:     document.getElementById('fq').value.trim(),
+    store: document.getElementById('fstore').value,
+    min:   document.getElementById('fmin').value,
+    max:   document.getElementById('fmax').value,
+    sort:  document.getElementById('fsort').value,
+  };
+}
+
+function populateStores(stores){
+  const sel = document.getElementById('fstore');
+  stores.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.slug; o.textContent = s.name;
+    sel.appendChild(o);
+  });
+}
+
 async function loadGrid(){
   const grid = document.getElementById('grid');
   grid.innerHTML = `<div class="spinner">Cargando…</div>`;
   const all = PAGE.size === 'all';
-  const limit = all ? 100000 : PAGE.size;
-  const offset = all ? 0 : PAGE.offset;
+  const f = getFilters();
+  const params = new URLSearchParams({
+    limit:  all ? 100000 : PAGE.size,
+    offset: all ? 0 : PAGE.offset,
+    sort:   f.sort,
+  });
+  if(f.q)     params.set('q', f.q);
+  if(f.store) params.set('store', f.store);
+  if(f.min)   params.set('min', f.min);
+  if(f.max)   params.set('max', f.max);
   try{
-    const r = await fetch(`${API}/products.php?limit=${limit}&offset=${offset}`);
+    const r = await fetch(`${API}/products.php?${params}`);
     const j = await r.json();
     PAGE.total = j.total || 0;
+    if(!storesLoaded && Array.isArray(j.stores)){ populateStores(j.stores); storesLoaded = true; }
     if(!j.ok || !j.items.length){
-      grid.innerHTML = `<div class="empty">No hay productos para mostrar.</div>`;
+      grid.innerHTML = `<div class="empty">No hay productos que coincidan con la búsqueda.</div>`;
       updatePager(0); return;
     }
     grid.innerHTML = j.items.map(cardHtml).join('');
@@ -320,7 +368,12 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 document.getElementById('go').addEventListener('click', () => {
   const val = document.getElementById('q').value.trim();
   if(!val) return;
-  openDetail(/^https?:\/\//i.test(val) ? {url: val} : {sku: val}, 'track.php');
+  if(/^https?:\/\//i.test(val)){
+    openDetail({url: val}, 'track.php');   // URL → rastrear el producto
+  } else {
+    document.getElementById('fq').value = val;  // texto → buscar entre los rastreados
+    PAGE.offset = 0; loadGrid(); gotoTopOfGrid();
+  }
 });
 document.getElementById('q').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('go').click(); });
 document.getElementById('close').addEventListener('click', () => document.getElementById('overlay').classList.remove('open'));
@@ -340,6 +393,21 @@ document.getElementById('next').addEventListener('click', () => {
   if(PAGE.size === 'all') return;
   PAGE.offset += PAGE.size;
   loadGrid(); gotoTopOfGrid();
+});
+
+// --- Filtros combinados (nombre + tienda + precio + orden) ---
+let filterTimer;
+function applyFilters(){ PAGE.offset = 0; loadGrid(); }
+['fq','fmin','fmax'].forEach(id =>
+  document.getElementById(id).addEventListener('input', () => {
+    clearTimeout(filterTimer); filterTimer = setTimeout(applyFilters, 350);
+  }));
+['fstore','fsort'].forEach(id =>
+  document.getElementById(id).addEventListener('change', applyFilters));
+document.getElementById('fclear').addEventListener('click', () => {
+  ['fq','fstore','fmin','fmax'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fsort').value = 'name';
+  applyFilters();
 });
 
 loadChanges();
