@@ -14,12 +14,14 @@ use OjoAlPrecio\Web\Fetch\Http;
 final class CategoryImporter
 {
     /** @return array{imported:int} */
-    public static function import(PDO $db, array $store, Http $http): array
+    public static function import(PDO $db, array $store): array
     {
-        $url  = rtrim((string) $store['base_url'], '/') . '/api/catalog_system/pub/category/tree/50';
-        $tree = $http->getJson($url);
+        $base = rtrim((string) $store['base_url'], '/');
+        // El endpoint del árbol rate-limita el UA de bot (429). Con UA de navegador + Referer pasa.
+        $http = new Http('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36');
+        $tree = $http->getJson($base . '/api/catalog_system/pub/category/tree/50', ['Referer: ' . $base . '/']);
         if (!is_array($tree)) {
-            throw new \RuntimeException('No se pudo obtener el árbol de categorías.');
+            throw new \RuntimeException('No se pudo obtener el árbol de categorías (VTEX respondió sin datos, puede ser rate-limit momentáneo).');
         }
 
         $rows = [];

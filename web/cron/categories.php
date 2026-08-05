@@ -43,7 +43,7 @@ if ($store['platform'] !== 'vtex') {
 }
 
 try {
-    $res = CategoryImporter::import($db, $store, new Http());
+    $res = CategoryImporter::import($db, $store);
     out(200, ['ok' => true, 'store' => $slug, 'imported' => $res['imported']]);
 } catch (\Throwable $e) {
     out(500, ['ok' => false, 'error' => 'Error interno', 'detail' => $e->getMessage()]);
