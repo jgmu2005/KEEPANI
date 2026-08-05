@@ -1,0 +1,33 @@
+name: Crawl catálogo completo (por categorías)
+
+# Baja/refresca el catálogo ENTERO de Sinsa y Siman recorriendo categorías hoja.
+# Es también el refresco diario de precios (cada corrida agrega un punto por producto).
+on:
+  workflow_dispatch:
+    inputs:
+      store:
+        description: 'Tienda (sinsa, siman o all)'
+        required: true
+        default: 'sinsa'
+  schedule:
+    - cron: '0 8 * * *'   # diario 08:00 UTC (~2:00 AM Managua) — refresco completo
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: Crawl completo por categorías
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/crawl_categories.php "${{ github.event.inputs.store || 'all' }}"

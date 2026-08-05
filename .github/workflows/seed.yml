@@ -1,8 +1,7 @@
-name: Catálogo VTEX — seed y refresco diario
+name: Seed rápido VTEX (top ~2500, manual)
 
-# Cómo se dispara:
-#  - Manual: Actions → este workflow → Run workflow (elegís la tienda).
-#  - Automático: todos los días re-crawlea el catálogo = refresco de precios.
+# Seed rápido del top ~2500 por tienda (paginación plana). Manual solamente.
+# El refresco diario COMPLETO (por categorías) lo hace el workflow "Crawl catálogo completo".
 on:
   workflow_dispatch:
     inputs:
@@ -10,8 +9,6 @@ on:
         description: 'Tienda (sinsa, siman o all)'
         required: true
         default: 'all'
-  schedule:
-    - cron: '0 11 * * *'   # diario 11:00 UTC (~5:00 AM Managua) — refresco de precios VTEX
 
 jobs:
   seed:
