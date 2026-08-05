@@ -110,8 +110,13 @@ final class Mailer
             }
 
             $subjectEnc = '=?UTF-8?B?' . base64_encode($subject) . '?=';
-            $headers = "From: $name <$from>\r\n"
+            $domain = substr((string) strrchr($from, '@'), 1) ?: 'localhost';
+            $messageId = '<' . bin2hex(random_bytes(12)) . '@' . $domain . '>';
+            $headers = 'Date: ' . gmdate('r') . "\r\n"
+                . "Message-ID: $messageId\r\n"
+                . "From: $name <$from>\r\n"
                 . "To: <$to>\r\n"
+                . "Reply-To: <$from>\r\n"
                 . "Subject: $subjectEnc\r\n"
                 . "MIME-Version: 1.0\r\n"
                 . "Content-Type: text/html; charset=UTF-8\r\n"
