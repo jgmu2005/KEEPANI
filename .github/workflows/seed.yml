@@ -1,17 +1,17 @@
-name: Seed catálogo VTEX
+name: Catálogo VTEX — seed y refresco diario
 
 # Cómo se dispara:
-#  - Manual: pestaña Actions → "Seed catálogo VTEX" → Run workflow (elegís la tienda).
-#  - (Opcional) Programado: descomentá el bloque schedule de abajo.
+#  - Manual: Actions → este workflow → Run workflow (elegís la tienda).
+#  - Automático: todos los días re-crawlea el catálogo = refresco de precios.
 on:
   workflow_dispatch:
     inputs:
       store:
-        description: 'Tienda a sembrar (sinsa, siman o all)'
+        description: 'Tienda (sinsa, siman o all)'
         required: true
         default: 'all'
-  # schedule:
-  #   - cron: '0 11 * * *'   # todos los días 11:00 UTC (~5:00 AM Managua)
+  schedule:
+    - cron: '0 11 * * *'   # diario 11:00 UTC (~5:00 AM Managua) — refresco de precios VTEX
 
 jobs:
   seed:
