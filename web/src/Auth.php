@@ -14,6 +14,14 @@ final class Auth
     /** Nivel → máximo de productos que puede rastrear (alertas). Configurable acá. */
     public const LIMITS = ['free' => 2, 'donor' => 10];
 
+    /** Dominios de correo desechable/temporal — bloqueados en el registro. */
+    private const DISPOSABLE = [
+        'mailinator.com', 'guerrillamail.com', 'guerrillamail.info', '10minutemail.com',
+        'tempmail.com', 'temp-mail.org', 'yopmail.com', 'trashmail.com', 'getnada.com',
+        'maildrop.cc', 'sharklasers.com', 'throwawaymail.com', 'fakeinbox.com',
+        'dispostable.com', 'mohmal.com', 'emailondeck.com',
+    ];
+
     public static function start(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
@@ -34,6 +42,10 @@ final class Auth
         $email = strtolower(trim($email));
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new \InvalidArgumentException('Correo inválido');
+        }
+        $domain = substr((string) strrchr($email, '@'), 1);
+        if ($domain !== '' && in_array($domain, self::DISPOSABLE, true)) {
+            throw new \RuntimeException('Usá un correo real (no temporal/desechable).');
         }
         if (strlen($password) < 8) {
             throw new \InvalidArgumentException('La contraseña debe tener al menos 8 caracteres');

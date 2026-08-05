@@ -188,6 +188,7 @@
       <h3 id="authTitle" style="margin:0 0 4px">Iniciar sesión</h3>
       <p class="note" style="margin:0 0 16px">Necesario para crear alertas de precio.</p>
       <div id="authError" style="display:none;color:var(--bad);font-size:.85rem;margin-bottom:10px"></div>
+      <input id="authWebsite" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
       <input id="authEmail" type="email" placeholder="Correo" autocomplete="email">
       <input id="authPass" type="password" placeholder="Contraseña (mín. 8)" autocomplete="current-password">
       <button id="authSubmit" class="btn-store" style="width:100%;border:0;margin-top:4px">Entrar</button>
@@ -563,7 +564,7 @@ async function submitAuth(){
   try{
     const r = await fetch(`${API}/auth/${endpoint}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, website: document.getElementById('authWebsite').value })
     });
     const j = await r.json();
     if(!j.ok){ err.textContent = j.error || 'Error'; err.style.display = 'block'; return; }
