@@ -97,6 +97,7 @@ try {
         $ingest->ingest($recs);
         $ingested += count($recs);
         $from     += VtexCatalogCrawler::PAGE_SIZE;
+        usleep(350000); // 0.35s entre páginas: no disparar el rate-limit de la tienda
     }
 
     // Guardar avance (si hubo fallo de fetch, el cursor NO avanza en esa página).

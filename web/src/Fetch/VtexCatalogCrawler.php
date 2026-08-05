@@ -57,7 +57,13 @@ final class VtexCatalogCrawler
 
         $data = $this->http->getJson($url);
         if ($data === null) {
-            return null; // fallo: distinto de "no hay más productos"
+            // VTEX a veces corta ráfagas rápidas (rate-limit). Esperamos y
+            // reintentamos esta misma página una vez antes de rendirnos.
+            usleep(1500000); // 1.5s
+            $data = $this->http->getJson($url);
+        }
+        if ($data === null) {
+            return null; // fallo real: distinto de "no hay más productos"
         }
 
         $out = [];
