@@ -45,17 +45,19 @@ final class VtexCatalogCrawler
 
     /**
      * Trae una página del catálogo desde $from.
-     * @return array<int,array> registros normalizados (toArray) listos para ingerir.
+     * @return array<int,array>|null  registros normalizados (toArray); [] si la
+     *         página está vacía de verdad (fin del catálogo); NULL si el fetch
+     *         FALLÓ (red/respuesta no-JSON) — que NO es fin, hay que reintentar.
      */
-    public function page(int $from, int $count = self::PAGE_SIZE): array
+    public function page(int $from, int $count = self::PAGE_SIZE): ?array
     {
         $to  = $from + $count - 1;
         $url = rtrim($this->baseUrl, '/')
             . '/api/catalog_system/pub/products/search?_from=' . $from . '&_to=' . $to;
 
         $data = $this->http->getJson($url);
-        if (!is_array($data)) {
-            return [];
+        if ($data === null) {
+            return null; // fallo: distinto de "no hay más productos"
         }
 
         $out = [];

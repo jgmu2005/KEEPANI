@@ -82,22 +82,24 @@ try {
     $crawler = VtexCatalogCrawler::fromStore($store, new Http());
     $ingest  = new IngestService($db);
 
-    $from      = (int) $cursor['next_from'];
-    $ingested  = 0;
-    $done      = false;
+    $from       = (int) $cursor['next_from'];
+    $ingested   = 0;
+    $done       = false;
+    $fetchError = false;
 
     for ($i = 0; $i < $pages; $i++) {
         if ($from > VtexCatalogCrawler::MAX_OFFSET) { $done = true; break; }
 
         $recs = $crawler->page($from);
-        if (!$recs) { $done = true; break; }   // sin más productos
+        if ($recs === null) { $fetchError = true; break; }  // fallo: NO marcar done, reintentar luego
+        if ($recs === [])   { $done = true; break; }         // fin real del catálogo
 
         $ingest->ingest($recs);
         $ingested += count($recs);
         $from     += VtexCatalogCrawler::PAGE_SIZE;
     }
 
-    // Guardar avance.
+    // Guardar avance (si hubo fallo de fetch, el cursor NO avanza en esa página).
     $db->prepare(
         'UPDATE crawl_cursors SET next_from = ?, total_seen = total_seen + ?, done = ? WHERE store_slug = ?'
     )->execute([$from, $ingested, $done ? 1 : 0, $slug]);
@@ -111,7 +113,10 @@ try {
         'total_seen'        => $total,
         'next_from'         => $from,
         'done'              => $done,
-        'note'              => $done ? 'Catálogo recorrido ✔' : 'Volvé a llamar para seguir avanzando.',
+        'fetch_error'       => $fetchError,
+        'note'              => $fetchError
+            ? 'La tienda falló en esta página (transitorio). Volvé a llamar para reintentar desde el mismo punto.'
+            : ($done ? 'Catálogo recorrido ✔' : 'Volvé a llamar para seguir avanzando.'),
     ]);
 } catch (\Throwable $e) {
     out(500, ['ok' => false, 'error' => 'Error interno', 'detail' => $e->getMessage()]);
