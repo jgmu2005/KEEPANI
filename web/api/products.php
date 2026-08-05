@@ -15,12 +15,19 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
 try {
-    $repo = new ProductRepository(Db::conn());
-    $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 200;
+    $repo   = new ProductRepository(Db::conn());
+    $limit  = isset($_GET['limit'])  ? (int) $_GET['limit']  : 50;
+    $offset = isset($_GET['offset']) ? (int) $_GET['offset'] : 0;
 
     http_response_code(200);
     echo json_encode(
-        ['ok' => true, 'items' => $repo->listWithLatest($limit)],
+        [
+            'ok'     => true,
+            'total'  => $repo->countProducts(),
+            'limit'  => $limit,
+            'offset' => $offset,
+            'items'  => $repo->listWithLatest($limit, $offset),
+        ],
         JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
     );
 } catch (\Throwable $e) {

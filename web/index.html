@@ -67,6 +67,18 @@
   .btn-store{background:var(--brand);color:#fff;padding:10px 16px;border-radius:9px;font-weight:700}
   .note{color:var(--muted);font-size:.8rem}
 
+  section{margin-bottom:32px}
+  .grid-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+  .grid-head h2{margin:0}
+  .pager{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+  .pager select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:.85rem}
+  .pg-btn{padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font-size:.85rem}
+  .pg-btn:disabled{opacity:.4;cursor:default}
+  .page-info{min-width:130px;text-align:center;font-variant-numeric:tabular-nums}
+  .delta{align-self:flex-start;font-size:.74rem;font-weight:800;padding:2px 8px;border-radius:999px}
+  .delta.down{color:#065f46;background:#d1fae5}
+  .delta.up{color:#991b1b;background:#fee2e2}
+  .old-price{color:var(--muted);text-decoration:line-through;font-size:.82rem;font-weight:500}
   footer{background:#0f172a;color:#94a3b8;padding:26px 0;text-align:center;font-size:.86rem}
   footer .donate{margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   footer .donate a{background:#1e293b;color:#e2e8f0;padding:8px 14px;border-radius:8px;font-weight:600}
@@ -88,8 +100,32 @@
 </header>
 
 <main class="wrap">
-  <h2>Productos rastreados</h2>
-  <div id="grid" class="grid"><div class="spinner">Cargando…</div></div>
+  <section id="changes-section" style="display:none">
+    <h2>📉 Cambios recientes de precio</h2>
+    <div id="changes" class="grid"></div>
+  </section>
+
+  <section>
+    <div class="grid-head">
+      <h2>Productos rastreados</h2>
+      <div class="pager">
+        <label>Ver
+          <select id="pageSize">
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+            <option value="2000">2000</option>
+            <option value="all">Todos</option>
+          </select>
+        </label>
+        <button id="prev" class="pg-btn">‹ Anterior</button>
+        <span id="pageInfo" class="page-info"></span>
+        <button id="next" class="pg-btn">Siguiente ›</button>
+      </div>
+    </div>
+    <div id="grid" class="grid"><div class="spinner">Cargando…</div></div>
+  </section>
 </main>
 
 <div class="overlay" id="overlay">
@@ -118,30 +154,91 @@ const money = (v, cur='NIO') =>
 
 let chart = null;
 
-async function loadGrid(){
-  const grid = document.getElementById('grid');
+const PAGE = { size: 50, offset: 0, total: 0 };
+const nf = new Intl.NumberFormat('es-NI');
+
+function cardHtml(p){
+  return `<div class="card" data-id="${p.id}">
+    <div class="img">${p.image_url ? `<img src="${p.image_url}" alt="" loading="lazy">` : '📦'}</div>
+    <div class="body">
+      <span class="badge">${p.store_name || p.store}</span>
+      <div class="title">${escapeHtml(p.title || '(sin título)')}</div>
+      <div class="price">${money(p.price_final, p.currency)}</div>
+      <div class="stock ${p.in_stock ? 'in':'out'}">${p.in_stock ? '● En stock' : '○ Agotado'}</div>
+    </div>
+  </div>`;
+}
+
+function wireCards(container){
+  container.querySelectorAll('.card').forEach(c =>
+    c.addEventListener('click', () => openDetail({product_id: c.dataset.id})));
+}
+
+async function loadChanges(){
+  const sec = document.getElementById('changes-section');
+  const box = document.getElementById('changes');
   try{
-    const r = await fetch(`${API}/products.php`);
+    const r = await fetch(`${API}/changes.php?limit=12`);
     const j = await r.json();
-    if(!j.ok || !j.items.length){
-      grid.innerHTML = `<div class="empty">Aún no hay productos rastreados. Pegá una URL arriba para empezar.</div>`;
-      return;
-    }
-    grid.innerHTML = j.items.map(p => `
-      <div class="card" data-id="${p.id}">
+    if(!j.ok || !j.items.length){ sec.style.display = 'none'; return; }
+    sec.style.display = '';
+    box.innerHTML = j.items.map(p => {
+      const cur = p.currency || 'NIO';
+      const arrow = p.direction === 'down' ? '▼' : '▲';
+      const delta = p.delta_pct == null ? '' : `${arrow} ${Math.abs(p.delta_pct)}%`;
+      return `<div class="card" data-id="${p.id}">
         <div class="img">${p.image_url ? `<img src="${p.image_url}" alt="" loading="lazy">` : '📦'}</div>
         <div class="body">
           <span class="badge">${p.store_name || p.store}</span>
           <div class="title">${escapeHtml(p.title || '(sin título)')}</div>
-          <div class="price">${money(p.price_final, p.currency)}</div>
-          <div class="stock ${p.in_stock ? 'in':'out'}">${p.in_stock ? '● En stock' : '○ Agotado'}</div>
+          <span class="delta ${p.direction}">${delta}</span>
+          <div class="price">${money(p.price_now, cur)} <span class="old-price">${money(p.price_prev, cur)}</span></div>
         </div>
-      </div>`).join('');
-    grid.querySelectorAll('.card').forEach(c =>
-      c.addEventListener('click', () => openDetail({product_id: c.dataset.id})));
+      </div>`;
+    }).join('');
+    wireCards(box);
+  }catch(e){ sec.style.display = 'none'; }
+}
+
+async function loadGrid(){
+  const grid = document.getElementById('grid');
+  grid.innerHTML = `<div class="spinner">Cargando…</div>`;
+  const all = PAGE.size === 'all';
+  const limit = all ? 100000 : PAGE.size;
+  const offset = all ? 0 : PAGE.offset;
+  try{
+    const r = await fetch(`${API}/products.php?limit=${limit}&offset=${offset}`);
+    const j = await r.json();
+    PAGE.total = j.total || 0;
+    if(!j.ok || !j.items.length){
+      grid.innerHTML = `<div class="empty">No hay productos para mostrar.</div>`;
+      updatePager(0); return;
+    }
+    grid.innerHTML = j.items.map(cardHtml).join('');
+    wireCards(grid);
+    updatePager(j.items.length);
   }catch(e){
     grid.innerHTML = `<div class="empty">No se pudo cargar. Intentá de nuevo.</div>`;
   }
+}
+
+function updatePager(shown){
+  const info = document.getElementById('pageInfo');
+  const prev = document.getElementById('prev');
+  const next = document.getElementById('next');
+  if(PAGE.size === 'all'){
+    info.textContent = `${nf.format(PAGE.total)} productos`;
+    prev.disabled = true; next.disabled = true; return;
+  }
+  const from = PAGE.total === 0 ? 0 : PAGE.offset + 1;
+  const to = PAGE.offset + shown;
+  info.textContent = `${nf.format(from)}–${nf.format(to)} de ${nf.format(PAGE.total)}`;
+  prev.disabled = PAGE.offset <= 0;
+  next.disabled = to >= PAGE.total;
+}
+
+function gotoTopOfGrid(){
+  window.scrollTo({ top: document.querySelector('.grid-head').offsetTop - 20, behavior: 'smooth' });
 }
 
 async function openDetail(params, endpoint='history.php'){
@@ -229,6 +326,23 @@ document.getElementById('q').addEventListener('keydown', e => { if(e.key==='Ente
 document.getElementById('close').addEventListener('click', () => document.getElementById('overlay').classList.remove('open'));
 document.getElementById('overlay').addEventListener('click', e => { if(e.target.id==='overlay') e.target.classList.remove('open'); });
 
+document.getElementById('pageSize').addEventListener('change', e => {
+  PAGE.size = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+  PAGE.offset = 0;
+  loadGrid();
+});
+document.getElementById('prev').addEventListener('click', () => {
+  if(PAGE.size === 'all') return;
+  PAGE.offset = Math.max(0, PAGE.offset - PAGE.size);
+  loadGrid(); gotoTopOfGrid();
+});
+document.getElementById('next').addEventListener('click', () => {
+  if(PAGE.size === 'all') return;
+  PAGE.offset += PAGE.size;
+  loadGrid(); gotoTopOfGrid();
+});
+
+loadChanges();
 loadGrid();
 </script>
 </body>

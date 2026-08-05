@@ -190,10 +190,17 @@ final class ProductRepository
         ];
     }
 
-    /** Lista de productos rastreados con su último precio (para el home). */
-    public function listWithLatest(int $limit = 200): array
+    /** Total de productos rastreados (para la paginación). */
+    public function countProducts(): int
     {
-        $limit = max(1, min($limit, 500));
+        return (int) $this->db->query('SELECT COUNT(*) FROM products WHERE is_active = 1')->fetchColumn();
+    }
+
+    /** Página de productos rastreados con su último precio (para el home). */
+    public function listWithLatest(int $limit = 50, int $offset = 0): array
+    {
+        $limit  = max(1, min($limit, 10000));
+        $offset = max(0, $offset);
         $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
                        s.slug AS store, s.name AS store_name,
                        ph.price_final, ph.currency, ph.in_stock, ph.captured_date AS last_date
@@ -206,7 +213,7 @@ final class ProductRepository
                   )
                  WHERE p.is_active = 1
                  ORDER BY p.title ASC
-                 LIMIT ' . $limit;
+                 LIMIT ' . $limit . ' OFFSET ' . $offset;
 
         return array_map(static function (array $r): array {
             return [
@@ -221,6 +228,54 @@ final class ProductRepository
                 'currency'    => $r['currency'] ?? 'NIO',
                 'in_stock'    => (bool) $r['in_stock'],
                 'last_date'   => $r['last_date'],
+            ];
+        }, $this->db->query($sql)->fetchAll());
+    }
+
+    /**
+     * Productos cuyo precio CAMBIÓ entre su última captura y la anterior.
+     * (Se llena cuando hay ≥2 días con precios distintos; antes va vacío.)
+     */
+    public function recentChanges(int $limit = 12): array
+    {
+        $limit = max(1, min($limit, 60));
+        $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
+                       s.slug AS store, s.name AS store_name,
+                       cur.price_final  AS price_now,
+                       prev.price_final AS price_prev,
+                       cur.currency, cur.in_stock, cur.captured_date AS date_now
+                  FROM products p
+                  JOIN stores s ON s.id = p.store_id
+                  JOIN price_history cur ON cur.id = (
+                        SELECT id FROM price_history WHERE product_id = p.id
+                        ORDER BY captured_at DESC LIMIT 1)
+                  JOIN price_history prev ON prev.id = (
+                        SELECT id FROM price_history WHERE product_id = p.id
+                          AND captured_date < cur.captured_date
+                        ORDER BY captured_at DESC LIMIT 1)
+                 WHERE cur.price_final IS NOT NULL AND prev.price_final IS NOT NULL
+                   AND cur.price_final <> prev.price_final
+                 ORDER BY cur.captured_at DESC
+                 LIMIT ' . $limit;
+
+        return array_map(static function (array $r): array {
+            $now  = (float) $r['price_now'];
+            $prev = (float) $r['price_prev'];
+            return [
+                'id'         => (int) $r['id'],
+                'title'      => $r['title'],
+                'brand'      => $r['brand'],
+                'image_url'  => $r['image_url'],
+                'url'        => $r['url'],
+                'store'      => $r['store'],
+                'store_name' => $r['store_name'],
+                'price_now'  => $now,
+                'price_prev' => $prev,
+                'currency'   => $r['currency'] ?? 'NIO',
+                'in_stock'   => (bool) $r['in_stock'],
+                'date'       => $r['date_now'],
+                'direction'  => $now < $prev ? 'down' : 'up',
+                'delta_pct'  => $prev > 0 ? round(($now - $prev) / $prev * 100, 1) : null,
             ];
         }, $this->db->query($sql)->fetchAll());
     }
