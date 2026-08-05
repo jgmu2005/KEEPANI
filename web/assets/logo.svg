@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 145" width="220" height="145" role="img" aria-label="Ojo al Precio">
+  <path d="M18 70 Q110 20 202 70 Q110 120 18 70 Z" fill="none" stroke="#12263f" stroke-width="11" stroke-linejoin="round"/>
+  <circle cx="88" cy="62" r="33" fill="#0ea5e9"/>
+  <text x="88" y="73" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="31" fill="#ffffff">C$</text>
+  <path d="M62 82 C 104 116, 140 104, 176 118" fill="none" stroke="#16a34a" stroke-width="10" stroke-linecap="round"/>
+  <polygon points="196,131 168,129 185,105" fill="#16a34a"/>
+</svg>

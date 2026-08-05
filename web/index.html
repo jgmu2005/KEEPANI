@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ojo al Precio — Historial de precios en tiendas de Nicaragua</title>
 <meta name="description" content="Consulta el historial de precios de productos en tiendas de Nicaragua y descubre si una oferta es real.">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <style>
   :root{
     --bg:#0f172a; --bg2:#1e293b; --card:#ffffff; --ink:#0f172a; --muted:#64748b;
@@ -18,7 +19,8 @@
   .wrap{max-width:1080px;margin:0 auto;padding:0 16px}
 
   header{background:linear-gradient(135deg,var(--bg),var(--bg2));color:#fff;padding:28px 0 34px}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.5rem}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:1.5rem}
+  .brand-mark{height:44px;width:auto;flex:none}
   .brand small{font-weight:500;color:#94a3b8;font-size:.8rem;display:block;margin-top:2px}
   .tagline{color:#cbd5e1;margin:10px 0 18px;max-width:640px}
   .search{display:flex;gap:8px;flex-wrap:wrap}
@@ -108,7 +110,16 @@
 <header>
   <div class="wrap">
     <div class="topbar">
-      <div class="brand">👁️ Ojo al Precio <small>Historial de precios · Tiendas de Nicaragua</small></div>
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 220 145" role="img" aria-label="Ojo al Precio">
+          <path d="M18 70 Q110 20 202 70 Q110 120 18 70 Z" fill="none" stroke="#ffffff" stroke-width="11" stroke-linejoin="round"/>
+          <circle cx="88" cy="62" r="33" fill="#0ea5e9"/>
+          <text x="88" y="73" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="31" fill="#ffffff">C$</text>
+          <path d="M62 82 C 104 116, 140 104, 176 118" fill="none" stroke="#22c55e" stroke-width="10" stroke-linecap="round"/>
+          <polygon points="196,131 168,129 185,105" fill="#22c55e"/>
+        </svg>
+        <span class="brand-text">Ojo al Precio <small>Historial de precios · Tiendas de Nicaragua</small></span>
+      </div>
       <div id="authArea" class="auth-area"></div>
     </div>
     <p class="tagline">¿Esa "oferta" es real? Pegá el enlace de un producto o buscá entre los que seguimos y mirá cómo se ha movido su precio en el tiempo.</p>
@@ -578,8 +589,8 @@ async function applySettings(){
     if(!j.ok) return;
     const s = j.settings;
     if(s.site_name) document.title = `${s.site_name} — Historial de precios en tiendas de Nicaragua`;
-    const brand = document.querySelector('.brand');
-    if(brand) brand.innerHTML = `${s.logo_emoji||'👁️'} ${escapeHtml(s.site_name||'Ojo al Precio')} <small>${escapeHtml(s.tagline||'')}</small>`;
+    const bt = document.querySelector('.brand-text');
+    if(bt) bt.innerHTML = `${escapeHtml(s.site_name||'Ojo al Precio')} <small>${escapeHtml(s.tagline||'')}</small>`;
     const tl = document.querySelector('.tagline');
     if(tl && s.hero_text) tl.textContent = s.hero_text;
     const fn = document.getElementById('footerNote');

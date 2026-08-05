@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="Ojo al Precio">
+  <rect x="2" y="2" width="92" height="92" rx="22" fill="#0f172a"/>
+  <g transform="translate(6,20) scale(0.38)">
+    <path d="M18 70 Q110 20 202 70 Q110 120 18 70 Z" fill="none" stroke="#e2e8f0" stroke-width="12" stroke-linejoin="round"/>
+    <circle cx="88" cy="62" r="33" fill="#0ea5e9"/>
+    <text x="88" y="74" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="34" fill="#ffffff">C$</text>
+    <path d="M62 82 C 104 116, 140 104, 176 118" fill="none" stroke="#22c55e" stroke-width="12" stroke-linecap="round"/>
+    <polygon points="200,133 166,131 186,103" fill="#22c55e"/>
+  </g>
+</svg>
