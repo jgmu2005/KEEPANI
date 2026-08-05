@@ -22,8 +22,8 @@ if (!is_array($in)) {
 }
 
 foreach ($in as $k => $v) {
-    // La contraseña SMTP vacía significa "no cambiar" — no la pisamos.
-    if ($k === 'smtp_pass' && (string) $v === '') {
+    // Secretos vacíos = "no cambiar" — no los pisamos.
+    if (($k === 'smtp_pass' || $k === 'kofi_token') && (string) $v === '') {
         continue;
     }
     Settings::set($db, (string) $k, (string) $v); // set ignora claves fuera de la lista blanca

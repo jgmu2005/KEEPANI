@@ -25,6 +25,12 @@ final class Settings
         'smtp_user', 'smtp_pass', 'smtp_from_email', 'smtp_from_name',
     ];
 
+    /** Otras claves privadas (nunca públicas). */
+    public const KOFI_KEYS = ['kofi_token'];
+
+    /** Claves cuyo valor se ENMASCARA en el admin (secretos). */
+    private const MASKED = ['smtp_pass', 'kofi_token'];
+
     private static ?array $cache = null;
 
     /** Todos los ajustes como mapa k=>v. */
@@ -51,19 +57,25 @@ final class Settings
         return $out;
     }
 
-    /** Vista para el admin: branding + SMTP, con la contraseña ENMASCARADA. */
+    /** Vista para el admin: branding + privados, con los secretos ENMASCARADOS. */
     public static function adminView(PDO $db): array
     {
         $all = self::all($db);
         $out = [];
-        foreach (self::PUBLIC_KEYS as $k) {
-            $out[$k] = $all[$k] ?? '';
+        $keys = array_merge(self::PUBLIC_KEYS, self::SMTP_KEYS, self::KOFI_KEYS);
+        foreach ($keys as $k) {
+            $out[$k] = in_array($k, self::MASKED, true) ? '' : ($all[$k] ?? '');
         }
-        foreach (self::SMTP_KEYS as $k) {
-            $out[$k] = $k === 'smtp_pass' ? '' : ($all[$k] ?? '');
-        }
-        $out['smtp_pass_set'] = !empty($all['smtp_pass']); // ¿hay contraseña guardada?
+        // Banderas "¿ya está guardado?" para los secretos.
+        $out['smtp_pass_set']  = !empty($all['smtp_pass']);
+        $out['kofi_token_set'] = !empty($all['kofi_token']);
         return $out;
+    }
+
+    /** Lee una clave cruda (uso interno; ej. el webhook lee kofi_token). */
+    public static function get(PDO $db, string $k): string
+    {
+        return (string) (self::all($db)[$k] ?? '');
     }
 
     /** Credenciales SMTP crudas (para el Mailer). Uso interno/admin. */
@@ -80,7 +92,8 @@ final class Settings
     /** Guarda un ajuste (solo claves de las listas blancas). */
     public static function set(PDO $db, string $k, string $v): void
     {
-        if (!in_array($k, self::PUBLIC_KEYS, true) && !in_array($k, self::SMTP_KEYS, true)) {
+        $allowed = array_merge(self::PUBLIC_KEYS, self::SMTP_KEYS, self::KOFI_KEYS);
+        if (!in_array($k, $allowed, true)) {
             return;
         }
         $st = $db->prepare('INSERT INTO settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)');

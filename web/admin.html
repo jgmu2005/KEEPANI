@@ -97,6 +97,24 @@
     </div>
 
     <div class="card">
+      <h2>Ko-fi / Donaciones</h2>
+      <label>Token de verificación de Ko-fi</label>
+      <input id="kofi_token" type="password" placeholder="pegá el token de Ko-fi">
+      <label>URL del webhook (pegala en Ko-fi)</label>
+      <input id="kofiUrl" readonly onclick="this.select()">
+      <p style="font-size:.8rem;color:var(--muted);margin:12px 0 0">
+        En Ko-fi: <b>Settings → Webhooks & API</b> → pegá la URL de arriba en "Webhook URL" y copiá el
+        "Verification Token" al campo. El botón <b>“Guardar ajustes”</b> (arriba) guarda el token.
+        Cuando alguien done con el correo de su cuenta, sube a <b>Donante</b> solo.
+      </p>
+      <h2 style="margin-top:22px">Donaciones recibidas</h2>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Fecha</th><th>De</th><th>Monto</th><th>Correo</th><th>Acreditada a</th></tr></thead>
+        <tbody id="donationsBody"><tr><td colspan="5" style="color:var(--muted)">—</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
       <h2>Usuarios</h2>
       <div id="userMsg" class="msg"></div>
       <div style="overflow-x:auto">
@@ -113,7 +131,8 @@
 const API = './api';
 const PUB_KEYS = ['site_name','tagline','hero_text','logo_emoji','donate_kofi','donate_paypal','footer_note'];
 const SMTP_KEYS = ['smtp_host','smtp_port','smtp_secure','smtp_user','smtp_from_email','smtp_from_name','smtp_pass'];
-const FORM_KEYS = [...PUB_KEYS, ...SMTP_KEYS];
+const FORM_KEYS = [...PUB_KEYS, ...SMTP_KEYS, 'kofi_token'];
+const MASKED = ['smtp_pass', 'kofi_token'];
 const $ = id => document.getElementById(id);
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -124,7 +143,7 @@ async function init(){
   try{ me = await api('auth/me.php'); }catch(e){ me = {user:null}; }
   if(me.user && me.user.is_admin){
     $('loginView').classList.add('hidden'); $('adminView').classList.remove('hidden');
-    loadSettings(); loadUsers();
+    loadSettings(); loadUsers(); loadDonations();
   } else {
     $('adminView').classList.add('hidden'); $('loginView').classList.remove('hidden');
     if(me.user){ $('loginError').textContent = 'Esa cuenta no es administrador.'; $('loginError').style.display='block'; }
@@ -145,8 +164,10 @@ $('lpass').addEventListener('keydown', e => { if(e.key==='Enter') $('loginBtn').
 async function loadSettings(){
   const j = await api('admin/settings_get.php');
   if(!j.ok) return;
-  FORM_KEYS.forEach(k => { if($(k) && k!=='smtp_pass') $(k).value = j.settings[k] ?? ''; });
-  if($('smtp_pass')) $('smtp_pass').placeholder = j.settings.smtp_pass_set ? '•••••• (guardada — dejá vacío para no cambiar)' : 'contraseña';
+  FORM_KEYS.forEach(k => { if($(k) && !MASKED.includes(k)) $(k).value = j.settings[k] ?? ''; });
+  if($('smtp_pass'))  $('smtp_pass').placeholder  = j.settings.smtp_pass_set  ? '•••••• (guardada — dejá vacío para no cambiar)' : 'contraseña';
+  if($('kofi_token')) $('kofi_token').placeholder = j.settings.kofi_token_set ? '•••••• (guardado — dejá vacío para no cambiar)' : 'pegá el token de Ko-fi';
+  if($('kofiUrl'))    $('kofiUrl').value = location.origin + location.pathname.replace(/admin\.html$/, '') + 'api/webhooks/kofi.php';
 }
 $('saveBtn').addEventListener('click', async () => {
   const payload = {}; FORM_KEYS.forEach(k => { if($(k)) payload[k] = $(k).value; });
@@ -154,7 +175,7 @@ $('saveBtn').addEventListener('click', async () => {
   const j = await api('admin/settings_save.php', {method:'POST',headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
   msg.textContent = j.ok ? 'Guardado ✔' : (j.error||'Error');
   msg.className = 'msg ' + (j.ok?'ok':'err');
-  if(j.ok && $('smtp_pass')) $('smtp_pass').value = '';
+  if(j.ok){ MASKED.forEach(k => { if($(k)) $(k).value = ''; }); }
 });
 $('testBtn').addEventListener('click', async () => {
   const msg = $('smtpMsg'); msg.className='msg ok'; msg.textContent='Enviando…';
@@ -185,6 +206,21 @@ async function loadUsers(){
     msg.textContent = j.ok ? 'Nivel actualizado ✔' : (j.error||'Error');
     msg.className = 'msg ' + (j.ok?'ok':'err');
   }));
+}
+
+// Donaciones (Ko-fi)
+async function loadDonations(){
+  const j = await api('admin/donations.php');
+  const body = $('donationsBody');
+  if(!j.ok){ body.innerHTML = `<tr><td colspan="5" style="color:var(--bad)">${esc(j.error||'error')}</td></tr>`; return; }
+  if(!j.donations.length){ body.innerHTML = `<tr><td colspan="5" style="color:var(--muted)">Aún no hay donaciones.</td></tr>`; return; }
+  body.innerHTML = j.donations.map(d => `<tr>
+    <td>${esc((d.created_at||'').slice(0,10))}</td>
+    <td>${esc(d.from_name||'—')}</td>
+    <td>${d.amount!=null ? esc((d.currency||'')+' '+d.amount) : '—'}</td>
+    <td>${esc(d.email||'—')}</td>
+    <td>${d.matched_email ? esc(d.matched_email) : '<span style="color:var(--bad)">sin acreditar</span>'}</td>
+  </tr>`).join('');
 }
 
 init();
