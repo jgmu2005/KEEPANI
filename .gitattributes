@@ -1,0 +1,6 @@
+# Normaliza saltos de línea a LF (Linux) en el repositorio.
+# Evita problemas al desplegar en FatCow / correr en GitHub Actions.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary

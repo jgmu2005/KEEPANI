@@ -1,0 +1,11 @@
+# Credenciales reales — NUNCA se versionan (solo el .sample)
+web/config/config.php
+scraper/config/ingest.php
+
+# PHP / dependencias
+vendor/
+
+# Logs y temporales
+*.log
+.DS_Store
+Thumbs.db

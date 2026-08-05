@@ -1,0 +1,33 @@
+name: Seed catálogo VTEX
+
+# Cómo se dispara:
+#  - Manual: pestaña Actions → "Seed catálogo VTEX" → Run workflow (elegís la tienda).
+#  - (Opcional) Programado: descomentá el bloque schedule de abajo.
+on:
+  workflow_dispatch:
+    inputs:
+      store:
+        description: 'Tienda a sembrar (sinsa, siman o all)'
+        required: true
+        default: 'all'
+  # schedule:
+  #   - cron: '0 11 * * *'   # todos los días 11:00 UTC (~5:00 AM Managua)
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: Correr el crawler y enviar a la ingesta
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/seed_remote.php "${{ github.event.inputs.store || 'all' }}"

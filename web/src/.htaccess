@@ -1,0 +1,9 @@
+# Bloquea el acceso web directo al código fuente (clases PHP).
+# Solo el autoloader las incluye del lado servidor.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

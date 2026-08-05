@@ -1,0 +1,53 @@
+{
+  "captured_at": "2026-08-05T12:00:00Z",
+  "items": [
+    {
+      "store": "sinsa",
+      "sku": "140513297",
+      "url": "https://www.sinsa.com.ni/bombillo-led-a60-e27-12w-6500k-4-piezas-ecomax-140513297/p",
+      "title": "BOMBILLO LED A60 E27 12W 6500K 4 PIEZAS ECOMAX",
+      "brand": "Ecomax",
+      "image_url": "https://b2csinsa.vteximg.com.br/arquivos/ids/931028/140513297-1.jpg",
+      "price_native": 69.77,
+      "price_final": 69.77,
+      "list_price": 232.58,
+      "discount_pct": 70,
+      "currency": "NIO",
+      "in_stock": true,
+      "tax_included": true,
+      "tax_rate": 0.15
+    },
+    {
+      "store": "siman",
+      "sku": "6925078",
+      "url": "https://ni.siman.com/audifono-in-ear-redmi-buds-3-lite-white-103599303/p",
+      "title": "Audifono in ear redmi buds 3 lite white",
+      "brand": "Xiaomi",
+      "image_url": "https://siman.vteximg.com.br/arquivos/ids/2610378/103599303.jpg",
+      "price_native": 399,
+      "price_final": 399,
+      "list_price": 1469,
+      "discount_pct": 72.8,
+      "currency": "NIO",
+      "in_stock": true,
+      "tax_included": true,
+      "tax_rate": 0.15
+    },
+    {
+      "store": "copasa",
+      "sku": "55V6C",
+      "url": "https://www.copasa.com.ni/Product/Detail/55V6C",
+      "title": "Aire Haier de 18,000 BTU",
+      "brand": null,
+      "image_url": "https://s3.amazonaws.com/online.storage/COPASA/Products/b7b13414-f0a5-4434-907a-17bc05852a68.png",
+      "price_native": 12999,
+      "price_final": 12999,
+      "list_price": null,
+      "discount_pct": null,
+      "currency": "NIO",
+      "in_stock": true,
+      "tax_included": true,
+      "tax_rate": 0.15
+    }
+  ]
+}

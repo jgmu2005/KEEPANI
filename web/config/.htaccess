@@ -1,0 +1,11 @@
+# Bloquea el acceso web directo a esta carpeta (credenciales).
+# Solo PHP la incluye del lado servidor; nunca debe servirse por HTTP.
+<IfModule mod_authz_core.c>
+    # Apache 2.4+
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    # Apache 2.2
+    Order allow,deny
+    Deny from all
+</IfModule>
