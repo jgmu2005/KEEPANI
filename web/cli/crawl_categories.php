@@ -21,6 +21,9 @@ use OjoAlPrecio\Web\Fetch\VtexMapper;
 const STORES = [
     'sinsa' => ['base_url' => 'https://www.sinsa.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'siman' => ['base_url' => 'https://ni.siman.com',      'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    // Walmart: SOLO la sección Electrónica (categoría 13). 'paths' fija el subárbol
+    // a crawlear en vez del árbol completo. El resto de Walmart queda a on-demand.
+    'walmart' => ['base_url' => 'https://www.walmart.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15, 'paths' => [[13]]],
 ];
 const PAGE = 50;
 const MAX_OFFSET = 2450;
@@ -148,13 +151,20 @@ foreach ($targets as $slug) {
     $ctx  = $cfg + ['slug' => $slug, 'base' => $base, 'referer' => $base . '/', 'http' => $http, 'ingestUrl' => $ingestUrl, 'ingestKey' => $ingestKey];
     line("=== $slug ===");
 
-    $tree = apiGet($base . '/api/catalog_system/pub/category/tree/50', $base . '/');
-    if (!is_array($tree)) {
-        fail("No se pudo traer el árbol de categorías de $slug");
+    if (!empty($cfg['paths'])) {
+        // Subárbol acotado (ej. Walmart → solo Electrónica). VTEX devuelve todo
+        // el subárbol con fq=C:/13/, así que una "ruta" por raíz alcanza.
+        $leaves = $cfg['paths'];
+        line('  rutas acotadas: ' . count($leaves) . ' (' . implode(' ', array_map(fn($p) => 'C:/' . implode('/', $p) . '/', $leaves)) . ')');
+    } else {
+        $tree = apiGet($base . '/api/catalog_system/pub/category/tree/50', $base . '/');
+        if (!is_array($tree)) {
+            fail("No se pudo traer el árbol de categorías de $slug");
+        }
+        $leaves = [];
+        collectLeafPaths($tree, [], $leaves);
+        line('  categorías hoja: ' . count($leaves));
     }
-    $leaves = [];
-    collectLeafPaths($tree, [], $leaves);
-    line('  categorías hoja: ' . count($leaves));
 
     $sent = 0; $capped = 0; $seen = []; $failed = [];
 
