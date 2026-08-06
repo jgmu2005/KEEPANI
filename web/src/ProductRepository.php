@@ -340,6 +340,62 @@ final class ProductRepository
     }
 
     /**
+     * Grupo del comparador por slug + sus ofertas (una por producto/tienda),
+     * ordenadas por precio. Para la página pública producto.php.
+     * @return array{group:array,offers:array}|null
+     */
+    public function groupBySlug(string $slug): ?array
+    {
+        $gs = $this->db->prepare('SELECT * FROM product_groups WHERE slug = ? LIMIT 1');
+        $gs->execute([$slug]);
+        $g = $gs->fetch();
+        if (!$g) {
+            return null;
+        }
+
+        $st = $this->db->prepare(
+            'SELECT p.id, p.title, p.brand, p.image_url, p.url,
+                    s.slug AS store, s.name AS store_name,
+                    ph.price_final, ph.list_price, ph.currency, ph.in_stock, ph.captured_date AS last_date
+               FROM products p
+               JOIN stores s ON s.id = p.store_id
+               LEFT JOIN price_history ph ON ph.id = (
+                    SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
+              WHERE p.group_id = ? AND p.is_active = 1
+              ORDER BY (ph.price_final IS NULL), ph.price_final ASC'
+        );
+        $st->execute([(int) $g['id']]);
+
+        $offers = array_map(static function (array $r): array {
+            return [
+                'store'       => $r['store'],
+                'store_name'  => $r['store_name'],
+                'title'       => $r['title'],
+                'image_url'   => $r['image_url'],
+                'url'         => $r['url'],
+                'price_final' => $r['price_final'] !== null ? (float) $r['price_final'] : null,
+                'list_price'  => $r['list_price'] !== null ? (float) $r['list_price'] : null,
+                'currency'    => $r['currency'] ?? 'NIO',
+                'in_stock'    => (bool) $r['in_stock'],
+                'last_date'   => $r['last_date'],
+            ];
+        }, $st->fetchAll());
+
+        return [
+            'group' => [
+                'id'              => (int) $g['id'],
+                'slug'            => $g['slug'],
+                'canonical_title' => $g['canonical_title'],
+                'brand'           => $g['brand'],
+                'image_url'       => $g['image_url'],
+                'store_count'     => (int) $g['store_count'],
+                'member_count'    => (int) $g['member_count'],
+            ],
+            'offers' => $offers,
+        ];
+    }
+
+    /**
      * Productos cuyo precio CAMBIÓ entre su última captura y la anterior.
      * (Se llena cuando hay ≥2 días con precios distintos; antes va vacío.)
      */
