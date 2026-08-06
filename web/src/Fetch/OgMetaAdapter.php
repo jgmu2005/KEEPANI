@@ -54,7 +54,10 @@ final class OgMetaAdapter implements StoreAdapter
         }
 
         $availRaw = strtolower((string) $this->meta($html, 'product:availability'));
-        $inStock  = str_contains($availRaw, 'in stock') || str_contains($availRaw, 'instock');
+        // Si la tienda no publica disponibilidad (ej. Unicomer), asumimos en stock.
+        $inStock  = $availRaw === ''
+            ? true
+            : (str_contains($availRaw, 'in stock') || str_contains($availRaw, 'instock'));
 
         // Precio de lista (Magento: data-price-amount; el mayor > precio = precio tachado).
         $list = null;

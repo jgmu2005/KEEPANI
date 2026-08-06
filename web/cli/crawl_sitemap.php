@@ -22,6 +22,22 @@ const STORES = [
         'sitemap'  => 'https://www.elgallomasgallo.com.ni/media/sitemap_tienda_el_gallo_ni.xml',
         'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15,
     ],
+    // Unicomer (Magento, /nicaragua/…-{id}/p) — sin product:availability → OG asume en stock.
+    'lacuracao' => [
+        'base_url' => 'https://www.lacuracaonline.com',
+        'sitemap'  => 'https://www.lacuracaonline.com/media/sitemap/sitemap_lco_ni_products.xml',
+        'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15,
+    ],
+    'radioshack' => [
+        'base_url' => 'https://www.radioshackla.com',
+        'sitemap'  => 'https://www.radioshackla.com/media/sitemap/sitemap_rso_ni_products.xml',
+        'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15,
+    ],
+    'tropigas' => [
+        'base_url' => 'https://www.almacenestropigas.com',
+        'sitemap'  => 'https://www.almacenestropigas.com/media/sitemap/sitemap_tg_nic.xml',
+        'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15,
+    ],
 ];
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 const BATCH = 25;
@@ -55,8 +71,8 @@ foreach ($targets as $slug) {
     preg_match_all('~<loc>\s*(https?://[^<\s]+?)\s*</loc>~', $xml, $m);
     $urls = [];
     foreach ($m[1] as $loc) {
-        if (preg_match('~-(\d+)/?$~', $loc, $mm)) {
-            $urls[$loc] = $mm[1]; // solo URLs de producto (terminan en -id); dedup por url
+        if (preg_match('~-(\d+)(?:/p)?/?$~', $loc, $mm)) {
+            $urls[$loc] = $mm[1]; // solo URLs de producto (-id o -id/p); dedup por url
         }
     }
     line('  productos en el sitemap: ' . count($urls));
@@ -76,7 +92,7 @@ foreach ($targets as $slug) {
             $sent += count($batch); $batch = [];
         }
         if ($i % 50 === 0) { line("  ...$i/" . count($urls) . " · $sent enviados · $fails fallos"); }
-        usleep(400000);
+        usleep(250000);
     }
     if ($batch) {
         $res = $http->postJson($ingestUrl, ['items' => $batch], ['X-Api-Key: ' . $ingestKey]);

@@ -1,19 +1,19 @@
-name: Crawl Magento por sitemap (Gallo)
+name: Crawl Magento por sitemap (Gallo + Unicomer)
 
 on:
   workflow_dispatch:
     inputs:
       store:
-        description: 'Tienda (gallo o all)'
+        description: 'Tienda (all, gallo, lacuracao, radioshack, tropigas)'
         required: true
-        default: 'gallo'
+        default: 'all'
   schedule:
-    - cron: '30 8 * * *'   # diario 08:30 UTC — después del crawl VTEX (refresco de Gallo)
+    - cron: '30 8 * * *'   # diario 08:30 UTC — después del crawl VTEX (refresco de precios/stock)
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 350   # Tropigas ~9k productos (1 fetch OG por producto)
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -24,4 +24,4 @@ jobs:
         env:
           OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
           OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
-        run: php web/cli/crawl_sitemap.php "${{ github.event.inputs.store || 'gallo' }}"
+        run: php web/cli/crawl_sitemap.php "${{ github.event.inputs.store || 'all' }}"
