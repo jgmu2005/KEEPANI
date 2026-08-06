@@ -36,6 +36,58 @@ $usd  = static function (?float $v) use ($usdRate): string {
     return '≈ US$' . number_format($v / $usdRate, 2);
 };
 
+/** Gráfico SVG de líneas del precio por tienda (server-rendered, sin JS). */
+function price_chart_svg(array $seriesByStore, string $cur): string
+{
+    $colors = ['#0ea5e9', '#16a34a', '#f59e0b', '#8b5cf6', '#dc2626', '#0891b2'];
+    $W = 720; $H = 300; $Lp = 58; $Rp = 14; $Tp = 12; $Bp = 34;
+    $pw = $W - $Lp - $Rp; $ph = $H - $Tp - $Bp;
+
+    $allTs = []; $allP = [];
+    foreach ($seriesByStore as $s) {
+        foreach ($s as $pt) { $allTs[] = strtotime($pt['d']); $allP[] = (float) $pt['p']; }
+    }
+    if (count($allP) < 2) { return ''; }
+    $minTs = min($allTs); $maxTs = max($allTs); $minP = min($allP); $maxP = max($allP);
+    if ($maxTs == $minTs) { $maxTs = $minTs + 86400; }
+    if ($maxP == $minP)  { $maxP  = $minP + 1; }
+
+    $x = static fn($ts): float => $Lp + ($ts - $minTs) / ($maxTs - $minTs) * $pw;
+    $y = static fn($p): float  => $Tp + (1 - ($p - $minP) / ($maxP - $minP)) * $ph;
+    $lbl = static fn($v): string => ($cur === 'USD' ? 'US$' : 'C$') . number_format($v, 0);
+
+    $svg = '<svg viewBox="0 0 ' . $W . ' ' . $H . '" class="chart" role="img" aria-label="Historial de precios">';
+    for ($i = 0; $i <= 3; $i++) {
+        $val = $minP + ($maxP - $minP) * $i / 3; $yy = round($y($val), 1);
+        $svg .= '<line x1="' . $Lp . '" y1="' . $yy . '" x2="' . ($W - $Rp) . '" y2="' . $yy . '" stroke="#e2e8f0"/>';
+        $svg .= '<text x="' . ($Lp - 6) . '" y="' . ($yy + 3) . '" text-anchor="end" font-size="10" fill="#94a3b8">' . $lbl($val) . '</text>';
+    }
+    $svg .= '<text x="' . round($x($minTs), 1) . '" y="' . ($H - 12) . '" font-size="10" fill="#94a3b8">' . date('d/m', $minTs) . '</text>';
+    $svg .= '<text x="' . round($x($maxTs), 1) . '" y="' . ($H - 12) . '" text-anchor="end" font-size="10" fill="#94a3b8">' . date('d/m', $maxTs) . '</text>';
+
+    $ci = 0;
+    foreach ($seriesByStore as $s) {
+        $col = $colors[$ci % count($colors)]; $ci++;
+        $pts = [];
+        foreach ($s as $pt) { $pts[] = round($x(strtotime($pt['d'])), 1) . ',' . round($y((float) $pt['p']), 1); }
+        if (count($pts) === 1) {
+            [$px, $py] = explode(',', $pts[0]);
+            $svg .= '<circle cx="' . $px . '" cy="' . $py . '" r="3.5" fill="' . $col . '"/>';
+        } else {
+            $svg .= '<polyline points="' . implode(' ', $pts) . '" fill="none" stroke="' . $col . '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+        }
+    }
+    $svg .= '</svg>';
+
+    $ci = 0; $leg = '<div class="legend">';
+    foreach ($seriesByStore as $store => $s) {
+        $col = $colors[$ci % count($colors)]; $ci++;
+        $leg .= '<span><i style="background:' . $col . '"></i>' . htmlspecialchars((string) $store, ENT_QUOTES, 'UTF-8') . '</span>';
+    }
+    $leg .= '</div>';
+    return $svg . $leg;
+}
+
 if (!$data || !$data['offers']) {
     http_response_code(404);
     ?><!doctype html><html lang="es"><head><meta charset="utf-8">
@@ -58,6 +110,22 @@ $title   = $g['canonical_title'] ?: 'Producto';
 $image   = $g['image_url'] ?: ($offers[0]['image_url'] ?? '');
 $cheapest = $priced[0] ?? null; // ya vienen ordenadas por precio asc
 $pageUrl = $base . '/producto.php?slug=' . rawurlencode((string) $g['slug']);
+
+// Series por tienda para el gráfico + mínimos/máximos históricos.
+$ids        = array_map(static fn($o) => $o['id'], $offers);
+$seriesById = $repo->priceSeries($ids, 90);
+$seriesByStore = [];
+$allPts = [];
+foreach ($offers as $o) {
+    $s = $seriesById[$o['id']] ?? [];
+    if ($s) {
+        $seriesByStore[$o['store_name']] = $s;
+        foreach ($s as $pt) { $allPts[] = (float) $pt['p']; }
+    }
+}
+$histMin  = $allPts ? min($allPts) : $low;
+$histMax  = $allPts ? max($allPts) : $high;
+$chartSvg = price_chart_svg($seriesByStore, $cur);
 
 $savingTxt = ($low !== null && $high !== null && $high > $low)
     ? ' Ahorrás hasta ' . $fmt($high - $low, $cur) . '.'
@@ -145,12 +213,38 @@ if ($priced) {
   .st.in{color:var(--ok)} .st.out{color:var(--bad)}
   .go{background:var(--brand);color:#fff;padding:8px 13px;border-radius:8px;font-weight:700;white-space:nowrap}
   .foot{margin-top:26px;color:var(--muted);font-size:.82rem;text-align:center}
-  @media(max-width:560px){.usd,th.h-usd,td.c-usd{display:none}}
+  /* header con marca */
+  .site{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff}
+  .site .in{max-width:820px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{display:flex;align-items:center;gap:10px;color:#fff}
+  .brand .logo{font-size:1.7rem;line-height:1}
+  .brand b{font-size:1.05rem;display:block;line-height:1.15}
+  .brand small{color:#94a3b8;font-size:.72rem}
+  .site .back{color:#7dd3fc;font-weight:600;font-size:.85rem;white-space:nowrap}
+  /* franja de stats */
+  .stats-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+  .stats-strip .s{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .stats-strip .k{font-size:.7rem;text-transform:uppercase;color:var(--muted);letter-spacing:.02em}
+  .stats-strip .v{font-size:1.1rem;font-weight:800;margin-top:2px}
+  .stats-strip .v.lo{color:var(--ok)} .stats-strip .v.hi{color:var(--bad)}
+  /* gráfico */
+  .chart{width:100%;height:auto;display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:10px;font-size:.82rem;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+  .nodata{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;text-align:center;color:var(--muted)}
+  @media(max-width:560px){.usd,th.h-usd,td.c-usd{display:none}.stats-strip{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
+<header class="site"><div class="in">
+  <a class="brand" href="index.html">
+    <span class="logo">🔎</span>
+    <span><b><?= $h($siteName) ?></b><small>Historial y comparación de precios · Nicaragua 🇳🇮</small></span>
+  </a>
+  <a class="back" href="index.html">Ver todos los productos →</a>
+</div></header>
 <div class="wrap">
-  <div class="top"><a href="index.html">← <?= $h($siteName) ?></a></div>
 
   <div class="head">
     <?php if ($image): ?><img src="<?= $h($image) ?>" alt="<?= $h($title) ?>"><?php endif; ?>
@@ -187,6 +281,20 @@ if ($priced) {
     <?php endforeach; ?>
     </tbody>
   </table>
+
+  <div class="stats-strip">
+    <div class="s"><div class="k">Más barato ahora</div><div class="v lo"><?= $fmt($low, $cur) ?></div></div>
+    <div class="s"><div class="k">Mínimo histórico</div><div class="v"><?= $fmt($histMin, $cur) ?></div></div>
+    <div class="s"><div class="k">Máximo histórico</div><div class="v hi"><?= $fmt($histMax, $cur) ?></div></div>
+    <div class="s"><div class="k">Tiendas</div><div class="v"><?= (int) $g['store_count'] ?></div></div>
+  </div>
+
+  <h2>Historial de precios por tienda</h2>
+  <?php if ($chartSvg !== ''): ?>
+    <?= $chartSvg ?>
+  <?php else: ?>
+    <div class="nodata">📅 Necesitamos algunos días más de datos para dibujar la tendencia. Volvé pronto.</div>
+  <?php endif; ?>
 
   <p class="foot">Precios referenciales, tomados de cada tienda. Verificá el precio final antes de comprar.<br>
     Comparación de <?= $h($siteName) ?> 🇳🇮</p>

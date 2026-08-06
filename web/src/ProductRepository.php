@@ -378,6 +378,7 @@ final class ProductRepository
 
         $offers = array_map(static function (array $r): array {
             return [
+                'id'          => (int) $r['id'],
                 'store'       => $r['store'],
                 'store_name'  => $r['store_name'],
                 'title'       => $r['title'],
