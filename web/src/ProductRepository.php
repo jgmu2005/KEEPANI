@@ -406,6 +406,44 @@ final class ProductRepository
     }
 
     /**
+     * Lista de grupos multi-tienda (para la vitrina "Comparador"), con su rango
+     * de precio actual entre tiendas. @return array{total:int, items:array}
+     */
+    public function groupsList(int $limit = 24, int $offset = 0): array
+    {
+        $limit  = max(1, min($limit, 100));
+        $offset = max(0, $offset);
+        $total  = (int) $this->db->query('SELECT COUNT(*) FROM product_groups WHERE store_count >= 2')->fetchColumn();
+
+        $sql = 'SELECT g.slug, g.canonical_title AS title, g.brand, g.image_url, g.store_count,
+                       MIN(ph.price_final) AS min_price, MAX(ph.price_final) AS max_price,
+                       MAX(ph.currency) AS currency
+                  FROM product_groups g
+                  JOIN products p ON p.group_id = g.id AND p.is_active = 1
+                  LEFT JOIN price_history ph ON ph.id = (
+                        SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
+                 WHERE g.store_count >= 2
+                 GROUP BY g.id
+                 ORDER BY g.store_count DESC, g.updated_at DESC
+                 LIMIT ' . $limit . ' OFFSET ' . $offset;
+
+        $items = array_map(static function (array $r): array {
+            return [
+                'slug'        => $r['slug'],
+                'title'       => $r['title'],
+                'brand'       => $r['brand'],
+                'image_url'   => $r['image_url'],
+                'store_count' => (int) $r['store_count'],
+                'min_price'   => $r['min_price'] !== null ? (float) $r['min_price'] : null,
+                'max_price'   => $r['max_price'] !== null ? (float) $r['max_price'] : null,
+                'currency'    => $r['currency'] ?? 'NIO',
+            ];
+        }, $this->db->query($sql)->fetchAll());
+
+        return ['total' => $total, 'items' => $items];
+    }
+
+    /**
      * Productos cuyo precio CAMBIÓ entre su última captura y la anterior.
      * (Se llena cuando hay ≥2 días con precios distintos; antes va vacío.)
      */

@@ -159,6 +159,7 @@
     <div class="hint">URL de un producto (Siman, Sinsa, La Curacao, RadioShack, Tropigas, El Gallo…) → lo rastrea · palabras → busca entre los rastreados. <a href="ayuda.html#tiendas">Ver tiendas</a></div>
     <nav class="topnav">
       <a id="navOfertas">🔥 Ofertas</a>
+      <a id="navComparador">⚖️ Comparador</a>
       <a id="navCatalogo">📚 Catálogo completo</a>
       <a id="navSeguimientos">🔔 Mis seguimientos</a>
       <a href="ayuda.html">❓ Ayuda</a>
@@ -188,6 +189,12 @@
   <section id="changes-section" style="display:none">
     <h2>📉 Cambios recientes de precio</h2>
     <div id="changes" class="grid"></div>
+  </section>
+
+  <section id="comparador-section" style="display:none">
+    <h2>⚖️ Comparador entre tiendas</h2>
+    <p class="note" style="margin:-6px 0 12px">El mismo producto en varias tiendas: mirá dónde está más barato.</p>
+    <div id="comparador-grid" class="grid"></div>
   </section>
 
   <section id="catalogo">
@@ -381,6 +388,38 @@ async function loadChanges(){
     }).join('');
     wireCards(box);
   }catch(e){ sec.style.display = 'none'; }
+}
+
+function comparadorCard(g){
+  const cur = g.currency || 'NIO';
+  const save = (g.min_price != null && g.max_price != null && g.max_price > g.min_price) ? (g.max_price - g.min_price) : 0;
+  return `<a class="card" href="producto.php?slug=${encodeURIComponent(g.slug)}" target="_blank" rel="noopener">
+    <div class="img">
+      <span class="lowest" style="background:#eff6ff;color:var(--brand-dk);border-color:#bfdbfe">⚖️ ${g.store_count} tiendas</span>
+      ${g.image_url ? `<img src="${g.image_url}" alt="" loading="lazy">` : '📦'}
+    </div>
+    <div class="body">
+      ${g.brand ? `<span class="badge">${escapeHtml(g.brand)}</span>` : ''}
+      <div class="title">${escapeHtml(g.title || '(sin título)')}</div>
+      <div class="price" style="margin-top:auto">${g.min_price != null ? 'desde ' + money(g.min_price, cur) : '—'}</div>
+      ${save > 0 ? `<div class="save">Ahorrá hasta ${money(save, cur)}</div>` : ''}
+    </div>
+  </a>`;
+}
+async function openComparador(){
+  const sec = document.getElementById('comparador-section');
+  const box = document.getElementById('comparador-grid');
+  sec.style.display = '';
+  box.innerHTML = `<div class="spinner">Cargando…</div>`;
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try{
+    const j = await (await fetch(`${API}/groups.php?limit=48`)).json();
+    if(!j.ok || !j.items.length){
+      box.innerHTML = `<div class="empty">Todavía no hay productos en varias tiendas. Se van sumando a medida que crece el catálogo. ⚖️</div>`;
+      return;
+    }
+    box.innerHTML = j.items.map(comparadorCard).join('');
+  }catch(e){ box.innerHTML = `<div class="empty">No se pudo cargar. Intentá de nuevo.</div>`; }
 }
 
 let storesLoaded = false;
@@ -808,6 +847,7 @@ document.getElementById('navCatalogo').addEventListener('click', () => {
   document.getElementById('fsort').value = 'name';
   PAGE.offset = 0; loadGrid(); gotoTopOfGrid();
 });
+document.getElementById('navComparador').addEventListener('click', openComparador);
 document.getElementById('navSeguimientos').addEventListener('click', () => {
   AUTH.user ? openMyAlerts() : openAuth('login');
 });
