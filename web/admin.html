@@ -130,6 +130,13 @@
         </table>
       </div>
     </div>
+
+    <div class="card">
+      <h2>Revisión de comparaciones <span id="matchCount" style="color:var(--muted);font-weight:400;font-size:.85rem"></span></h2>
+      <p style="color:var(--muted);font-size:.88rem;margin-top:-4px">Candidatos “mismo producto” entre tiendas (matcher por marca + imagen + título). Aprobá para unirlos en una comparación.</p>
+      <div id="matchMsg" class="msg"></div>
+      <div id="matchesBox"><div style="color:var(--muted)">Cargando…</div></div>
+    </div>
   </div>
 </div>
 
@@ -149,12 +156,56 @@ async function init(){
   try{ me = await api('auth/me.php'); }catch(e){ me = {user:null}; }
   if(me.user && me.user.is_admin){
     $('loginView').classList.add('hidden'); $('adminView').classList.remove('hidden');
-    loadSettings(); loadUsers(); loadDonations();
+    loadSettings(); loadUsers(); loadDonations(); loadMatches();
   } else {
     $('adminView').classList.add('hidden'); $('loginView').classList.remove('hidden');
     if(me.user){ $('loginError').textContent = 'Esa cuenta no es administrador.'; $('loginError').style.display='block'; }
   }
 }
+
+// Revisión de comparaciones (matcher 2b)
+const mMoney = v => v==null ? '—' : 'C$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+function mSide(x){
+  const img = x.img ? `<img src="${esc(x.img)}" style="width:52px;height:52px;object-fit:contain;background:#f8fafc;border-radius:6px;flex:none">`
+                    : `<div style="width:52px;height:52px;display:grid;place-items:center;background:#f8fafc;border-radius:6px;flex:none">📦</div>`;
+  return `<a href="${esc(x.url)}" target="_blank" rel="noopener" style="flex:1;display:flex;gap:8px;align-items:center;min-width:0;color:inherit;text-decoration:none">
+    ${img}
+    <div style="min-width:0">
+      <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase">${esc(x.store)}</div>
+      <div style="font-size:.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.title||'')}</div>
+      <div style="font-weight:700">${mMoney(x.price)}</div>
+    </div></a>`;
+}
+function mRow(m){
+  const conf = m.method==='image' ? `imagen · dist ${m.img}` : `título · ${Math.round(m.jaccard*100)}%`;
+  return `<div class="mrow" data-id="${m.id}" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="display:flex;gap:10px;align-items:center">${mSide(m.a)}<div style="color:var(--muted);font-weight:800">↔</div>${mSide(m.b)}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px;flex-wrap:wrap">
+      <span style="font-weight:800">${m.score}<small style="color:var(--muted);font-weight:400"> /100 · ${conf}</small></span>
+      <span class="macts">
+        <button data-id="${m.id}" data-d="approve" style="background:#16a34a;color:#fff">✔ Es el mismo</button>
+        <button data-id="${m.id}" data-d="reject" style="background:#e2e8f0;color:#0f172a">✕ No</button>
+      </span>
+    </div>
+  </div>`;
+}
+async function loadMatches(){
+  const box = $('matchesBox');
+  let j; try{ j = await api('admin/matches.php'); }catch(e){ box.innerHTML = '<div style="color:var(--muted)">Error al cargar.</div>'; return; }
+  if(!j.ok){ box.innerHTML = '<div style="color:var(--muted)">No disponible.</div>'; return; }
+  $('matchCount').textContent = j.pending ? `(${j.pending} pendientes)` : '';
+  box.innerHTML = j.items.length ? j.items.map(mRow).join('')
+    : '<div style="color:var(--muted)">No hay candidatos pendientes. 👌</div>';
+}
+$('matchesBox').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-d]'); if(!btn) return;
+  btn.disabled = true;
+  const j = await api('admin/match_decide.php', {method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id:+btn.dataset.id, decision:btn.dataset.d })});
+  const row = btn.closest('.mrow');
+  if(j.ok){ row.style.opacity = '.45'; row.querySelector('.macts').textContent = btn.dataset.d==='approve' ? '✅ Unido' : '❌ Descartado'; }
+  else { btn.disabled = false; $('matchMsg').textContent = j.error || 'Error'; }
+});
 
 // Login
 $('loginBtn').addEventListener('click', async () => {
