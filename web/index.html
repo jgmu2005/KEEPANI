@@ -517,18 +517,29 @@ async function openDetail(params, endpoint='history.php'){
     </div>`;
 
   drawChart(h, cur);
-  renderAlertBox(p.id, s.current, cur);
+  renderAlertBox(p.id, s.current, cur, s.in_stock);
   if(endpoint === 'track.php' && j.added) loadGrid(); // el nuevo producto aparece en la grilla
 }
 
 // --- Alertas de precio ---
-function renderAlertBox(productId, currentPrice, cur){
+function renderAlertBox(productId, currentPrice, cur, inStock){
   const box = document.getElementById('alertBox');
   if(!box) return;
   if(!AUTH.user){
-    box.innerHTML = `<div class="alert-cta"><span>🔔 ¿Querés que te avisemos si baja?</span>
+    const q = inStock ? '🔔 ¿Querés que te avisemos si baja?' : '🔔 ¿Te avisamos cuando vuelva a haber?';
+    box.innerHTML = `<div class="alert-cta"><span>${q}</span>
       <button class="btn-store" id="alertLoginBtn" style="padding:8px 14px">Iniciá sesión</button></div>`;
     document.getElementById('alertLoginBtn').addEventListener('click', () => openAuth('login'));
+    return;
+  }
+  if(!inStock){
+    // Producto agotado → alerta de restock (sin precio objetivo).
+    box.innerHTML = `<div class="alert-cta">
+      <span>🔔 Avísame cuando vuelva a estar disponible</span>
+      <button class="btn-store" id="alertRestockBtn">Crear alerta</button>
+      <span id="alertMsg" class="note"></span>
+    </div>`;
+    document.getElementById('alertRestockBtn').addEventListener('click', () => createAlert(productId, 'restock'));
     return;
   }
   const def = currentPrice != null ? Math.floor(currentPrice) : '';
@@ -539,15 +550,19 @@ function renderAlertBox(productId, currentPrice, cur){
     <button class="btn-store" id="alertCreateBtn">Crear alerta</button>
     <span id="alertMsg" class="note"></span>
   </div>`;
-  document.getElementById('alertCreateBtn').addEventListener('click', () => createAlert(productId));
+  document.getElementById('alertCreateBtn').addEventListener('click', () => createAlert(productId, 'price'));
 }
-async function createAlert(productId){
-  const target = parseFloat(document.getElementById('alertTarget').value);
+async function createAlert(productId, type='price'){
   const msg = document.getElementById('alertMsg');
-  if(!target || target <= 0){ msg.textContent = 'Poné un precio válido.'; msg.style.color = 'var(--bad)'; return; }
+  const body = {product_id: productId, alert_type: type};
+  if(type === 'price'){
+    const target = parseFloat(document.getElementById('alertTarget').value);
+    if(!target || target <= 0){ msg.textContent = 'Poné un precio válido.'; msg.style.color = 'var(--bad)'; return; }
+    body.target_price = target;
+  }
   try{
     const j = await (await fetch(`${API}/alerts/create.php`, {method:'POST',headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({product_id: productId, target_price: target})})).json();
+      body: JSON.stringify(body)})).json();
     if(j.ok){ msg.textContent = j.updated ? '✔ Alerta actualizada' : '✔ ¡Alerta creada!'; msg.style.color = 'var(--ok)'; }
     else {
       msg.style.color = 'var(--bad)';
@@ -576,11 +591,17 @@ async function openMyAlerts(){
   } else {
     html += j.alerts.map(a => {
       const cur = a.currency || 'NIO';
-      const hit = a.current_price != null && a.current_price <= a.target_price;
+      let info;
+      if(a.type === 'restock'){
+        info = `${a.store_name} · 🔔 avisar cuando vuelva · ${a.in_stock ? '<b style="color:var(--ok)">✓ disponible</b>' : 'actualmente agotado'}`;
+      } else {
+        const hit = a.current_price != null && a.target_price != null && a.current_price <= a.target_price;
+        info = `${a.store_name} · objetivo ${money(a.target_price, cur)} · actual ${money(a.current_price, cur)} ${hit ? '<b style="color:var(--ok)">✓ ¡en oferta!</b>' : ''}`;
+      }
       return `<div class="alert-row">
         <div class="alert-info">
           <div class="title">${escapeHtml(a.title || '(sin título)')}</div>
-          <div class="note">${a.store_name} · objetivo ${money(a.target_price, cur)} · actual ${money(a.current_price, cur)} ${hit ? '<b style="color:var(--ok)">✓ ¡en oferta!</b>' : ''}</div>
+          <div class="note">${info}</div>
         </div>
         <a class="mini" href="${a.url}" target="_blank" rel="noopener">Ver</a>
         <button class="mini del" data-id="${a.id}">Borrar</button>

@@ -1,7 +1,8 @@
 <?php
 declare(strict_types=1);
 
-/** POST /api/alerts/create.php — usuario. { product_id, target_price }
+/** POST /api/alerts/create.php — usuario. { product_id, target_price, alert_type? }
+ *  alert_type: 'price' (por defecto, con target_price) | 'restock' (sin precio).
  *  Crea/actualiza la alerta. Respeta el tope por nivel (free 2 / donor 10).
  */
 
@@ -25,11 +26,17 @@ if (!$u['is_verified']) {
 
 $in = json_decode(file_get_contents('php://input') ?: '', true) ?: [];
 $productId = (int) ($in['product_id'] ?? 0);
+$type      = ($in['alert_type'] ?? 'price') === 'restock' ? 'restock' : 'price';
 $target    = (float) ($in['target_price'] ?? 0);
 
-if ($productId <= 0 || $target <= 0) {
+if ($productId <= 0) {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Elegí un producto y un precio objetivo válido.']);
+    echo json_encode(['ok' => false, 'error' => 'Elegí un producto.']);
+    exit;
+}
+if ($type === 'price' && $target <= 0) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Poné un precio objetivo válido.']);
     exit;
 }
 
@@ -41,15 +48,18 @@ if ($exists->fetchColumn() === false) {
     exit;
 }
 
-// Si ya tiene alerta para este producto, actualiza el objetivo (no cuenta doble).
-$existingId = Alerts::existingId($db, $u['id'], $productId);
+// Si ya tiene una alerta de ESTE tipo para el producto:
+//  - precio: actualiza el objetivo · restock: ya está, no duplica.
+$existingId = Alerts::existingId($db, $u['id'], $productId, $type);
 if ($existingId !== null) {
-    Alerts::updateTarget($db, $existingId, $target);
+    if ($type === 'price') {
+        Alerts::updateTarget($db, $existingId, $target);
+    }
     echo json_encode(['ok' => true, 'updated' => true, 'id' => $existingId]);
     exit;
 }
 
-// Tope por nivel.
+// Tope por nivel (cuenta alertas de cualquier tipo).
 if (Alerts::countActive($db, $u['id']) >= $u['alert_limit']) {
     http_response_code(403);
     echo json_encode([
@@ -60,5 +70,5 @@ if (Alerts::countActive($db, $u['id']) >= $u['alert_limit']) {
     exit;
 }
 
-$id = Alerts::create($db, $u['id'], $productId, $target);
+$id = Alerts::create($db, $u['id'], $productId, $type, $type === 'price' ? $target : null);
 echo json_encode(['ok' => true, 'created' => true, 'id' => $id]);

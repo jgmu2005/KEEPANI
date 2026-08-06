@@ -44,12 +44,50 @@ $fmt = fn($v) => 'C$' . number_format((float) $v, 2);
 $alerts = Alerts::allActiveWithPrice($db);
 $emailed = 0; $rearmed = 0; $noPrice = 0; $pending = 0;
 
+$restocked = 0;
+
 foreach ($alerts as $a) {
+    $type    = $a['alert_type'] ?? 'price';
+    $already = $a['last_triggered_at'] !== null;
+
+    // ---- Alerta de restock: dispara al pasar de agotado a disponible ----
+    if ($type === 'restock') {
+        $inStock = (int) $a['in_stock'] === 1;
+        if ($inStock) {
+            if ($already) { continue; }             // ya avisó y sigue en stock
+            if (!$mailer)  { $pending++; continue; } // SMTP sin configurar → reintentar luego
+
+            $unsubUrl = $base . '/api/alerts/unsubscribe.php?a=' . (int) $a['id']
+                . '&t=' . hash_hmac('sha256', 'unsub:' . (int) $a['id'], (string) ($cfg['ingest_api_key'] ?? ''));
+            $priceLine = $a['price'] !== null ? '<p style="font-size:1.2rem;margin:8px 0"><b>' . $fmt($a['price']) . '</b></p>' : '';
+
+            $html = '<div style="font-family:system-ui,sans-serif;max-width:520px">'
+                . '<h2 style="color:#16a34a;margin:0 0 8px">🎉 ¡Volvió a estar disponible!</h2>'
+                . '<p style="margin:0 0 4px"><b>' . htmlspecialchars((string) $a['title']) . '</b></p>'
+                . $priceLine
+                . '<p><a href="' . htmlspecialchars((string) $a['url']) . '" '
+                . 'style="background:#0ea5e9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Ver el producto ↗</a></p>'
+                . '<p style="color:#94a3b8;font-size:.8rem;margin-top:20px">Recibís esto por una alerta que creaste en ' . htmlspecialchars((string) $siteName) . '. '
+                . '<a href="' . htmlspecialchars($unsubUrl) . '" style="color:#94a3b8">Dejar de recibir estas alertas</a>.</p></div>';
+
+            $res = $mailer->send((string) $a['email'], '🎉 Volvió a estar disponible: ' . $a['title'], $html);
+            if ($res['ok']) {
+                Alerts::markTriggered($db, (int) $a['id'], (float) ($a['price'] ?? 0));
+                $emailed++; $restocked++;
+            } else {
+                $pending++;
+            }
+        } elseif ($already) {
+            Alerts::rearm($db, (int) $a['id']); $rearmed++; // se agotó de nuevo → re-armar
+        }
+        continue;
+    }
+
+    // ---- Alerta de precio ----
     if ($a['price'] === null) { $noPrice++; continue; }
 
     $price  = (float) $a['price'];
     $target = (float) $a['target_price'];
-    $already = $a['last_triggered_at'] !== null;
 
     if ($price <= $target) {
         if ($already) { continue; }            // ya avisó y sigue bajo → no re-spamear
@@ -85,6 +123,7 @@ out(200, [
     'ok' => true,
     'checked'         => count($alerts),
     'emailed'         => $emailed,
+    'restocked'       => $restocked,
     'rearmed'         => $rearmed,
     'no_price'        => $noPrice,
     'mail_pending'    => $pending,
