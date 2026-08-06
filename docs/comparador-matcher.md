@@ -31,8 +31,20 @@ match por **marca + modelo + título + precio**.
 - **Nivel C — título difuso** → 0.6–0.85. Marca igual + similitud de tokens del
   título (Jaccard / trigramas) + precio dentro de ±X% → **cola de revisión
   manual** (no auto).
-- **Nivel D — imagen (a futuro)** → hash perceptual (pHash) de la foto; las
-  tiendas suelen reusar la imagen del fabricante. Potente pero más pesado.
+- **Nivel D — imagen (PROTAGONISTA, no "a futuro")** → hash perceptual (pHash)
+  de la foto; las tiendas reusan la imagen del fabricante. El caso Remington
+  (§10) mostró que suele ser **la señal más fuerte disponible** cuando falta el
+  EAN. Más pesado (hay que bajar y hashear imágenes), pero decisivo.
+
+### Guardarraíl obligatorio: atributos discriminantes
+Marca+título NO alcanza para fusionar: hay que **extraer y exigir coincidencia**
+de atributos que separan productos distintos de la misma línea —
+**potencia (watts), capacidad, subtipo** (secadora ≠ cepillo-secadora ≠
+plancha). Sin esto se fusionan productos distintos (ver §10).
+
+### Diccionario de sinónimos / traducción
+`zafiro=sapphire`, y ES/EN en general. Sin esto, el mismo modelo en dos idiomas
+baja de similitud y no matchea.
 
 ## 3. Blocking (para no comparar todo contra todo)
 
@@ -103,6 +115,27 @@ atributo (no separa grupo); la **capacidad/modelo** sí separa.
 3. Página pública `producto.php` + JSON-LD + compartir + sitemap.
 4. Nivel B/C + panel de revisión admin.
 5. (Futuro) hash de imagen; enriquecer EAN de Unicomer para cruzar islas.
+
+## 10. Caso real: secadora Remington (Siman vs Sinsa)
+
+Prueba con dos productos idénticos (misma secadora Remington Sapphire/Zafiro
+Luxe 2200W):
+
+| Señal | Siman | Sinsa | ¿Sirvió? |
+|---|---|---|---|
+| EAN | `""` (vacío) | `74590557671` | ❌ Siman no lo cargó |
+| Marca | Remington | Remington | ✅ |
+| Tipo | secadora de cabello | secadora de cabello | ✅ |
+| Modelo | **Zafiro** Luxe 2200w | **Sapphire** Luxe | ⚠️ sinónimo ES/EN |
+| Título (Jaccard) | — | — | ⚠️ ≈0.50 → revisión |
+| Imagen | foto fabricante | misma foto (otro host) | ✅ **la más fuerte** |
+| Precio | C$2,599 | C$3,029 | ✅ +16.5% |
+
+**Conclusiones:** (1) EAN no confiable ni en VTEX; (2) título solo = confianza
+media por sinónimos; (3) el pHash de imagen es la señal ganadora; (4) cuidado
+con falsos positivos: Siman también tiene "Cepillo Secadora Zafiro Luxe **1000w**"
+y "Plancha Sapphire Luxe" → sin guardarraíl de atributos (watts/subtipo) se
+fusionarían mal.
 
 ## 9. Preguntas abiertas
 
