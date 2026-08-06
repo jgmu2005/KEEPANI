@@ -29,6 +29,7 @@ final class NormalizedProduct
         public float   $taxRate,
         public ?float  $listPrice = null,
         public string  $capturedAt = '',
+        public ?int    $categoryId = null,
     ) {
         if ($this->capturedAt === '') {
             $this->capturedAt = gmdate('c');
@@ -78,6 +79,7 @@ final class NormalizedProduct
             'list_price'   => $this->listPrice,
             'discount_pct' => $this->discountPct(),
             'captured_at'  => $this->capturedAt,
+            'category_id'  => $this->categoryId,
         ];
     }
 }

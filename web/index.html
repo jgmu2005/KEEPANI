@@ -162,6 +162,7 @@
     <div class="filters">
       <input id="fq" type="text" placeholder="Buscar por nombre (ej: smart tv)" autocomplete="off">
       <select id="fstore"><option value="">Todas las tiendas</option></select>
+      <select id="fcategory" style="display:none"><option value="">Todas las categorías</option></select>
       <input id="fmin" type="number" min="0" placeholder="Precio mín">
       <input id="fmax" type="number" min="0" placeholder="Precio máx">
       <select id="fsort">
@@ -170,6 +171,9 @@
         <option value="price_desc">Precio: mayor a menor</option>
         <option value="discount">Mayor descuento</option>
       </select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted);white-space:nowrap;cursor:pointer">
+        <input type="checkbox" id="fstock" checked> Ocultar agotados
+      </label>
       <button id="fclear" class="pg-btn">Limpiar</button>
     </div>
     <div id="grid" class="grid"><div class="spinner">Cargando…</div></div>
@@ -273,12 +277,29 @@ let storesLoaded = false;
 
 function getFilters(){
   return {
-    q:     document.getElementById('fq').value.trim(),
-    store: document.getElementById('fstore').value,
-    min:   document.getElementById('fmin').value,
-    max:   document.getElementById('fmax').value,
-    sort:  document.getElementById('fsort').value,
+    q:        document.getElementById('fq').value.trim(),
+    store:    document.getElementById('fstore').value,
+    category: document.getElementById('fcategory').value,
+    min:      document.getElementById('fmin').value,
+    max:      document.getElementById('fmax').value,
+    sort:     document.getElementById('fsort').value,
+    in_stock: document.getElementById('fstock').checked ? '1' : '',
   };
+}
+
+async function loadCategories(){
+  const store = document.getElementById('fstore').value;
+  const sel = document.getElementById('fcategory');
+  sel.value = '';
+  if(!store){ sel.style.display = 'none'; return; }
+  try{
+    const j = await (await fetch(`${API}/categories.php?store=${encodeURIComponent(store)}`)).json();
+    if(j.ok && j.categories.length){
+      sel.innerHTML = '<option value="">Todas las categorías</option>' +
+        j.categories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+      sel.style.display = '';
+    } else { sel.style.display = 'none'; }
+  }catch(e){ sel.style.display = 'none'; }
 }
 
 function populateStores(stores){
@@ -300,10 +321,12 @@ async function loadGrid(){
     offset: all ? 0 : PAGE.offset,
     sort:   f.sort,
   });
-  if(f.q)     params.set('q', f.q);
-  if(f.store) params.set('store', f.store);
-  if(f.min)   params.set('min', f.min);
-  if(f.max)   params.set('max', f.max);
+  if(f.q)        params.set('q', f.q);
+  if(f.store)    params.set('store', f.store);
+  if(f.category) params.set('category', f.category);
+  if(f.min)      params.set('min', f.min);
+  if(f.max)      params.set('max', f.max);
+  if(f.in_stock) params.set('in_stock', f.in_stock);
   try{
     const r = await fetch(`${API}/products.php?${params}`);
     const j = await r.json();
@@ -520,11 +543,16 @@ function applyFilters(){ PAGE.offset = 0; loadGrid(); }
   document.getElementById(id).addEventListener('input', () => {
     clearTimeout(filterTimer); filterTimer = setTimeout(applyFilters, 350);
   }));
-['fstore','fsort'].forEach(id =>
+['fsort','fcategory','fstock'].forEach(id =>
   document.getElementById(id).addEventListener('change', applyFilters));
+document.getElementById('fstore').addEventListener('change', async () => {
+  await loadCategories(); applyFilters();
+});
 document.getElementById('fclear').addEventListener('click', () => {
   ['fq','fstore','fmin','fmax'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('fsort').value = 'name';
+  document.getElementById('fstock').checked = true;
+  const fc = document.getElementById('fcategory'); fc.value = ''; fc.style.display = 'none';
   applyFilters();
 });
 

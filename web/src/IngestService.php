@@ -91,6 +91,7 @@ final class IngestService
                         brand = COALESCE(?, brand),
                         image_url = COALESCE(?, image_url),
                         url = COALESCE(?, url),
+                        category_external_id = COALESCE(?, category_external_id),
                         last_seen_at = ?
                   WHERE id = ?'
             );
@@ -99,6 +100,7 @@ final class IngestService
                 $it['brand'] ?? null,
                 $it['image_url'] ?? null,
                 $it['url'] ?? null,
+                $it['category_id'] ?? null,
                 $capturedAt,
                 (int) $id,
             ]);
@@ -106,12 +108,13 @@ final class IngestService
         }
 
         $ins = $this->db->prepare(
-            'INSERT INTO products (store_id, external_sku, url, title, brand, image_url, first_seen_at, last_seen_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO products (store_id, external_sku, category_external_id, url, title, brand, image_url, first_seen_at, last_seen_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $ins->execute([
             $storeId,
             $sku,
+            $it['category_id'] ?? null,
             $it['url'] ?? '',
             $it['title'] ?? null,
             $it['brand'] ?? null,

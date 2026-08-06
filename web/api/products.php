@@ -20,13 +20,15 @@ try {
     $offset = isset($_GET['offset']) ? (int) $_GET['offset'] : 0;
 
     $res = $repo->search([
-        'q'      => $_GET['q']     ?? null,
-        'store'  => $_GET['store'] ?? null,
-        'min'    => $_GET['min']   ?? null,
-        'max'    => $_GET['max']   ?? null,
-        'sort'   => $_GET['sort']  ?? 'name',
-        'limit'  => $limit,
-        'offset' => $offset,
+        'q'        => $_GET['q']        ?? null,
+        'store'    => $_GET['store']    ?? null,
+        'min'      => $_GET['min']      ?? null,
+        'max'      => $_GET['max']      ?? null,
+        'in_stock' => $_GET['in_stock'] ?? null,
+        'category' => $_GET['category'] ?? null,
+        'sort'     => $_GET['sort']     ?? 'name',
+        'limit'    => $limit,
+        'offset'   => $offset,
     ]);
 
     http_response_code(200);

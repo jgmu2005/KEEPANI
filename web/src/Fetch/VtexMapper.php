@@ -49,6 +49,7 @@ final class VtexMapper
             taxIncluded: $taxIncluded,
             taxRate:     $taxRate,
             listPrice:   $listPrice,
+            categoryId:  isset($p['categoryId']) ? (int) $p['categoryId'] : null,
         );
     }
 }

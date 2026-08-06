@@ -199,6 +199,27 @@ final class ProductRepository
         );
     }
 
+    /** Categorías de una tienda que tienen al menos un producto (para el filtro). */
+    public function categoriesWithProducts(string $storeSlug): array
+    {
+        $sql = 'SELECT c.external_id AS id, c.name
+                  FROM categories c
+                  JOIN stores s ON s.id = c.store_id
+                 WHERE s.slug = ?
+                   AND EXISTS (
+                        SELECT 1 FROM products p
+                         WHERE p.store_id = c.store_id
+                           AND p.category_external_id = c.external_id
+                           AND p.is_active = 1)
+                 ORDER BY c.name';
+        $st = $this->db->prepare($sql);
+        $st->execute([$storeSlug]);
+        return array_map(
+            static fn(array $r): array => ['id' => (int) $r['id'], 'name' => $r['name']],
+            $st->fetchAll()
+        );
+    }
+
     /**
      * Búsqueda/filtrado COMBINADO de productos rastreados (todo junto):
      *   q (nombre), store (slug), min/max (precio final), sort, limit, offset.
@@ -224,6 +245,13 @@ final class ProductRepository
         if (isset($f['max']) && $f['max'] !== '' && $f['max'] !== null) {
             $where[] = 'ph.price_final <= :max';
             $params[':max'] = (float) $f['max'];
+        }
+        if (!empty($f['in_stock'])) {
+            $where[] = 'ph.in_stock = 1';
+        }
+        if (!empty($f['category'])) {
+            $where[] = 'p.category_external_id = :cat';
+            $params[':cat'] = (int) $f['category'];
         }
         $whereSql = implode(' AND ', $where);
 
