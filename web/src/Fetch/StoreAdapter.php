@@ -13,4 +13,7 @@ interface StoreAdapter
 
     /** Trae y normaliza UN producto por su SKU; null si no existe o falla. */
     public function fetchBySku(string $sku): ?NormalizedProduct;
+
+    /** Trae por URL (para tiendas cuya URL no se arma desde el SKU, ej. Magento). */
+    public function fetchByUrl(string $url, string $sku): ?NormalizedProduct;
 }

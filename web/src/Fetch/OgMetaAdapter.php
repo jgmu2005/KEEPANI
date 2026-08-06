@@ -34,9 +34,15 @@ final class OgMetaAdapter implements StoreAdapter
 
     public function fetchBySku(string $sku): ?NormalizedProduct
     {
-        $path = str_replace('{sku}', rawurlencode($sku), $this->productPath);
-        $url  = rtrim($this->baseUrl, '/') . $path;
+        if (!str_contains($this->productPath, '{sku}')) {
+            return null; // esta tienda no arma la URL desde el sku → usar fetchByUrl
+        }
+        $url = rtrim($this->baseUrl, '/') . str_replace('{sku}', rawurlencode($sku), $this->productPath);
+        return $this->fetchByUrl($url, $sku);
+    }
 
+    public function fetchByUrl(string $url, string $sku): ?NormalizedProduct
+    {
         $html = $this->http->get($url, ['Accept: text/html']);
         if ($html === null) {
             return null;
@@ -50,10 +56,19 @@ final class OgMetaAdapter implements StoreAdapter
         $availRaw = strtolower((string) $this->meta($html, 'product:availability'));
         $inStock  = str_contains($availRaw, 'in stock') || str_contains($availRaw, 'instock');
 
+        // Precio de lista (Magento: data-price-amount; el mayor > precio = precio tachado).
+        $list = null;
+        if (preg_match_all('/data-price-amount="([0-9.]+)"/', $html, $mm)) {
+            $max = max(array_map('floatval', $mm[1]));
+            if ($max > (float) $priceRaw) {
+                $list = $max;
+            }
+        }
+
         return new NormalizedProduct(
             storeSlug:   $this->slug,
             sku:         $sku,
-            url:         $this->meta($html, 'og:url') ?? $url,
+            url:         $this->meta($html, 'og:url') ?: $url,
             title:       $this->meta($html, 'og:title') ?: null,
             brand:       $this->meta($html, 'product:brand') ?: null,
             imageUrl:    $this->meta($html, 'og:image'),
@@ -62,6 +77,7 @@ final class OgMetaAdapter implements StoreAdapter
             inStock:     $inStock,
             taxIncluded: $this->taxIncluded,
             taxRate:     $this->taxRate,
+            listPrice:   $list,
         );
     }
 

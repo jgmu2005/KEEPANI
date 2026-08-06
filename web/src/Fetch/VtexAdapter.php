@@ -28,6 +28,12 @@ final class VtexAdapter implements StoreAdapter
         return $this->slug;
     }
 
+    /** En VTEX el sku (productId/RefId) basta; la URL no hace falta. */
+    public function fetchByUrl(string $url, string $sku): ?NormalizedProduct
+    {
+        return $this->fetchBySku($sku);
+    }
+
     /** Consulta el catálogo por un campo (productId o alternateIds_RefId). */
     private function searchBy(string $field, string $value): ?array
     {

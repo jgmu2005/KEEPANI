@@ -119,8 +119,11 @@ final class ProductRepository
         $sku = match ($store['platform']) {
             // VTEX: .../slug-del-producto-{ref-o-productId}/p
             'vtex'    => (preg_match('~-(\d+)(?:/p)?/?(?:[?#].*)?$~', $url, $m) ? $m[1] : null),
-            // Copasa OG: .../Product/Detail/{sku}
-            'og_meta' => (preg_match('~/Product/Detail/([^/?#]+)~i', $url, $m) ? rawurldecode($m[1]) : null),
+            // OG: Copasa (.../Product/Detail/{sku}) o Gallo/Magento (.../slug-{id})
+            'og_meta' => (
+                preg_match('~/Product/Detail/([^/?#]+)~i', $url, $m) ? rawurldecode($m[1])
+                    : (preg_match('~-(\d+)/?(?:[?#].*)?$~', $url, $m2) ? $m2[1] : null)
+            ),
             default   => null,
         };
 

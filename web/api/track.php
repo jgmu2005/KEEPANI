@@ -56,7 +56,9 @@ try {
 
         try {
             $adapter = AdapterFactory::fromStore($storeRow, new Http());
-            $rec = $adapter->fetchBySku($loc['sku']);
+            $rec = ($url !== null && $url !== '')
+                ? $adapter->fetchByUrl((string) $url, $loc['sku'])
+                : $adapter->fetchBySku($loc['sku']);
         } catch (\Throwable $e) {
             out(502, ['ok' => false, 'error' => 'No se pudo leer la tienda', 'detail' => $e->getMessage()]);
         }

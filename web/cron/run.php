@@ -59,7 +59,7 @@ try {
     }
 
     // Productos activos, los más desactualizados primero (NULL = nunca capturado).
-    $sql = 'SELECT p.id, p.store_id, p.external_sku
+    $sql = 'SELECT p.id, p.store_id, p.external_sku, p.url
               FROM products p
               LEFT JOIN (
                     SELECT product_id, MAX(captured_at) AS last_at
@@ -81,7 +81,7 @@ try {
         }
         try {
             $adapter = AdapterFactory::fromStore($store, $http);
-            $rec = $adapter->fetchBySku((string) $p['external_sku']);
+            $rec = $adapter->fetchByUrl((string) $p['url'], (string) $p['external_sku']);
             if ($rec === null) {
                 $failed[] = ['store' => $store['slug'], 'sku' => $p['external_sku']];
                 continue;
