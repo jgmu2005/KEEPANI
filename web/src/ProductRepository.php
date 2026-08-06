@@ -135,7 +135,7 @@ final class ProductRepository
     {
         $st = $this->db->prepare(
             'SELECT p.id, p.external_sku AS sku, p.title, p.brand, p.image_url, p.url,
-                    s.slug AS store, s.name AS store_name, s.currency,
+                    s.slug AS store, s.name AS store_name, s.currency, s.tax_included,
                     g.slug AS group_slug, g.store_count AS group_stores
                FROM products p
                JOIN stores s ON s.id = p.store_id
@@ -148,6 +148,7 @@ final class ProductRepository
             return null;
         }
         $row['group_stores'] = $row['group_stores'] !== null ? (int) $row['group_stores'] : null;
+        $row['tax_added']    = !(bool) $row['tax_included'];
         return $row;
     }
 
@@ -290,7 +291,7 @@ final class ProductRepository
         $total = (int) $countStmt->fetchColumn();
 
         $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
-                       s.slug AS store, s.name AS store_name,
+                       s.slug AS store, s.name AS store_name, s.tax_included,
                        ph.price_final, ph.list_price, ph.discount_pct,
                        ph.currency, ph.in_stock, ph.captured_date AS last_date,
                        pg.slug AS group_slug, pg.store_count AS group_stores
@@ -314,6 +315,7 @@ final class ProductRepository
                 'discount_pct' => $r['discount_pct'] !== null ? (float) $r['discount_pct'] : null,
                 'currency'     => $r['currency'] ?? 'NIO',
                 'in_stock'     => (bool) $r['in_stock'],
+                'tax_added'    => !(bool) $r['tax_included'],
                 'last_date'    => $r['last_date'],
                 'group_slug'   => $r['group_slug'] ?? null,
                 'group_stores' => $r['group_stores'] !== null ? (int) $r['group_stores'] : null,
@@ -365,7 +367,7 @@ final class ProductRepository
 
         $st = $this->db->prepare(
             'SELECT p.id, p.title, p.brand, p.image_url, p.url,
-                    s.slug AS store, s.name AS store_name,
+                    s.slug AS store, s.name AS store_name, s.tax_included,
                     ph.price_final, ph.list_price, ph.currency, ph.in_stock, ph.captured_date AS last_date
                FROM products p
                JOIN stores s ON s.id = p.store_id
@@ -388,6 +390,7 @@ final class ProductRepository
                 'list_price'  => $r['list_price'] !== null ? (float) $r['list_price'] : null,
                 'currency'    => $r['currency'] ?? 'NIO',
                 'in_stock'    => (bool) $r['in_stock'],
+                'tax_added'   => !(bool) $r['tax_included'], // precio con IVA estimado (+15%)
                 'last_date'   => $r['last_date'],
             ];
         }, $st->fetchAll());

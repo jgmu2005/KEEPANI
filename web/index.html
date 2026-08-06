@@ -353,7 +353,7 @@ function cardHtml(p){
       <span class="badge">${p.store_name || p.store}</span>
       <div class="title">${escapeHtml(p.title || '(sin título)')}</div>
       <div class="price">${money(p.price_final, cur)}${hasDisc ? ` <span class="old-price">${money(p.list_price, cur)}</span>` : ''}</div>
-      <div class="usd">${usd(p.price_final)}</div>
+      <div class="usd">${usd(p.price_final)}${p.tax_added ? ' · IVA est.' : ''}</div>
       ${hasDisc ? `<div class="save">Ahorrás ${money(saving, cur)}${pct ? ` · ${pct}%` : ''}</div>` : ''}
       ${sparkline(p.series)}
       ${p.group_slug && p.group_stores >= 2 ? `<a class="cmp" href="producto.php?slug=${encodeURIComponent(p.group_slug)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">⚖️ en ${p.group_stores} tiendas</a>` : ''}
@@ -553,6 +553,7 @@ async function openDetail(params, endpoint='history.php'){
       <div class="stat"><div class="k">Máximo histórico</div><div class="v max">${money(s.max,cur)}</div></div>
       <div class="stat"><div class="k">Disponibilidad</div><div class="v" style="font-size:1rem">${s.in_stock ? '✅ En stock':'❌ Agotado'}</div></div>
     </div>
+    ${p.tax_added ? `<div class="note" style="padding:2px 20px 0;color:var(--muted);font-size:.82rem">ℹ️ Precio con IVA estimado (+15%); en la tienda se muestra sin IVA (se suma en la caja).</div>` : ''}
     ${p.group_slug && p.group_stores >= 2 ? `<a class="compare-cta" href="producto.php?slug=${encodeURIComponent(p.group_slug)}" target="_blank" rel="noopener">⚖️ Comparar precio en ${p.group_stores} tiendas →</a>` : ''}
     ${dealSentence(j.deal, cur)}
     <div class="chart-box"><canvas id="chart" height="220"></canvas></div>

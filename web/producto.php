@@ -216,6 +216,8 @@ if ($priced) {
   tr:last-child td{border-bottom:0}
   .price{font-weight:800;font-size:1.05rem;white-space:nowrap}
   .old{color:var(--muted);text-decoration:line-through;font-size:.82rem;font-weight:500;margin-left:6px}
+  .taxest{display:block;color:var(--muted);font-size:.66rem;font-weight:600}
+  .taxnote{margin-top:10px;font-size:.8rem;color:var(--muted);background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
   .usd{color:var(--muted);font-size:.72rem}
   .cheap{background:#f0fdf4}
   .tag{display:inline-block;font-size:.64rem;font-weight:800;color:#065f46;background:#d1fae5;padding:2px 7px;border-radius:999px;margin-left:6px}
@@ -295,7 +297,7 @@ if ($priced) {
     ?>
       <tr class="<?= $isCheap ? 'cheap' : '' ?>">
         <td><b><?= $h($o['store_name']) ?></b><?= $isCheap ? '<span class="tag">💚 más barato</span>' : '' ?></td>
-        <td class="price"><?= $fmt($o['price_final'], $o['currency']) ?><?php if ($hasDisc): ?><span class="old"><?= $fmt($o['list_price'], $o['currency']) ?></span><?php endif; ?></td>
+        <td class="price"><?= $fmt($o['price_final'], $o['currency']) ?><?php if ($hasDisc): ?><span class="old"><?= $fmt($o['list_price'], $o['currency']) ?></span><?php endif; ?><?php if (!empty($o['tax_added'])): ?><small class="taxest">IVA estimado incluido</small><?php endif; ?></td>
         <td class="usd c-usd"><?= $h($usd($o['price_final'])) ?></td>
         <td><span class="st <?= $o['in_stock'] ? 'in' : 'out' ?>"><?= $o['in_stock'] ? '● En stock' : '○ Agotado' ?></span></td>
         <td><a class="go" href="<?= $h($o['url']) ?>" target="_blank" rel="noopener">Ver ↗</a></td>
@@ -303,6 +305,9 @@ if ($priced) {
     <?php endforeach; ?>
     </tbody>
   </table>
+  <?php if (array_filter($offers, static fn($o) => !empty($o['tax_added']))): ?>
+    <div class="taxnote">ℹ️ En tiendas tipo club (ej. PriceSmart) el precio de góndola se muestra <b>sin IVA</b> y el impuesto se agrega en la caja. Acá lo mostramos <b>con IVA estimado (+15%)</b> para comparar de forma justa con el resto.</div>
+  <?php endif; ?>
 
   <div class="stats-strip">
     <div class="s"><div class="k">Más barato ahora</div><div class="v lo"><?= $fmt($low, $cur) ?></div></div>
