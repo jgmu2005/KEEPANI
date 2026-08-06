@@ -66,6 +66,11 @@
         <div><label>Link PayPal</label><input id="donate_paypal" placeholder="https://paypal.me/tuusuario"></div>
       </div>
       <label>Nota del footer</label><textarea id="footer_note"></textarea>
+      <div class="row">
+        <div style="max-width:200px"><label>Tope Gratis (productos)</label><input id="limit_free" type="number" min="0"></div>
+        <div style="max-width:200px"><label>Tope Un-pago (productos)</label><input id="limit_onetime" type="number" min="0"></div>
+      </div>
+      <p style="font-size:.8rem;color:var(--muted);margin:8px 0 0">Suscripción = ilimitado mientras esté activa.</p>
       <div style="margin-top:16px"><button id="saveBtn">Guardar ajustes</button></div>
     </div>
 
@@ -105,7 +110,7 @@
       <p style="font-size:.8rem;color:var(--muted);margin:12px 0 0">
         En Ko-fi: <b>Settings → Webhooks & API</b> → pegá la URL de arriba en "Webhook URL" y copiá el
         "Verification Token" al campo. El botón <b>“Guardar ajustes”</b> (arriba) guarda el token.
-        Cuando alguien done con el correo de su cuenta, sube a <b>Donante</b> solo.
+        Cuando alguien done/suscriba con el correo de su cuenta, sube de nivel solo (un-pago o suscripción).
       </p>
       <h2 style="margin-top:22px">Donaciones recibidas</h2>
       <div style="overflow-x:auto"><table>
@@ -129,7 +134,7 @@
 
 <script>
 const API = './api';
-const PUB_KEYS = ['site_name','tagline','hero_text','logo_emoji','donate_kofi','donate_paypal','footer_note'];
+const PUB_KEYS = ['site_name','tagline','hero_text','logo_emoji','donate_kofi','donate_paypal','footer_note','limit_free','limit_onetime'];
 const SMTP_KEYS = ['smtp_host','smtp_port','smtp_secure','smtp_user','smtp_from_email','smtp_from_name','smtp_pass'];
 const FORM_KEYS = [...PUB_KEYS, ...SMTP_KEYS, 'kofi_token'];
 const MASKED = ['smtp_pass', 'kofi_token'];
@@ -194,8 +199,9 @@ async function loadUsers(){
     <td>${esc(u.email)}</td>
     <td><select data-id="${u.id}" class="tierSel">
       <option value="free" ${u.tier==='free'?'selected':''}>Gratis</option>
-      <option value="donor" ${u.tier==='donor'?'selected':''}>Donante</option>
-    </select></td>
+      <option value="onetime" ${u.tier==='onetime'?'selected':''}>Un pago</option>
+      <option value="subscriber" ${u.tier==='subscriber'?'selected':''}>Suscripción</option>
+    </select>${u.tier==='subscriber' && u.subscription_until ? `<div style="font-size:.72rem;color:var(--muted)">hasta ${esc(u.subscription_until.slice(0,10))}</div>` : ''}</td>
     <td>${u.alerts}</td>
     <td>${esc((u.created_at||'').slice(0,10))}</td>
   </tr>`).join('');

@@ -32,6 +32,10 @@ if ($expected === '' || !is_string($sent) || !hash_equals($expected, $sent)) {
     out(401, ['ok' => false, 'error' => 'No autorizado']);
 }
 
+// Mantenimiento diario: bajar a 'free' las suscripciones vencidas.
+$db->exec("UPDATE users SET tier = 'free'
+            WHERE tier = 'subscriber' AND subscription_until IS NOT NULL AND subscription_until < NOW()");
+
 $mailer   = Mailer::fromSettings($db);
 $siteName = Settings::all($db)['site_name'] ?? 'Ojo al Precio';
 $base = Verification::baseUrl();

@@ -55,7 +55,7 @@ if (Alerts::countActive($db, $u['id']) >= $u['alert_limit']) {
     echo json_encode([
         'ok' => false,
         'limit_reached' => true,
-        'error' => "Alcanzaste tu límite de {$u['alert_limit']} productos. Con una donación subís a 10.",
+        'error' => "Alcanzaste tu límite de {$u['alert_limit']} productos. Doná (o suscribite) para rastrear más.",
     ]);
     exit;
 }

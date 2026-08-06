@@ -13,7 +13,7 @@ header('Content-Type: application/json; charset=utf-8');
 $db = Db::conn();
 Auth::requireAdmin($db);
 
-$sql = 'SELECT u.id, u.email, u.tier, u.donated_at, u.created_at,
+$sql = 'SELECT u.id, u.email, u.tier, u.subscription_until, u.donated_at, u.created_at,
                COUNT(a.id) AS alerts
           FROM users u
           LEFT JOIN alerts a ON a.user_id = u.id AND a.is_active = 1
@@ -23,12 +23,13 @@ $sql = 'SELECT u.id, u.email, u.tier, u.donated_at, u.created_at,
 
 $users = array_map(static function (array $r): array {
     return [
-        'id'         => (int) $r['id'],
-        'email'      => $r['email'],
-        'tier'       => $r['tier'],
-        'alerts'     => (int) $r['alerts'],
-        'donated_at' => $r['donated_at'],
-        'created_at' => $r['created_at'],
+        'id'                 => (int) $r['id'],
+        'email'              => $r['email'],
+        'tier'               => $r['tier'],
+        'alerts'             => (int) $r['alerts'],
+        'subscription_until' => $r['subscription_until'],
+        'donated_at'         => $r['donated_at'],
+        'created_at'         => $r['created_at'],
     ];
 }, $db->query($sql)->fetchAll());
 

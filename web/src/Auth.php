@@ -11,8 +11,21 @@ use PDO;
  */
 final class Auth
 {
-    /** Nivel → máximo de productos que puede rastrear (alertas). Configurable acá. */
-    public const LIMITS = ['free' => 2, 'donor' => 10];
+    public const TIERS = ['free', 'onetime', 'subscriber'];
+    public const UNLIMITED = 1000000;
+
+    /** Tope de alertas por nivel (límites en settings) + vigencia de suscripción. */
+    public static function alertLimit(PDO $db, string $tier, ?string $subscriptionUntil): int
+    {
+        $s = Settings::all($db);
+        $free    = max(0, (int) ($s['limit_free'] ?? 5));
+        $onetime = max(0, (int) ($s['limit_onetime'] ?? 15));
+        if ($tier === 'subscriber') {
+            $active = $subscriptionUntil === null || strtotime($subscriptionUntil) > time();
+            return $active ? self::UNLIMITED : $free;
+        }
+        return $tier === 'onetime' ? $onetime : $free;
+    }
 
     /** Dominios de correo desechable/temporal — bloqueados en el registro. */
     private const DISPOSABLE = [
@@ -104,7 +117,7 @@ final class Auth
         if (!$id) {
             return null;
         }
-        $st = $db->prepare('SELECT id, email, tier, is_verified, donated_at, created_at FROM users WHERE id = ?');
+        $st = $db->prepare('SELECT id, email, tier, is_verified, subscription_until, donated_at, created_at FROM users WHERE id = ?');
         $st->execute([$id]);
         $u = $st->fetch();
         if (!$u) {
@@ -114,14 +127,15 @@ final class Auth
         $isAdmin = $adminEmail !== '' && strtolower($u['email']) === $adminEmail;
 
         return [
-            'id'          => (int) $u['id'],
-            'email'       => $u['email'],
-            'tier'        => $u['tier'],
-            'alert_limit' => self::LIMITS[$u['tier']] ?? self::LIMITS['free'],
-            'is_admin'    => $isAdmin,
-            'is_verified' => (bool) $u['is_verified'],
-            'donated_at'  => $u['donated_at'],
-            'created_at'  => $u['created_at'],
+            'id'                 => (int) $u['id'],
+            'email'              => $u['email'],
+            'tier'               => $u['tier'],
+            'alert_limit'        => self::alertLimit($db, $u['tier'], $u['subscription_until']),
+            'is_admin'           => $isAdmin,
+            'is_verified'        => (bool) $u['is_verified'],
+            'subscription_until' => $u['subscription_until'],
+            'donated_at'         => $u['donated_at'],
+            'created_at'         => $u['created_at'],
         ];
     }
 

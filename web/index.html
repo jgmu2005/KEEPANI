@@ -452,7 +452,7 @@ async function openMyAlerts(){
   if(!j.ok){ detail.innerHTML = `<div class="spinner">Necesitás iniciar sesión.</div>`; return; }
   let html = `<div style="padding:22px">
     <h3 style="margin:0 0 4px">🔔 Mis alertas</h3>
-    <p class="note" style="margin:0 0 16px">${j.alerts.length} de ${j.limit} productos · ${j.tier === 'donor' ? 'Donante' : 'Gratis'}${j.tier!=='donor' ? ' · doná para subir a 10' : ''}.</p>`;
+    <p class="note" style="margin:0 0 16px">${j.alerts.length} de ${j.limit >= 1000000 ? 'ilimitado' : j.limit} productos · ${tierLabel(j.tier)}${j.tier === 'free' ? ' · doná y subí tu tope' : ''}.</p>`;
   if(!j.alerts.length){
     html += `<div class="empty">Todavía no tenés alertas. Abrí un producto y creá una. 🔔</div>`;
   } else {
@@ -558,6 +558,7 @@ document.getElementById('fclear').addEventListener('click', () => {
 
 // --- Cuentas / sesión ---
 const AUTH = { user: null, mode: 'login' };
+const tierLabel = t => t === 'subscriber' ? 'Suscripción' : (t === 'onetime' ? 'Un pago' : 'Gratis');
 
 let tsWidgetId = null;
 function maybeRenderTurnstile(){
@@ -579,7 +580,7 @@ async function checkAuth(){
 function renderAuth(){
   const a = document.getElementById('authArea');
   if(AUTH.user){
-    const tier = AUTH.user.tier === 'donor' ? 'Donante' : 'Gratis';
+    const tier = tierLabel(AUTH.user.tier);
     const warn = AUTH.user.is_verified ? '' :
       `<button class="btn-auth" id="verifyBtn" style="background:rgba(234,179,8,.22);border-color:rgba(234,179,8,.5)">⚠️ Verificá tu correo</button>`;
     a.innerHTML = `${warn}

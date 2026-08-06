@@ -48,6 +48,10 @@ $limit = max(1, min($limit, 1000));
 try {
     $db = Db::conn();
 
+    // Mantenimiento: bajar a 'free' las suscripciones vencidas (Ko-fi no siempre avisa).
+    $db->exec("UPDATE users SET tier = 'free'
+                WHERE tier = 'subscriber' AND subscription_until IS NOT NULL AND subscription_until < NOW()");
+
     // Tiendas indexadas por id.
     $stores = [];
     foreach ($db->query('SELECT * FROM stores') as $s) {

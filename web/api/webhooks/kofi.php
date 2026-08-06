@@ -68,8 +68,16 @@ if ($ins->rowCount() === 0) {
 // Acreditar a un usuario.
 $userId = matchUser($db, $email, (string) ($data['message'] ?? ''));
 if ($userId) {
-    $db->prepare("UPDATE users SET tier = 'donor', donated_at = COALESCE(donated_at, NOW()) WHERE id = ?")
-       ->execute([$userId]);
+    $isSub = ($data['type'] ?? '') === 'Subscription' || !empty($data['is_subscription_payment']);
+    if ($isSub) {
+        // Suscripción: ilimitado. Vigencia +34 días (se renueva con cada pago).
+        $db->prepare("UPDATE users SET tier = 'subscriber', subscription_until = (NOW() + INTERVAL 34 DAY), donated_at = COALESCE(donated_at, NOW()) WHERE id = ?")
+           ->execute([$userId]);
+    } else {
+        // Un pago: sube a 'onetime' (sin bajar a un suscriptor activo).
+        $db->prepare("UPDATE users SET tier = IF(tier = 'subscriber', 'subscriber', 'onetime'), donated_at = COALESCE(donated_at, NOW()) WHERE id = ?")
+           ->execute([$userId]);
+    }
     $db->prepare('UPDATE donations SET matched_user_id = ? WHERE source = ? AND external_id = ?')
        ->execute([$userId, 'kofi', $msgId]);
 }

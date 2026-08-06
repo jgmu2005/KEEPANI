@@ -18,6 +18,7 @@ final class Settings
     public const PUBLIC_KEYS = [
         'site_name', 'tagline', 'hero_text', 'logo_emoji',
         'donate_kofi', 'donate_paypal', 'footer_note',
+        'limit_free', 'limit_onetime',
     ];
 
     public const SMTP_KEYS = [
