@@ -26,6 +26,15 @@ $siteName = $settings['site_name'] ?? 'Ojo al Precio';
 $usdRate  = (float) ($settings['usd_rate'] ?? 0);
 $base     = rtrim(Verification::baseUrl(), '/');
 
+$normUrl    = static function (?string $u): string {
+    $u = trim((string) $u);
+    if ($u === '') return '';
+    return preg_match('~^https?://~i', $u) ? $u : 'https://' . $u;
+};
+$kofi       = $normUrl($settings['donate_kofi'] ?? '');
+$paypal     = $normUrl($settings['donate_paypal'] ?? '');
+$footerNote = trim((string) ($settings['footer_note'] ?? ''));
+
 $h    = static fn($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 $fmt  = static function (?float $v, string $cur): string {
     if ($v === null) return '—';
@@ -109,6 +118,7 @@ $cur     = $offers[0]['currency'] ?? 'NIO';
 $title   = $g['canonical_title'] ?: 'Producto';
 $image   = $g['image_url'] ?: ($offers[0]['image_url'] ?? '');
 $cheapest = $priced[0] ?? null; // ya vienen ordenadas por precio asc
+$trackId  = (int) ($cheapest['id'] ?? ($offers[0]['id'] ?? 0)); // para deep-link a la ficha
 $pageUrl = $base . '/producto.php?slug=' . rawurlencode((string) $g['slug']);
 
 // Series por tienda para el gráfico + mínimos/máximos históricos.
@@ -213,6 +223,13 @@ if ($priced) {
   .st.in{color:var(--ok)} .st.out{color:var(--bad)}
   .go{background:var(--brand);color:#fff;padding:8px 13px;border-radius:8px;font-weight:700;white-space:nowrap}
   .foot{margin-top:26px;color:var(--muted);font-size:.82rem;text-align:center}
+  .cta-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#fff;padding:11px 18px;border-radius:9px;font-weight:800}
+  .site-foot{margin-top:34px;padding-top:20px;border-top:1px solid var(--line);text-align:center;color:var(--muted);font-size:.84rem}
+  .site-foot .donate{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center;margin:12px 0}
+  .site-foot .donate a{background:#1e293b;color:#e2e8f0;padding:8px 14px;border-radius:8px;font-weight:600}
+  .site-foot .legal{margin:12px 0}
+  .site-foot .legal a{color:var(--brand-dk);font-weight:600}
   /* header con marca */
   .site{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff}
   .site .in{max-width:820px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -257,7 +274,12 @@ if ($priced) {
           · en <?= (int) $g['store_count'] ?> tienda<?= $g['store_count'] === 1 ? '' : 's' ?>
         </div>
       <?php endif; ?>
-      <a class="share" href="<?= $h($waUrl) ?>" target="_blank" rel="noopener">📲 Compartir por WhatsApp</a>
+      <div class="cta-row">
+        <?php if ($trackId > 0): ?>
+          <a class="btn-primary" href="index.html?p=<?= $trackId ?>">🔔 Trackear este producto</a>
+        <?php endif; ?>
+        <a class="share" href="<?= $h($waUrl) ?>" target="_blank" rel="noopener">📲 Compartir</a>
+      </div>
     </div>
   </div>
 
@@ -296,8 +318,18 @@ if ($priced) {
     <div class="nodata">📅 Necesitamos algunos días más de datos para dibujar la tendencia. Volvé pronto.</div>
   <?php endif; ?>
 
-  <p class="foot">Precios referenciales, tomados de cada tienda. Verificá el precio final antes de comprar.<br>
-    Comparación de <?= $h($siteName) ?> 🇳🇮</p>
+  <footer class="site-foot">
+    <?php if ($footerNote !== ''): ?><p><?= $h($footerNote) ?></p><?php endif; ?>
+    <?php if ($kofi !== '' || $paypal !== ''): ?>
+      <div class="donate">
+        <span>¿Te sirve? Ayudanos a mantenerlo:</span>
+        <?php if ($kofi   !== ''): ?><a href="<?= $h($kofi) ?>" target="_blank" rel="noopener">☕ Doná (Ko-fi)</a><?php endif; ?>
+        <?php if ($paypal !== ''): ?><a href="<?= $h($paypal) ?>" target="_blank" rel="noopener">💳 PayPal</a><?php endif; ?>
+      </div>
+    <?php endif; ?>
+    <p class="legal"><a href="index.html">Inicio</a> · <a href="ayuda.html">Ayuda</a> · <a href="terminos.html">Términos y privacidad</a></p>
+    <p>Precios referenciales, tomados de cada tienda. Verificá el precio final antes de comprar. · <?= $h($siteName) ?> 🇳🇮</p>
+  </footer>
 </div>
 </body>
 </html>
