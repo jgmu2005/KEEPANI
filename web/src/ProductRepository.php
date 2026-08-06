@@ -284,7 +284,12 @@ final class ProductRepository
 
         $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
                        s.slug AS store, s.name AS store_name,
-                       ph.price_final, ph.currency, ph.in_stock, ph.captured_date AS last_date
+                       ph.price_final, ph.list_price, ph.discount_pct,
+                       ph.currency, ph.in_stock, ph.captured_date AS last_date,
+                       (SELECT MIN(h.price_final) FROM price_history h
+                          WHERE h.product_id = p.id AND h.price_final IS NOT NULL) AS min_ever,
+                       (SELECT COUNT(DISTINCT h.captured_date) FROM price_history h
+                          WHERE h.product_id = p.id) AS days_tracked
                 ' . $base . '
                 ORDER BY ' . $orderSql . '
                 LIMIT ' . $limit . ' OFFSET ' . $offset;
@@ -293,17 +298,21 @@ final class ProductRepository
 
         $items = array_map(static function (array $r): array {
             return [
-                'id'          => (int) $r['id'],
-                'title'       => $r['title'],
-                'brand'       => $r['brand'],
-                'image_url'   => $r['image_url'],
-                'url'         => $r['url'],
-                'store'       => $r['store'],
-                'store_name'  => $r['store_name'],
-                'price_final' => $r['price_final'] !== null ? (float) $r['price_final'] : null,
-                'currency'    => $r['currency'] ?? 'NIO',
-                'in_stock'    => (bool) $r['in_stock'],
-                'last_date'   => $r['last_date'],
+                'id'           => (int) $r['id'],
+                'title'        => $r['title'],
+                'brand'        => $r['brand'],
+                'image_url'    => $r['image_url'],
+                'url'          => $r['url'],
+                'store'        => $r['store'],
+                'store_name'   => $r['store_name'],
+                'price_final'  => $r['price_final'] !== null ? (float) $r['price_final'] : null,
+                'list_price'   => $r['list_price'] !== null ? (float) $r['list_price'] : null,
+                'discount_pct' => $r['discount_pct'] !== null ? (float) $r['discount_pct'] : null,
+                'min_ever'     => $r['min_ever'] !== null ? (float) $r['min_ever'] : null,
+                'days_tracked' => (int) $r['days_tracked'],
+                'currency'     => $r['currency'] ?? 'NIO',
+                'in_stock'     => (bool) $r['in_stock'],
+                'last_date'    => $r['last_date'],
             ];
         }, $stmt->fetchAll());
 
