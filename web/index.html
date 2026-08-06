@@ -145,6 +145,7 @@
     <div class="hint">URL de un producto (Siman, Sinsa, La Curacao, RadioShack, Tropigas, El Gallo…) → lo rastrea · palabras → busca entre los rastreados. <a href="ayuda.html#tiendas">Ver tiendas</a></div>
     <nav class="topnav">
       <a id="navOfertas">🔥 Ofertas</a>
+      <a id="navCatalogo">📚 Catálogo completo</a>
       <a id="navSeguimientos">🔔 Mis seguimientos</a>
       <a href="ayuda.html">❓ Ayuda</a>
     </nav>
@@ -175,7 +176,7 @@
     <div id="changes" class="grid"></div>
   </section>
 
-  <section>
+  <section id="catalogo">
     <div class="grid-head">
       <h2>Productos rastreados</h2>
       <div class="pager">
@@ -706,6 +707,12 @@ document.getElementById('authPass').addEventListener('keydown', e => { if(e.key=
 
 document.getElementById('navOfertas').addEventListener('click', () => {
   document.getElementById('fsort').value = 'discount';
+  PAGE.offset = 0; loadGrid(); gotoTopOfGrid();
+});
+document.getElementById('navCatalogo').addEventListener('click', () => {
+  // Vista neutral del catálogo completo: sin filtro de nombre ni orden por descuento.
+  document.getElementById('fq').value = '';
+  document.getElementById('fsort').value = 'name';
   PAGE.offset = 0; loadGrid(); gotoTopOfGrid();
 });
 document.getElementById('navSeguimientos').addEventListener('click', () => {
