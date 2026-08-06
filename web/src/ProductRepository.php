@@ -124,6 +124,8 @@ final class ProductRepository
                 preg_match('~/Product/Detail/([^/?#]+)~i', $url, $m) ? rawurldecode($m[1])
                     : (preg_match('~-(\d+)(?:/p)?/?(?:[?#].*)?$~', $url, $m2) ? $m2[1] : null)
             ),
+            // PriceSmart: .../es-ni/producto/{slug}/{pid} → el pid es el último número.
+            'bloomreach' => (preg_match('~/(\d+)/?(?:[?#].*)?$~', $url, $m) ? $m[1] : null),
             default   => null,
         };
 

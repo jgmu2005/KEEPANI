@@ -27,6 +27,10 @@ final class AdapterFactory
                 productPath: $store['product_path'] ?? '/Product/Detail/{sku}',
                 currencyFallback: $currency, taxIncluded: $taxIncluded, taxRate: $taxRate,
             ),
+            'bloomreach' => new PriceSmartAdapter(
+                http: $http, slug: $slug, baseUrl: $baseUrl,
+                currency: $currency, taxIncluded: $taxIncluded, taxRate: $taxRate,
+            ),
             default => throw new \InvalidArgumentException(
                 "Plataforma sin adaptador implementado: {$store['platform']} ({$slug})"
             ),
