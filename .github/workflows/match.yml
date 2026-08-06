@@ -1,0 +1,22 @@
+name: Matcher difuso (candidatos del comparador)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 9 * * *'   # diario 09:30 UTC — después del hasheo de imágenes (09:00)
+
+jobs:
+  match:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+      - name: Generar candidatos de match
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/build_matches_remote.php

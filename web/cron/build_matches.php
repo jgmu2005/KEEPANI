@@ -26,6 +26,9 @@ function out(int $s, array $p): never { http_response_code($s); echo json_encode
 
 const MAX_INSERT       = 5000;   // candidatos por corrida (idempotente: reanuda)
 const MAX_PAIRS_BRAND  = 40000;  // tope de comparaciones por marca (anti-patológico)
+const MAX_SECONDS      = 20;     // presupuesto (shared hosting): corta antes de colgar
+// NOTA: para el catálogo COMPLETO usá el workflow de GitHub (cli/build_matches_remote.php);
+// este cron es solo para catálogos chicos o corridas manuales.
 
 $db  = Db::conn();
 $cfg = Db::config();
@@ -56,9 +59,11 @@ $ins = $db->prepare(
 );
 
 $inserted = 0; $scored = 0; $brandsDone = 0; $capped = false;
+$start = time();
 
 foreach ($brands as $brand) {
     if ($inserted >= MAX_INSERT) { $capped = true; break; }
+    if (time() - $start >= MAX_SECONDS) { $capped = true; break; }
 
     $loadBrand->execute([$brand]);
     $prods = $loadBrand->fetchAll();
