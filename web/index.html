@@ -113,6 +113,7 @@
   .feature-card p{margin:0;font-size:.88rem;color:var(--muted);line-height:1.5}
   .cta-donate{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:12px 14px;font-size:.88rem;color:#065f46;margin:0 0 16px}
   .cta-donate a{color:#047857;font-weight:700}
+  .usd{font-size:.78rem;color:var(--muted);margin-top:-1px}
   footer{background:#0f172a;color:#94a3b8;padding:26px 0;text-align:center;font-size:.86rem}
   footer .donate{margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   footer .donate a{background:#1e293b;color:#e2e8f0;padding:8px 14px;border-radius:8px;font-weight:600}
@@ -255,9 +256,12 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 const API = './api';
+window.USD_RATE = 36.6243; // se actualiza con applySettings
 const money = (v, cur='NIO') =>
   v == null ? '—' : (cur === 'USD' ? '$' : 'C$') +
   new Intl.NumberFormat('es-NI',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
+const usd = v => (v == null || !window.USD_RATE) ? '' :
+  '≈ $' + new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(v / window.USD_RATE);
 
 let chart = null;
 
@@ -271,6 +275,7 @@ function cardHtml(p){
       <span class="badge">${p.store_name || p.store}</span>
       <div class="title">${escapeHtml(p.title || '(sin título)')}</div>
       <div class="price">${money(p.price_final, p.currency)}</div>
+      <div class="usd">${usd(p.price_final)}</div>
       <div class="stock ${p.in_stock ? 'in':'out'}">${p.in_stock ? '● En stock' : '○ Agotado'}</div>
     </div>
   </div>`;
@@ -428,7 +433,7 @@ async function openDetail(params, endpoint='history.php'){
       </div>
     </div>
     <div class="stats">
-      <div class="stat"><div class="k">Precio actual</div><div class="v">${money(s.current,cur)}</div></div>
+      <div class="stat"><div class="k">Precio actual</div><div class="v">${money(s.current,cur)}</div><div class="usd">${usd(s.current)}</div></div>
       <div class="stat"><div class="k">Mínimo histórico</div><div class="v min">${money(s.min,cur)}</div></div>
       <div class="stat"><div class="k">Máximo histórico</div><div class="v max">${money(s.max,cur)}</div></div>
       <div class="stat"><div class="k">Disponibilidad</div><div class="v" style="font-size:1rem">${s.in_stock ? '✅ En stock':'❌ Agotado'}</div></div>
@@ -712,6 +717,7 @@ async function applySettings(){
     if(!j.ok) return;
     const s = j.settings;
     window.TURNSTILE_SITEKEY = s.turnstile_site_key || '';
+    window.USD_RATE = parseFloat(s.usd_rate) || 36.6243;
     if(s.site_name) document.title = `${s.site_name} — Historial de precios en tiendas de Nicaragua`;
     const bt = document.querySelector('.brand-text');
     if(bt) bt.innerHTML = `${escapeHtml(s.site_name||'Ojo al Precio')} <small>${escapeHtml(s.tagline||'')}</small>`;

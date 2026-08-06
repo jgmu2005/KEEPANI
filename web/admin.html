@@ -69,6 +69,7 @@
       <div class="row">
         <div style="max-width:200px"><label>Tope Gratis (productos)</label><input id="limit_free" type="number" min="0"></div>
         <div style="max-width:200px"><label>Tope Un-pago (productos)</label><input id="limit_onetime" type="number" min="0"></div>
+        <div style="max-width:200px"><label>Tipo de cambio (C$ por US$1)</label><input id="usd_rate" type="number" step="0.0001" min="0"></div>
       </div>
       <p style="font-size:.8rem;color:var(--muted);margin:8px 0 0">Suscripción = ilimitado mientras esté activa.</p>
       <div style="margin-top:16px"><button id="saveBtn">Guardar ajustes</button></div>
@@ -134,7 +135,7 @@
 
 <script>
 const API = './api';
-const PUB_KEYS = ['site_name','tagline','hero_text','logo_emoji','donate_kofi','donate_paypal','footer_note','limit_free','limit_onetime'];
+const PUB_KEYS = ['site_name','tagline','hero_text','logo_emoji','donate_kofi','donate_paypal','footer_note','limit_free','limit_onetime','usd_rate'];
 const SMTP_KEYS = ['smtp_host','smtp_port','smtp_secure','smtp_user','smtp_from_email','smtp_from_name','smtp_pass'];
 const FORM_KEYS = [...PUB_KEYS, ...SMTP_KEYS, 'kofi_token'];
 const MASKED = ['smtp_pass', 'kofi_token'];
