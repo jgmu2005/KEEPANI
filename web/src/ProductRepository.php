@@ -320,6 +320,32 @@ final class ProductRepository
     }
 
     /**
+     * Serie de precios (últimos N días) para un conjunto de productos, en UNA
+     * sola query — alimenta los sparklines de las tarjetas.
+     * Devuelve [product_id => [['d' => 'YYYY-MM-DD', 'p' => float], ...]] por fecha.
+     */
+    public function priceSeries(array $ids, int $days = 45): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn(int $v): bool => $v > 0));
+        if (!$ids) {
+            return [];
+        }
+        $days = max(7, min($days, 180));
+        $in   = implode(',', $ids); // ints ya saneados: seguro para interpolar
+        $sql  = "SELECT product_id, captured_date AS d, price_final AS p
+                   FROM price_history
+                  WHERE product_id IN ($in)
+                    AND price_final IS NOT NULL
+                    AND captured_date >= DATE_SUB(CURDATE(), INTERVAL $days DAY)
+                  ORDER BY product_id, captured_date";
+        $out = [];
+        foreach ($this->db->query($sql)->fetchAll() as $r) {
+            $out[(int) $r['product_id']][] = ['d' => $r['d'], 'p' => (float) $r['p']];
+        }
+        return $out;
+    }
+
+    /**
      * Productos cuyo precio CAMBIÓ entre su última captura y la anterior.
      * (Se llena cuando hay ≥2 días con precios distintos; antes va vacío.)
      */

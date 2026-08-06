@@ -31,6 +31,14 @@ try {
         'offset'   => $offset,
     ]);
 
+    // Adjunta la serie de precios (sparkline) a cada ítem, en una sola query.
+    $ids    = array_map(static fn(array $it): int => $it['id'], $res['items']);
+    $series = $repo->priceSeries($ids);
+    foreach ($res['items'] as &$it) {
+        $it['series'] = $series[$it['id']] ?? [];
+    }
+    unset($it);
+
     http_response_code(200);
     echo json_encode(
         [
