@@ -28,7 +28,7 @@ header('Access-Control-Allow-Origin: *');
 function out(int $status, array $payload): never
 {
     http_response_code($status);
-    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 }
 
@@ -47,7 +47,7 @@ try {
         // No está rastreado: intentar leerlo en vivo y agregarlo.
         $loc = $repo->locate($store, $sku, $url);
         if (!$loc) {
-            out(404, ['ok' => false, 'error' => 'No reconocemos esa tienda o URL. Por ahora soportamos Sinsa, Siman y Copasa.']);
+            out(404, ['ok' => false, 'error' => 'No pudimos leer ese enlace. Pegá el link de un PRODUCTO (no de una búsqueda o categoría). Tiendas soportadas: Siman, Sinsa, La Curacao, RadioShack, Tropigas, El Gallo y Copasa.']);
         }
         $storeRow = $repo->storeBySlug($loc['slug']);
         if (!$storeRow) {

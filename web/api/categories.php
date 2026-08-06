@@ -15,7 +15,7 @@ try {
     $repo  = new ProductRepository(Db::conn());
     $store = (string) ($_GET['store'] ?? '');
     $cats  = $store !== '' ? $repo->categoriesWithProducts($store) : [];
-    echo json_encode(['ok' => true, 'categories' => $cats], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode(['ok' => true, 'categories' => $cats], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
 } catch (\Throwable $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Error interno']);

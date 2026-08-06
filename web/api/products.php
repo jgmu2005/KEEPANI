@@ -41,7 +41,7 @@ try {
             'items'  => $res['items'],
             'stores' => $repo->activeStores(),
         ],
-        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
     );
 } catch (\Throwable $e) {
     http_response_code(500);

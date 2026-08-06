@@ -22,7 +22,7 @@ try {
     http_response_code(200);
     echo json_encode(
         ['ok' => true, 'items' => $repo->recentChanges($limit)],
-        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
     );
 } catch (\Throwable $e) {
     http_response_code(500);

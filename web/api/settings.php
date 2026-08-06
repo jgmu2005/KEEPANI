@@ -17,7 +17,7 @@ try {
     // Site key de Turnstile (pública) para renderizar el captcha en el registro.
     $settings['turnstile_site_key'] = (string) (Db::config()['turnstile_site_key'] ?? '');
     echo json_encode(['ok' => true, 'settings' => $settings],
-        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
 } catch (\Throwable $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Error interno']);

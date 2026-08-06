@@ -142,7 +142,7 @@
              autocomplete="off" spellcheck="false">
       <button id="go">Buscar</button>
     </div>
-    <div class="hint">URL de un producto (Sinsa, Siman, Copasa) → lo rastrea · palabras → busca entre los rastreados.</div>
+    <div class="hint">URL de un producto (Siman, Sinsa, La Curacao, RadioShack, Tropigas, El Gallo…) → lo rastrea · palabras → busca entre los rastreados. <a href="ayuda.html#tiendas">Ver tiendas</a></div>
     <nav class="topnav">
       <a id="navOfertas">🔥 Ofertas</a>
       <a id="navSeguimientos">🔔 Mis seguimientos</a>
@@ -157,7 +157,7 @@
     <div class="features-grid">
       <div class="feature-card">
         <div class="fi">📈</div><h3>Historial de precios</h3>
-        <p>Mirá cómo se movió el precio de cada producto de Sinsa, Siman y Copasa en el tiempo, y descubrí si una "oferta" es real.</p>
+        <p>Mirá cómo se movió el precio de cada producto en el tiempo, en todas las tiendas que seguimos, y descubrí si una "oferta" es real.</p>
       </div>
       <div class="feature-card">
         <div class="fi">🔔</div><h3>Alertas de bajada</h3>
@@ -417,7 +417,9 @@ async function openDetail(params, endpoint='history.php'){
 
   if(!j.ok){
     detail.innerHTML = `<div class="spinner">${escapeHtml(j.error || 'No encontrado')}.<br>
-      Puede que ese producto todavía no lo estemos rastreando.</div>`;
+      Puede que ese producto todavía no lo estemos rastreando.
+      <div style="margin-top:16px"><a href="ayuda.html#tiendas" style="display:inline-block;padding:10px 18px;background:var(--brand);color:#fff;border-radius:8px;text-decoration:none;font-weight:600">❓ Ver tiendas soportadas y cómo rastrear</a></div>
+    </div>`;
     return;
   }
 
