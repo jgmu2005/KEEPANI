@@ -67,18 +67,19 @@ function apiGet(string $url, string $referer, int $retries = 4): ?array
     return null;
 }
 
-/** Ids de categorías HOJA (sin hijas). */
-function collectLeaves(array $nodes, array &$out): void
+/** Rutas COMPLETAS (raíz→hoja) de las categorías hoja.
+ *  VTEX filtra por la RUTA (C:/id1/id2/hoja/), no por el id de la hoja suelto. */
+function collectLeafPaths(array $nodes, array $prefix, array &$out): void
 {
     foreach ($nodes as $n) {
         if (!is_array($n) || !isset($n['id'])) {
             continue;
         }
-        if (empty($n['hasChildren'])) {
-            $out[] = (int) $n['id'];
-        }
+        $path = array_merge($prefix, [(int) $n['id']]);
         if (!empty($n['children']) && is_array($n['children'])) {
-            collectLeaves($n['children'], $out);
+            collectLeafPaths($n['children'], $path, $out);
+        } else {
+            $out[] = $path; // hoja → ruta completa
         }
     }
 }
@@ -109,17 +110,17 @@ foreach ($targets as $slug) {
         fail("No se pudo traer el árbol de categorías de $slug");
     }
     $leaves = [];
-    collectLeaves($tree, $leaves);
-    $leaves = array_values(array_unique($leaves));
+    collectLeafPaths($tree, [], $leaves);
     line('  categorías hoja: ' . count($leaves));
 
     $sent = 0; $capped = 0; $fails = 0; $seen = [];
 
-    foreach ($leaves as $idx => $catId) {
+    foreach ($leaves as $idx => $path) {
+        $catPath = implode('/', $path);
         $from = 0;
         while ($from <= MAX_OFFSET) {
             $to  = $from + PAGE - 1;
-            $url = $base . '/api/catalog_system/pub/products/search?fq=C:/' . $catId . '/&_from=' . $from . '&_to=' . $to;
+            $url = $base . '/api/catalog_system/pub/products/search?fq=C:/' . $catPath . '/&_from=' . $from . '&_to=' . $to;
             $data = apiGet($url, $referer);
             if ($data === null) { $fails++; break; }       // fetch falló tras reintentos
             if (count($data) === 0) { break; }              // fin de la categoría
