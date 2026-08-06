@@ -83,12 +83,20 @@ final class IngestService
         $sel->execute([$storeId, $sku]);
         $id = $sel->fetchColumn();
 
+        // Identidad para el comparador (ver Normalizer / docs/comparador-matcher.md).
+        $ean       = isset($it['ean']) && $it['ean'] !== '' ? (string) $it['ean'] : null;
+        $brandNorm = Normalizer::brand($it['brand'] ?? null);
+        $modelNorm = Normalizer::model($it['title'] ?? null);
+
         if ($id !== false) {
             // COALESCE(nuevo, actual): solo sobrescribe si viene valor no nulo.
             $upd = $this->db->prepare(
                 'UPDATE products
                     SET title = COALESCE(?, title),
                         brand = COALESCE(?, brand),
+                        brand_norm = COALESCE(?, brand_norm),
+                        model_norm = COALESCE(?, model_norm),
+                        ean = COALESCE(?, ean),
                         image_url = COALESCE(?, image_url),
                         url = COALESCE(?, url),
                         category_external_id = COALESCE(?, category_external_id),
@@ -98,6 +106,9 @@ final class IngestService
             $upd->execute([
                 $it['title'] ?? null,
                 $it['brand'] ?? null,
+                $brandNorm,
+                $modelNorm,
+                $ean,
                 $it['image_url'] ?? null,
                 $it['url'] ?? null,
                 $it['category_id'] ?? null,
@@ -108,16 +119,19 @@ final class IngestService
         }
 
         $ins = $this->db->prepare(
-            'INSERT INTO products (store_id, external_sku, category_external_id, url, title, brand, image_url, first_seen_at, last_seen_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO products (store_id, external_sku, ean, category_external_id, url, title, brand, brand_norm, model_norm, image_url, first_seen_at, last_seen_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $ins->execute([
             $storeId,
             $sku,
+            $ean,
             $it['category_id'] ?? null,
             $it['url'] ?? '',
             $it['title'] ?? null,
             $it['brand'] ?? null,
+            $brandNorm,
+            $modelNorm,
             $it['image_url'] ?? null,
             $capturedAt,
             $capturedAt,

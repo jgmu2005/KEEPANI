@@ -36,6 +36,15 @@ final class VtexMapper
         $avail     = (int) ($offer['AvailableQuantity'] ?? 0);
         $isAvail   = (bool) ($offer['IsAvailable'] ?? false);
 
+        // EAN/GTIN: VTEX lo pone por item; puede venir vacío. Tomamos el primero no vacío.
+        $ean = null;
+        foreach ($p['items'] ?? [] as $it) {
+            if (!empty($it['ean'])) {
+                $ean = (string) $it['ean'];
+                break;
+            }
+        }
+
         return new NormalizedProduct(
             storeSlug:   $slug,
             sku:         (string) $p['productId'],
@@ -50,6 +59,7 @@ final class VtexMapper
             taxRate:     $taxRate,
             listPrice:   $listPrice,
             categoryId:  isset($p['categoryId']) ? (int) $p['categoryId'] : null,
+            ean:         $ean,
         );
     }
 }
