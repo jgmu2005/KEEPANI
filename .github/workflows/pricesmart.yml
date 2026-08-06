@@ -1,0 +1,22 @@
+name: Crawl PriceSmart (categorías seleccionadas)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 8 * * *'   # diario 08:00 UTC, junto al resto de crawls
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+      - name: Crawl PriceSmart
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/crawl_pricesmart.php
