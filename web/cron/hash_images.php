@@ -35,7 +35,9 @@ if (!function_exists('imagecreatefromstring')) {
     out(500, ['ok' => false, 'error' => 'GD no disponible en este PHP']);
 }
 
-$limit = isset($_GET['limit']) ? max(1, min((int) $_GET['limit'], 300)) : 60;
+// Default conservador para entrar bajo el timeout típico de cron-job.org (30s).
+// Subilo con ?limit=N (tope 300) si ampliás el timeout del cron.
+$limit = isset($_GET['limit']) ? max(1, min((int) $_GET['limit'], 300)) : 30;
 
 $UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
