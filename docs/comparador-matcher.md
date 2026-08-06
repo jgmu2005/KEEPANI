@@ -31,10 +31,20 @@ match por **marca + modelo + título + precio**.
 - **Nivel C — título difuso** → 0.6–0.85. Marca igual + similitud de tokens del
   título (Jaccard / trigramas) + precio dentro de ±X% → **cola de revisión
   manual** (no auto).
-- **Nivel D — imagen (PROTAGONISTA, no "a futuro")** → hash perceptual (pHash)
+- **Nivel D — imagen (PROTAGONISTA, no "a futuro")** → hash perceptual (**dHash**
   de la foto; las tiendas reusan la imagen del fabricante. El caso Remington
   (§10) mostró que suele ser **la señal más fuerte disponible** cuando falta el
   EAN. Más pesado (hay que bajar y hashear imágenes), pero decisivo.
+  - **Validado empíricamente** (§10): la MISMA secadora en Siman vs Sinsa dio
+    dHash = **11**; el no-match más cercano = **19**. → **umbral ~13-14** con
+    buen margen. Usar **dHash** (separó mejor que aHash: 10 vs 4 en un par confuso).
+  - Es un **rankeador de candidatos** (vecino más cercano dentro del bloque de
+    marca), no un juez único: combinar con marca + atributos para no fusionar
+    productos de silueta parecida (una plancha y un cepillo dieron 10 entre sí).
+  - **Cómputo**: dHash de 64 bits (redimensionar a 9×8, gris, comparar píxeles
+    contiguos). Se calcula en el crawler (GitHub Actions, PHP GD) y se guarda
+    como `img_dhash` (BIGINT/CHAR(16) hex); el match compara por Hamming en el
+    batch (XOR + popcount), no en SQL.
 
 ### Guardarraíl obligatorio: atributos discriminantes
 Marca+título NO alcanza para fusionar: hay que **extraer y exigir coincidencia**
@@ -136,6 +146,19 @@ media por sinónimos; (3) el pHash de imagen es la señal ganadora; (4) cuidado
 con falsos positivos: Siman también tiene "Cepillo Secadora Zafiro Luxe **1000w**"
 y "Plancha Sapphire Luxe" → sin guardarraíl de atributos (watts/subtipo) se
 fusionarían mal.
+
+**Prueba de pHash (dHash, distancia de Hamming):**
+
+| | Secadora Siman | Secadora Sinsa | Cepillo 1000w | Plancha |
+|---|---|---|---|---|
+| Secadora Siman | 0 | **11** | 20 | 22 |
+| Secadora Sinsa | **11** | 0 | 19 | 23 |
+| Cepillo 1000w | 20 | 19 | 0 | 10 |
+| Plancha | 22 | 23 | 10 | 0 |
+
+El verdadero match (11) es el vecino más cercano y queda claramente por debajo
+de los no-match (19-23). Umbral sugerido ~13-14. El par plancha/cepillo (10)
+confirma que el pHash necesita el guardarraíl de marca+atributos.
 
 ## 9. Preguntas abiertas
 
