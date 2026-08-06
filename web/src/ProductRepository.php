@@ -135,14 +135,20 @@ final class ProductRepository
     {
         $st = $this->db->prepare(
             'SELECT p.id, p.external_sku AS sku, p.title, p.brand, p.image_url, p.url,
-                    s.slug AS store, s.name AS store_name, s.currency
+                    s.slug AS store, s.name AS store_name, s.currency,
+                    g.slug AS group_slug, g.store_count AS group_stores
                FROM products p
                JOIN stores s ON s.id = p.store_id
+               LEFT JOIN product_groups g ON g.id = p.group_id
               WHERE p.id = ?'
         );
         $st->execute([$id]);
         $row = $st->fetch();
-        return $row ?: null;
+        if (!$row) {
+            return null;
+        }
+        $row['group_stores'] = $row['group_stores'] !== null ? (int) $row['group_stores'] : null;
+        return $row;
     }
 
     /** Histórico ordenado por fecha (para la gráfica). */
@@ -273,6 +279,7 @@ final class ProductRepository
         // FROM + WHERE compartido entre el conteo y la página.
         $base = 'FROM products p
                  JOIN stores s ON s.id = p.store_id
+                 LEFT JOIN product_groups pg ON pg.id = p.group_id
                  LEFT JOIN price_history ph ON ph.id = (
                      SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1
                  )
@@ -285,7 +292,8 @@ final class ProductRepository
         $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
                        s.slug AS store, s.name AS store_name,
                        ph.price_final, ph.list_price, ph.discount_pct,
-                       ph.currency, ph.in_stock, ph.captured_date AS last_date
+                       ph.currency, ph.in_stock, ph.captured_date AS last_date,
+                       pg.slug AS group_slug, pg.store_count AS group_stores
                 ' . $base . '
                 ORDER BY ' . $orderSql . '
                 LIMIT ' . $limit . ' OFFSET ' . $offset;
@@ -307,6 +315,8 @@ final class ProductRepository
                 'currency'     => $r['currency'] ?? 'NIO',
                 'in_stock'     => (bool) $r['in_stock'],
                 'last_date'    => $r['last_date'],
+                'group_slug'   => $r['group_slug'] ?? null,
+                'group_stores' => $r['group_stores'] !== null ? (int) $r['group_stores'] : null,
             ];
         }, $stmt->fetchAll());
 
