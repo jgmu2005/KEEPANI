@@ -102,6 +102,17 @@
   .delta.down{color:#065f46;background:#d1fae5}
   .delta.up{color:#991b1b;background:#fee2e2}
   .old-price{color:var(--muted);text-decoration:line-through;font-size:.82rem;font-weight:500}
+  .topnav{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+  .topnav a{color:#e2e8f0;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+    padding:8px 14px;border-radius:9px;font-size:.9rem;font-weight:600;cursor:pointer;text-decoration:none}
+  .topnav a:hover{background:rgba(255,255,255,.18)}
+  .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .feature-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .feature-card .fi{font-size:1.7rem;line-height:1}
+  .feature-card h3{margin:8px 0 6px;font-size:1rem}
+  .feature-card p{margin:0;font-size:.88rem;color:var(--muted);line-height:1.5}
+  .cta-donate{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:12px 14px;font-size:.88rem;color:#065f46;margin:0 0 16px}
+  .cta-donate a{color:#047857;font-weight:700}
   footer{background:#0f172a;color:#94a3b8;padding:26px 0;text-align:center;font-size:.86rem}
   footer .donate{margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   footer .donate a{background:#1e293b;color:#e2e8f0;padding:8px 14px;border-radius:8px;font-weight:600}
@@ -131,10 +142,33 @@
       <button id="go">Buscar</button>
     </div>
     <div class="hint">URL de un producto (Sinsa, Siman, Copasa) → lo rastrea · palabras → busca entre los rastreados.</div>
+    <nav class="topnav">
+      <a id="navOfertas">🔥 Ofertas</a>
+      <a id="navSeguimientos">🔔 Mis seguimientos</a>
+      <a href="ayuda.html">❓ Ayuda</a>
+    </nav>
   </div>
 </header>
 
 <main class="wrap">
+  <section>
+    <h2>Funciones principales</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="fi">📈</div><h3>Historial de precios</h3>
+        <p>Mirá cómo se movió el precio de cada producto de Sinsa, Siman y Copasa en el tiempo, y descubrí si una "oferta" es real.</p>
+      </div>
+      <div class="feature-card">
+        <div class="fi">🔔</div><h3>Alertas de bajada</h3>
+        <p>Rastreá cualquier producto y te avisamos por correo apenas baje del precio que vos elijas.</p>
+      </div>
+      <div class="feature-card">
+        <div class="fi">🧩</div><h3>Extensión de Chrome</h3>
+        <p>Mirá el historial de precios directo en la página del producto, justo debajo del precio. <a href="ayuda.html#extension" style="color:var(--brand-dk);font-weight:600">Ver cómo</a>.</p>
+      </div>
+    </div>
+  </section>
+
   <section id="changes-section" style="display:none">
     <h2>📉 Cambios recientes de precio</h2>
     <div id="changes" class="grid"></div>
@@ -440,7 +474,12 @@ async function createAlert(productId){
     const j = await (await fetch(`${API}/alerts/create.php`, {method:'POST',headers:{'Content-Type':'application/json'},
       body: JSON.stringify({product_id: productId, target_price: target})})).json();
     if(j.ok){ msg.textContent = j.updated ? '✔ Alerta actualizada' : '✔ ¡Alerta creada!'; msg.style.color = 'var(--ok)'; }
-    else { msg.textContent = j.error || 'Error'; msg.style.color = 'var(--bad)'; }
+    else {
+      msg.style.color = 'var(--bad)';
+      if(j.limit_reached && window.DONATE_KOFI){
+        msg.innerHTML = escapeHtml(j.error) + ` <a href="${window.DONATE_KOFI}" target="_blank" rel="noopener" style="color:var(--brand-dk)">Doná</a>`;
+      } else { msg.textContent = j.error || 'Error'; }
+    }
   }catch(e){ msg.textContent = 'Error de red'; msg.style.color = 'var(--bad)'; }
 }
 async function openMyAlerts(){
@@ -450,9 +489,13 @@ async function openMyAlerts(){
   let j;
   try{ j = await (await fetch(`${API}/alerts/list.php`)).json(); }catch(e){ j = {ok:false}; }
   if(!j.ok){ detail.innerHTML = `<div class="spinner">Necesitás iniciar sesión.</div>`; return; }
+  const cta = (j.tier !== 'subscriber' && window.DONATE_KOFI)
+    ? `<div class="cta-donate">¿Querés rastrear más? <a href="${window.DONATE_KOFI}" target="_blank" rel="noopener">Doná o suscribite</a> con el correo de tu cuenta y subimos tu tope solo.</div>`
+    : '';
   let html = `<div style="padding:22px">
     <h3 style="margin:0 0 4px">🔔 Mis alertas</h3>
-    <p class="note" style="margin:0 0 16px">${j.alerts.length} de ${j.limit >= 1000000 ? 'ilimitado' : j.limit} productos · ${tierLabel(j.tier)}${j.tier === 'free' ? ' · doná y subí tu tope' : ''}.</p>`;
+    <p class="note" style="margin:0 0 14px">${j.alerts.length} de ${j.limit >= 1000000 ? 'ilimitado' : j.limit} productos · ${tierLabel(j.tier)}.</p>
+    ${cta}`;
   if(!j.alerts.length){
     html += `<div class="empty">Todavía no tenés alertas. Abrí un producto y creá una. 🔔</div>`;
   } else {
@@ -654,6 +697,14 @@ document.getElementById('authSubmit').addEventListener('click', submitAuth);
 document.getElementById('authForgot').addEventListener('click', forgotPassword);
 document.getElementById('authPass').addEventListener('keydown', e => { if(e.key==='Enter') submitAuth(); });
 
+document.getElementById('navOfertas').addEventListener('click', () => {
+  document.getElementById('fsort').value = 'discount';
+  PAGE.offset = 0; loadGrid(); gotoTopOfGrid();
+});
+document.getElementById('navSeguimientos').addEventListener('click', () => {
+  AUTH.user ? openMyAlerts() : openAuth('login');
+});
+
 // --- Branding configurable desde el panel admin ---
 async function applySettings(){
   try{
@@ -669,6 +720,7 @@ async function applySettings(){
     const fn = document.getElementById('footerNote');
     if(fn && s.footer_note) fn.textContent = s.footer_note;
     const normUrl = u => { u=(u||'').trim(); return u ? (/^https?:\/\//i.test(u) ? u : 'https://'+u) : ''; };
+    window.DONATE_KOFI = normUrl(s.donate_kofi);
     const kofi = document.getElementById('kofi'), paypal = document.getElementById('paypal');
     if(kofi){ const k=normUrl(s.donate_kofi); if(k){ kofi.href=k; kofi.style.display=''; } else kofi.style.display='none'; }
     if(paypal){ const p=normUrl(s.donate_paypal); if(p){ paypal.href=p; paypal.style.display=''; } else paypal.style.display='none'; }

@@ -32,6 +32,7 @@ Esfuerzo: S (chico) · M (medio) · L (grande)
 - 🟢 M — **Variaciones** (talla/color) — tabla product_variations ya prevista.
 
 ## 3. Alertas y notificaciones
+- 🟡 M — **Refrescar los productos rastreados ≥4 veces/día** (no todo el catálogo — solo los que tienen alertas activas): un cron cada ~6h que actualiza esos productos para detectar bajadas más rápido y disparar alertas casi en el día.
 - 🟡 S — **Tipos de alerta**: "baja X%", "está en su mínimo histórico", "volvió a haber stock".
 - 🟡 M — **WhatsApp / Telegram** como canal (WhatsApp es enorme en NI).
 - 🟡 S — **Resumen semanal** por email ("mejores bajadas de la semana").
