@@ -42,6 +42,11 @@
   .card .img{position:relative;aspect-ratio:1;background:#f8fafc;display:flex;align-items:center;justify-content:center;padding:12px}
   .lowest{position:absolute;top:8px;left:8px;z-index:1;font-size:.66rem;font-weight:800;color:#065f46;
     background:#d1fae5;border:1px solid #6ee7b7;padding:3px 8px;border-radius:999px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+  .lowest.fake{color:#92400e;background:#fef3c7;border-color:#fcd34d}
+  .deal-note{margin-top:12px;padding:10px 12px;border-radius:9px;font-size:.88rem;font-weight:600;line-height:1.4}
+  .deal-note.ok{color:#065f46;background:#d1fae5}
+  .deal-note.warn{color:#92400e;background:#fef3c7}
+  .deal-note.muted{color:var(--muted);background:#f1f5f9}
   .save{align-self:flex-start;font-size:.76rem;font-weight:700;color:var(--ok)}
   .spark{width:100%;height:30px;display:block;margin:2px 0}
   .spark-wrap{display:flex;align-items:center;gap:6px}
@@ -298,16 +303,37 @@ function sparkline(series){
   </div>`;
 }
 
+// Badge de veredicto para la esquina de la tarjeta (solo señales fuertes).
+function dealBadge(deal){
+  if(!deal) return '';
+  if(deal.verdict === 'fake') return `<span class="lowest fake" title="El precio no es más bajo de lo habitual">⚠️ Oferta dudosa</span>`;
+  if(deal.verdict === 'low')  return `<span class="lowest" title="Está en su precio más bajo registrado">💚 Precio más bajo</span>`;
+  return '';
+}
+// Frase explicativa para la ficha (todos los veredictos).
+function dealSentence(deal, cur){
+  if(!deal) return '';
+  const t = money(deal.typical, cur);
+  const ref = deal.list != null ? money(deal.list, cur) : '';
+  const map = {
+    new_low:            ['ok',    `🔥 Buen momento: está en su precio más bajo registrado (habitual ≈ ${t}).`],
+    at_low:             ['ok',    `💚 Es el precio más bajo que le hemos registrado (habitual ≈ ${t}).`],
+    inflated_ref:       ['warn',  `⚠️ Oferta dudosa: el precio “antes” (${ref}) supera cualquiera que hayamos registrado. Su precio habitual ronda ${t}.`],
+    permanent_discount: ['warn',  `⚠️ Oferta dudosa: este es su precio habitual (≈ ${t}); el “descuento” es casi permanente.`],
+    usual:              ['muted', `Cerca de su precio de siempre (≈ ${t}).`],
+  };
+  const m = map[deal.reason];
+  return m ? `<div class="deal-note ${m[0]}">${m[1]}</div>` : '';
+}
+
 function cardHtml(p){
   const cur = p.currency || 'NIO';
   const hasDisc = p.list_price != null && p.price_final != null && p.list_price > p.price_final;
   const saving  = hasDisc ? (p.list_price - p.price_final) : 0;
   const pct     = hasDisc ? (p.discount_pct != null ? Math.round(p.discount_pct) : Math.round(saving / p.list_price * 100)) : 0;
-  // Precio más bajo desde que lo seguimos (con ≥2 días de historial para que signifique algo).
-  const isLowest = p.days_tracked >= 2 && p.min_ever != null && p.price_final != null && p.price_final <= p.min_ever + 0.01;
   return `<div class="card" data-id="${p.id}">
     <div class="img">
-      ${isLowest ? `<span class="lowest" title="Es el precio más bajo desde que lo seguimos">💚 Precio más bajo</span>` : ''}
+      ${dealBadge(p.deal)}
       ${p.image_url ? `<img src="${p.image_url}" alt="" loading="lazy">` : '📦'}
     </div>
     <div class="body">
@@ -481,6 +507,7 @@ async function openDetail(params, endpoint='history.php'){
       <div class="stat"><div class="k">Máximo histórico</div><div class="v max">${money(s.max,cur)}</div></div>
       <div class="stat"><div class="k">Disponibilidad</div><div class="v" style="font-size:1rem">${s.in_stock ? '✅ En stock':'❌ Agotado'}</div></div>
     </div>
+    ${dealSentence(j.deal, cur)}
     <div class="chart-box"><canvas id="chart" height="220"></canvas></div>
     ${h.length < 2 ? `<div class="note" style="padding:0 20px 4px">📅 Se necesitan más días de datos para ver la tendencia. Volvé pronto.</div>` : ''}
     <div class="alert-box" id="alertBox"></div>

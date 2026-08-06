@@ -10,6 +10,7 @@ require dirname(__DIR__) . '/bootstrap.php';
 
 use OjoAlPrecio\Web\Db;
 use OjoAlPrecio\Web\ProductRepository;
+use OjoAlPrecio\Web\DealAnalyzer;
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -36,6 +37,11 @@ try {
     $series = $repo->priceSeries($ids);
     foreach ($res['items'] as &$it) {
         $it['series'] = $series[$it['id']] ?? [];
+        $it['deal']   = DealAnalyzer::analyze(
+            $it['price_final'],
+            $it['list_price'],
+            array_map(static fn(array $s): float => (float) $s['p'], $it['series'])
+        );
     }
     unset($it);
 

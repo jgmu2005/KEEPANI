@@ -15,6 +15,7 @@ require dirname(__DIR__) . '/bootstrap.php';
 
 use OjoAlPrecio\Web\Db;
 use OjoAlPrecio\Web\ProductRepository;
+use OjoAlPrecio\Web\DealAnalyzer;
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *'); // lectura pública (dashboard + extensión)
@@ -43,11 +44,19 @@ try {
     $product = $repo->product($id);
     $history = $repo->history($id);
 
+    $last = end($history) ?: null;
+    $deal = DealAnalyzer::analyze(
+        $last['price_final'] ?? null,
+        $last['list_price']  ?? null,
+        array_map(static fn(array $h) => $h['price_final'], $history)
+    );
+
     out(200, [
         'ok'      => true,
         'product' => $product,
         'stats'   => $repo->stats($history),
         'history' => $history,
+        'deal'    => $deal,
     ]);
 } catch (\Throwable $e) {
     out(500, ['ok' => false, 'error' => 'Error interno', 'detail' => $e->getMessage()]);
