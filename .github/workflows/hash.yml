@@ -1,0 +1,22 @@
+name: Hashear imágenes (dHash) para el comparador
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *'   # diario 09:00 UTC — después de los crawls (productos nuevos del día)
+
+jobs:
+  hash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json, gd
+      - name: Hashear imágenes pendientes
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/hash_images_remote.php
