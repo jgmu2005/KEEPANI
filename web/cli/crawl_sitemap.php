@@ -78,7 +78,25 @@ foreach ($targets as $slug) {
     line('  productos en el sitemap: ' . count($urls));
 
     $adapter = new OgMetaAdapter($http, $slug, $cfg['base_url'], '', $cfg['currency'], $cfg['tax_included'], $cfg['tax_rate']);
-    $batch = []; $sent = 0; $fails = 0; $i = 0;
+    $batch = []; $sent = 0; $fails = 0; $i = 0; $lost = 0; $consec = 0;
+
+    // Envía el lote actual. La ingesta es idempotente por día, así que un lote
+    // perdido por un blip de red se recupera en el próximo run (no aborta todo).
+    $flush = function () use (&$batch, &$sent, &$lost, &$consec, $http, $ingestUrl, $ingestKey) {
+        if (!$batch) { return; }
+        $res = $http->postJson($ingestUrl, ['items' => $batch], ['X-Api-Key: ' . $ingestKey]);
+        if ($res['status'] === 200) {
+            $sent += count($batch); $consec = 0;
+        } elseif ($res['status'] === 401 || $res['status'] === 403) {
+            fail("Ingesta rechazada (HTTP {$res['status']}): revisá el secret OJO_INGEST_KEY.");
+        } else {
+            $lost += count($batch); $consec++;
+            $why = $res['error'] !== '' ? $res['error'] : "HTTP {$res['status']}";
+            line("  ⚠ ingesta falló ($why) — lote de " . count($batch) . " descartado, sigo");
+            if ($consec >= 5) { fail("Ingesta caída: 5 lotes seguidos fallaron. Aborto (reintentá el run luego)."); }
+        }
+        $batch = [];
+    };
 
     foreach ($urls as $url => $sku) {
         $i++;
@@ -86,21 +104,13 @@ foreach ($targets as $slug) {
         if ($rec === null) { $fails++; }
         else { $batch[] = $rec->toArray(); }
 
-        if (count($batch) >= BATCH) {
-            $res = $http->postJson($ingestUrl, ['items' => $batch], ['X-Api-Key: ' . $ingestKey]);
-            if ($res['status'] !== 200) { fail("Ingesta HTTP {$res['status']}: " . $res['body']); }
-            $sent += count($batch); $batch = [];
-        }
-        if ($i % 50 === 0) { line("  ...$i/" . count($urls) . " · $sent enviados · $fails fallos"); }
+        if (count($batch) >= BATCH) { $flush(); }
+        if ($i % 50 === 0) { line("  ...$i/" . count($urls) . " · $sent enviados · $fails sin OG · $lost perdidos"); }
         usleep(250000);
     }
-    if ($batch) {
-        $res = $http->postJson($ingestUrl, ['items' => $batch], ['X-Api-Key: ' . $ingestKey]);
-        if ($res['status'] !== 200) { fail("Ingesta HTTP {$res['status']}: " . $res['body']); }
-        $sent += count($batch);
-    }
+    $flush();
 
-    line("  ✔ $slug: $sent productos" . ($fails ? " · $fails fallos" : ''));
+    line("  ✔ $slug: $sent productos" . ($fails ? " · $fails sin OG" : '') . ($lost ? " · $lost perdidos en ingesta" : ''));
     $grand += $sent;
 }
 
