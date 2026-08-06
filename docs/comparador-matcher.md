@@ -121,6 +121,9 @@ atributo (no separa grupo); la **capacidad/modelo** sí separa.
 
 1. **Enriquecer identidad en ingesta** (EAN VTEX + SKU Unicomer + brand/model
    normalizados). *Empezar pronto: necesita acumular datos.*
+   - ✅ Hecho: migración 017 + Normalizer + VtexMapper(ean) + IngestService.
+   - ✅ Hecho: `cron/hash_images.php` — llena `img_dhash` incremental (1 vez por
+     producto), disparado por cron-job.org con X-Api-Key. dHash 9x8 en PHP/GD.
 2. Matcher batch A/A' (auto, alta confianza) + tabla `product_groups`.
 3. Página pública `producto.php` + JSON-LD + compartir + sitemap.
 4. Nivel B/C + panel de revisión admin.
