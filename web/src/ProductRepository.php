@@ -477,6 +477,7 @@ final class ProductRepository
                         ORDER BY captured_at DESC LIMIT 1)
                  WHERE cur.price_final IS NOT NULL AND prev.price_final IS NOT NULL
                    AND cur.price_final <> prev.price_final
+                   AND cur.in_stock = 1
                  ORDER BY cur.captured_at DESC
                  LIMIT ' . $limit;
 
@@ -511,6 +512,7 @@ final class ProductRepository
                         ORDER BY captured_at DESC LIMIT 1)
                  WHERE cur.price_final IS NOT NULL AND prev.price_final IS NOT NULL
                    AND cur.price_final <> prev.price_final AND prev.price_final > 0
+                   AND cur.in_stock = 1
                  ORDER BY ' . $order . '
                  LIMIT ' . $limit . ' OFFSET ' . $offset;
 
