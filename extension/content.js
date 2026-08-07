@@ -8,10 +8,18 @@
   const SITE = 'https://ojoalprecio.online';
 
   const host = location.hostname.replace(/^www\./, '');
+  const MAGENTO = { platform: 'magento', anchor: '.product-info-main .price-box' };
+  const VTEX    = { platform: 'vtex',    anchor: '[class*="sellingPriceValue"]' }; // cubre v1 y v3 del componente
   const CONF = {
-    'sinsa.com.ni': { platform: 'vtex',   anchor: '.vtex-product-price-1-x-sellingPriceValue' },
-    'ni.siman.com': { platform: 'vtex',   anchor: '.vtex-product-price-1-x-sellingPriceValue' },
-    'copasa.com.ni': { platform: 'copasa', anchor: '.name-product' },
+    'sinsa.com.ni':           VTEX,
+    'ni.siman.com':           VTEX,
+    'walmart.com.ni':         VTEX,
+    'copasa.com.ni':          { platform: 'copasa', anchor: '.name-product' },
+    'elgallomasgallo.com.ni': MAGENTO,
+    'lacuracaonline.com':     MAGENTO,
+    'radioshackla.com':       MAGENTO,
+    'almacenestropigas.com':  MAGENTO,
+    'pricesmart.com':         { platform: 'pricesmart', anchor: '.sf-price' },
   }[host];
   if (!CONF) return;
   console.log('[Ojo al Precio] extensión activa en', host);
@@ -21,9 +29,14 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   function isProduct() {
-    return CONF.platform === 'vtex'
-      ? /-\d+\/p(\/|\?|#|$)/.test(location.pathname)
-      : /\/Product\/Detail\//i.test(location.pathname);
+    const p = location.pathname;
+    switch (CONF.platform) {
+      case 'vtex':       return /-\d+\/p(\/|\?|#|$)/.test(p);            // .../slug-{id}/p
+      case 'magento':    return /-\d+(\/p)?(\/|\?|#|$)/.test(p);         // Gallo .../slug-{id} · Unicomer .../slug-{id}/p
+      case 'copasa':     return /\/Product\/Detail\//i.test(p);
+      case 'pricesmart': return /\/producto\/.+\/\d+/.test(p);          // /es-ni/producto/{slug}/{pid}
+      default:           return false;
+    }
   }
 
   // Mini-gráfica SVG (sin dependencias).
@@ -56,8 +69,8 @@
     div.id = 'oap-widget';
     div.innerHTML = html;
     const target = CONF.platform === 'vtex'
-      ? (anchor.closest('[class*="vtex-product-price"]') || anchor.parentElement || anchor)
-      : anchor;
+      ? (anchor.closest('[class*="sellingPrice"]') || anchor.parentElement || anchor)
+      : anchor; // magento (.price-box), pricesmart (.sf-price), copasa (.name-product)
     target.parentNode.insertBefore(div, target.nextSibling);
     return div;
   }

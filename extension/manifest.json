@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Ojo al Precio",
-  "version": "0.1.1",
-  "description": "Muestra el historial de precios (Sinsa, Siman, Copasa) directo en la página del producto.",
+  "version": "0.2.0",
+  "description": "Muestra el historial de precios (Siman, Sinsa, Walmart, PriceSmart, El Gallo, La Curacao, RadioShack, Tropigas, Copasa) directo en la página del producto.",
   "content_scripts": [
     {
       "matches": [
@@ -11,7 +11,19 @@
         "https://ni.siman.com/*",
         "https://siman.com/*",
         "https://copasa.com.ni/*",
-        "https://*.copasa.com.ni/*"
+        "https://*.copasa.com.ni/*",
+        "https://walmart.com.ni/*",
+        "https://*.walmart.com.ni/*",
+        "https://elgallomasgallo.com.ni/*",
+        "https://*.elgallomasgallo.com.ni/*",
+        "https://lacuracaonline.com/*",
+        "https://*.lacuracaonline.com/*",
+        "https://radioshackla.com/*",
+        "https://*.radioshackla.com/*",
+        "https://almacenestropigas.com/*",
+        "https://*.almacenestropigas.com/*",
+        "https://pricesmart.com/*",
+        "https://*.pricesmart.com/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"],
