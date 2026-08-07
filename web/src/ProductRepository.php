@@ -232,6 +232,23 @@ final class ProductRepository
         );
     }
 
+    /** Categorías más comunes por NOMBRE (todas las tiendas) — para los chips. */
+    public function topCategories(int $limit = 14): array
+    {
+        $limit = max(1, min($limit, 40));
+        $sql = 'SELECT c.name, COUNT(*) AS n
+                  FROM products p
+                  JOIN categories c ON c.store_id = p.store_id AND c.external_id = p.category_external_id
+                 WHERE p.is_active = 1 AND p.category_external_id IS NOT NULL AND c.name <> ""
+                 GROUP BY c.name
+                 ORDER BY n DESC
+                 LIMIT ' . $limit;
+        return array_map(
+            static fn(array $r): array => ['name' => $r['name'], 'count' => (int) $r['n']],
+            $this->db->query($sql)->fetchAll()
+        );
+    }
+
     /**
      * Búsqueda/filtrado COMBINADO de productos rastreados (todo junto):
      *   q (nombre), store (slug), min/max (precio final), sort, limit, offset.
@@ -264,6 +281,14 @@ final class ProductRepository
         if (!empty($f['category'])) {
             $where[] = 'p.category_external_id = :cat';
             $params[':cat'] = (int) $f['category'];
+        }
+        // Filtro por NOMBRE de categoría (chips globales, cruza tiendas).
+        if (!empty($f['cat_name'])) {
+            $where[] = 'EXISTS (SELECT 1 FROM categories c
+                                 WHERE c.store_id = p.store_id
+                                   AND c.external_id = p.category_external_id
+                                   AND c.name = :catname)';
+            $params[':catname'] = $f['cat_name'];
         }
         $whereSql = implode(' AND ', $where);
 

@@ -27,6 +27,7 @@ try {
         'max'      => $_GET['max']      ?? null,
         'in_stock' => $_GET['in_stock'] ?? null,
         'category' => $_GET['category'] ?? null,
+        'cat_name' => $_GET['cat_name'] ?? null,
         'sort'     => $_GET['sort']     ?? 'name',
         'limit'    => $limit,
         'offset'   => $offset,
