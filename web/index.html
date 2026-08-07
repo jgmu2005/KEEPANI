@@ -61,7 +61,9 @@
   .compare-cta{display:block;margin:14px 20px 0;padding:12px 16px;text-align:center;background:#eff6ff;color:var(--brand-dk);border:1px solid #bfdbfe;border-radius:10px;font-weight:800}
   .cmp{align-self:flex-start;font-size:.7rem;font-weight:700;color:var(--brand-dk);background:#eff6ff;border:1px solid #dbeafe;padding:2px 8px;border-radius:999px}
   .cmp:hover{background:#dbeafe}
-  .save{align-self:flex-start;font-size:.76rem;font-weight:700;color:var(--ok)}
+  .save{align-self:flex-start;font-size:.76rem;font-weight:700;color:var(--ok);display:inline-flex;align-items:center}
+  .help{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#e2e8f0;color:var(--muted);font-size:.6rem;font-weight:800;cursor:help;margin-left:5px;flex:none}
+  .help:hover{background:#cbd5e1}
   .spark{width:100%;height:30px;display:block;margin:2px 0}
   .spark-wrap{display:flex;align-items:center;gap:6px}
   .spark-lbl{font-size:.62rem;color:var(--muted);white-space:nowrap;font-weight:600}
@@ -472,7 +474,7 @@ function cardHtml(p){
       <span class="badge">${p.store_name || p.store}</span>
       <div class="title">${escapeHtml(p.title || '(sin título)')}</div>
       <div class="price-box ${pcls}">${money(p.price_final, cur)}${hasDisc ? ` <span class="old-price">${money(p.list_price, cur)}</span>` : ''}</div>
-      ${hasDisc ? `<div class="save">Ahorrás ${money(saving, cur)}${pct ? ` · ${pct}%` : ''}</div>` : ''}
+      ${hasDisc ? `<div class="save">Ahorrás ${money(saving, cur)}${pct ? ` · ${pct}%` : ''}<span class="help" title="Descuento informado por la tienda (precio de lista vs. precio actual). No verificado con nuestro historial de precios.">?</span></div>` : ''}
       ${p.tax_added ? '<div class="note-iva">IVA est. incluido</div>' : ''}
       ${sparkline(p.series)}
       ${p.group_slug && p.group_stores >= 2 ? `<a class="cmp" href="producto.php?slug=${encodeURIComponent(p.group_slug)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">⚖️ en ${p.group_stores} tiendas</a>` : ''}
