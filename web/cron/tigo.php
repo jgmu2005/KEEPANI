@@ -57,10 +57,28 @@ if ($expected === '' || !is_string($sent) || !hash_equals($expected, $sent)) {
     out(401, ['ok' => false, 'error' => 'No autorizado']);
 }
 
-$http = new Http(UA);
-$html = $http->get(URL, ['Accept: text/html']);
-if ($html === null) {
-    out(502, ['ok' => false, 'error' => 'No se pudo bajar el catálogo de Tigo (¿bloqueo de IP también en FatCow?)']);
+// Fetch DIRECTO con timeout corto: si Tigo tarpitea/bloquea a FatCow, falla
+// rápido con diagnóstico (código HTTP) en vez de colgar el gateway (502 mudo).
+$ch = curl_init(URL);
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_FOLLOWLOCATION => true,
+    CURLOPT_MAXREDIRS      => 3,
+    CURLOPT_CONNECTTIMEOUT => 8,
+    CURLOPT_TIMEOUT        => 15,
+    CURLOPT_USERAGENT      => UA,
+    CURLOPT_ENCODING       => '',
+    CURLOPT_HTTPHEADER     => ['Accept: text/html'],
+]);
+$html = curl_exec($ch);
+$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$cerr = curl_error($ch);
+curl_close($ch);
+if ($html === false || $code < 200 || $code >= 300 || $html === '') {
+    out(200, ['ok' => false, 'error' => 'No se pudo bajar Tigo desde FatCow',
+        'http_code' => $code, 'curl_error' => $cerr,
+        'diagnostico' => $code === 403 ? 'Tigo bloquea la IP de FatCow' :
+            ($code === 0 ? 'timeout/sin respuesta (tarpit o bloqueo)' : 'respuesta inesperada')]);
 }
 
 preg_match_all('~<script type="application/ld\+json"[^>]*>(.*?)</script>~is', $html, $m);

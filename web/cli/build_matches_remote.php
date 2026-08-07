@@ -31,11 +31,15 @@ $start = time();
 function apiGet(string $url, string $key): ?array
 {
     $ch = curl_init($url);
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 60,
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 60,
         CURLOPT_HTTPHEADER => ['X-Api-Key: ' . $key, 'Accept: application/json']]);
-    $body = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    if ($code !== 200 || $body === false) { return null; }
+    $body = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $cerr = curl_error($ch); curl_close($ch);
+    if ($code !== 200 || $body === false) {
+        fwrite(STDERR, "  [apiGet] HTTP $code" . ($cerr ? " curl:$cerr" : '') . " body:" . substr((string) $body, 0, 400) . "\n");
+        return null;
+    }
     $j = json_decode((string) $body, true);
+    if (!is_array($j)) { fwrite(STDERR, "  [apiGet] respuesta no-JSON: " . substr((string) $body, 0, 400) . "\n"); }
     return is_array($j) ? $j : null;
 }
 function apiPost(string $url, array $payload, string $key): int
