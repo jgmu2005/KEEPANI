@@ -28,12 +28,13 @@ $fmt = static function (?float $v, string $cur = 'NIO'): string {
 };
 
 $storeSlug = trim((string) ($_GET['store'] ?? '')) ?: null;
+$sort      = in_array($_GET['sort'] ?? '', ['price_asc', 'price_desc', 'name'], true) ? $_GET['sort'] : 'recent';
 $page      = max(1, (int) ($_GET['page'] ?? 1));
 $per       = 48;
 $offset    = ($page - 1) * $per;
 
 $stores = $repo->storeFilter();
-$res    = $repo->listProducts($storeSlug, $per, $offset);
+$res    = $repo->listProducts($storeSlug, $per, $offset, $sort);
 $items  = $res['items'];
 $total  = $res['total'];
 $pages  = max(1, (int) ceil($total / $per));
@@ -42,6 +43,19 @@ $curStoreName = null;
 if ($storeSlug) {
     foreach ($stores as $s) { if ($s['slug'] === $storeSlug) { $curStoreName = $s['name']; } }
 }
+
+// Construye una URL de /marketplace preservando tienda + orden (+ página).
+$mkUrl = static function (array $over = []) use ($base, $storeSlug, $sort): string {
+    $st = array_key_exists('store', $over) ? $over['store'] : $storeSlug;
+    $so = array_key_exists('sort',  $over) ? $over['sort']  : $sort;
+    $pg = $over['page'] ?? 1;
+    $q = [];
+    if ($st)                 { $q['store'] = $st; }
+    if ($so && $so !== 'recent') { $q['sort'] = $so; }
+    if ($pg > 1)             { $q['page'] = $pg; }
+    return $base . '/marketplace' . ($q ? '?' . http_build_query($q) : '');
+};
+$sortOpts = ['recent' => '🆕 Recientes', 'price_asc' => '⬆️ Precio: menor a mayor', 'price_desc' => '⬇️ Precio: mayor a menor'];
 
 $metaTitle = ($curStoreName ? $curStoreName . ' — ' : '') . 'Marketplace de tiendas locales en Nicaragua';
 $metaDesc  = 'Productos de tiendas y emprendimientos locales de Nicaragua con su precio actual, más bajo y más alto. ' . $siteName . '.';
@@ -76,6 +90,9 @@ $pageUrl   = $base . '/marketplace' . ($storeSlug ? '?store=' . rawurlencode($st
   .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
   .filters a{padding:7px 13px;border:1px solid var(--line);background:#fff;border-radius:999px;font-size:.84rem;font-weight:600;color:var(--ink)}
   .filters a.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .sortbar{display:flex;gap:8px;flex-wrap:wrap;margin:-6px 0 18px}
+  .sortbar a{padding:6px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;font-size:.8rem;font-weight:600;color:var(--muted)}
+  .sortbar a.on{background:#0f172a;color:#fff;border-color:#0f172a}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
   .card .img{aspect-ratio:1;background:#f8fafc;display:grid;place-items:center;position:relative}
@@ -108,9 +125,15 @@ $pageUrl   = $base . '/marketplace' . ($storeSlug ? '?store=' . rawurlencode($st
   <p class="lead">Productos de tiendas y emprendimientos nicaragüenses (en Treinta), con su <b>precio actual</b>, el <b>más bajo</b> y el <b>más alto</b> que registramos. El pedido se hace directo con la tienda por WhatsApp.</p>
 
   <div class="filters">
-    <a href="<?= $h($base) ?>/marketplace" class="<?= $storeSlug ? '' : 'on' ?>">Todas</a>
+    <a href="<?= $h($mkUrl(['store' => null, 'page' => 1])) ?>" class="<?= $storeSlug ? '' : 'on' ?>">Todas</a>
     <?php foreach ($stores as $s): ?>
-      <a href="<?= $h($base) ?>/marketplace?store=<?= $h(rawurlencode($s['slug'])) ?>" class="<?= $storeSlug === $s['slug'] ? 'on' : '' ?>"><?= $h($s['name']) ?> <small>(<?= (int) $s['n'] ?>)</small></a>
+      <a href="<?= $h($mkUrl(['store' => $s['slug'], 'page' => 1])) ?>" class="<?= $storeSlug === $s['slug'] ? 'on' : '' ?>"><?= $h($s['name']) ?> <small>(<?= (int) $s['n'] ?>)</small></a>
+    <?php endforeach; ?>
+  </div>
+
+  <div class="sortbar">
+    <?php foreach ($sortOpts as $k => $label): ?>
+      <a href="<?= $h($mkUrl(['sort' => $k, 'page' => 1])) ?>" class="<?= $sort === $k ? 'on' : '' ?>"><?= $label ?></a>
     <?php endforeach; ?>
   </div>
 
@@ -147,10 +170,9 @@ $pageUrl   = $base . '/marketplace' . ($storeSlug ? '?store=' . rawurlencode($st
 
     <?php if ($pages > 1): ?>
       <div class="pager">
-        <?php $q = $storeSlug ? '&store=' . rawurlencode($storeSlug) : ''; ?>
-        <?php if ($page > 1): ?><a href="<?= $h($base) ?>/marketplace?page=<?= $page - 1 . $q ?>">‹ Anterior</a><?php endif; ?>
+        <?php if ($page > 1): ?><a href="<?= $h($mkUrl(['page' => $page - 1])) ?>">‹ Anterior</a><?php endif; ?>
         <span class="cur"><?= $page ?> / <?= $pages ?></span>
-        <?php if ($page < $pages): ?><a href="<?= $h($base) ?>/marketplace?page=<?= $page + 1 . $q ?>">Siguiente ›</a><?php endif; ?>
+        <?php if ($page < $pages): ?><a href="<?= $h($mkUrl(['page' => $page + 1])) ?>">Siguiente ›</a><?php endif; ?>
       </div>
     <?php endif; ?>
   <?php endif; ?>

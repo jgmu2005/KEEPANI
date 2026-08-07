@@ -129,7 +129,7 @@ final class MarketplaceRepo
      * Productos para la página pública, con precio actual + mín/máx histórico.
      * @return array{total:int, items:array}
      */
-    public function listProducts(?string $storeSlug, int $limit, int $offset): array
+    public function listProducts(?string $storeSlug, int $limit, int $offset, string $sort = 'recent'): array
     {
         $where  = 'p.is_active = 1 AND s.is_active = 1 AND p.price IS NOT NULL';
         $params = [];
@@ -137,6 +137,13 @@ final class MarketplaceRepo
             $where .= ' AND s.slug = :slug';
             $params[':slug'] = $storeSlug;
         }
+
+        $order = [
+            'recent'     => 'p.last_seen DESC, p.id DESC',
+            'price_asc'  => 'p.price ASC, p.id DESC',
+            'price_desc' => 'p.price DESC, p.id DESC',
+            'name'       => 'p.name ASC',
+        ][$sort] ?? 'p.last_seen DESC, p.id DESC';
 
         $cnt = $this->db->prepare("SELECT COUNT(*) FROM mk_products p JOIN mk_stores s ON s.id = p.store_id WHERE $where");
         $cnt->execute($params);
@@ -148,7 +155,7 @@ final class MarketplaceRepo
                        (SELECT MAX(price) FROM mk_price_history WHERE product_id = p.id AND price IS NOT NULL) AS max_price
                   FROM mk_products p JOIN mk_stores s ON s.id = p.store_id
                  WHERE $where
-                 ORDER BY p.last_seen DESC, p.id DESC
+                 ORDER BY $order
                  LIMIT " . (int) $limit . ' OFFSET ' . (int) $offset;
         $st = $this->db->prepare($sql);
         $st->execute($params);
