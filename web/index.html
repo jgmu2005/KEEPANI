@@ -121,10 +121,6 @@
   .load-more:disabled{opacity:.6;cursor:default}
   .seg{padding:8px 14px;border:1px solid var(--line);background:#fff;border-radius:999px;cursor:pointer;font-weight:700;font-size:.85rem;color:var(--muted)}
   .seg.on{background:var(--brand);color:#fff;border-color:var(--brand)}
-  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
-  .chip{padding:7px 13px;border:1px solid var(--line);background:#fff;border-radius:999px;cursor:pointer;font-weight:600;font-size:.82rem;color:var(--muted);white-space:nowrap;transition:background .12s,color .12s,border-color .12s}
-  .chip:hover{border-color:#cbd5e1}
-  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
   .page-info{min-width:130px;text-align:center;font-variant-numeric:tabular-nums}
   .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;
     background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
@@ -346,7 +342,6 @@
       </label>
       <button id="fclear" class="pg-btn">Limpiar</button>
     </div>
-    <div id="catchips" class="chips" style="display:none"></div>
     <div id="grid" class="grid"><div class="spinner">Cargando…</div></div>
     <div id="loadMoreWrap" style="text-align:center;margin-top:20px;display:none">
       <button id="loadMore" class="load-more">Ver más</button>
@@ -597,28 +592,16 @@ async function loadMoreComparador(){
 
 let storesLoaded = false;
 
-const CATCHIP = { active: '' };
 function getFilters(){
   return {
     q:        document.getElementById('fq').value.trim(),
     store:    document.getElementById('fstore').value,
     category: document.getElementById('fcategory').value,
-    cat_name: CATCHIP.active,
     min:      document.getElementById('fmin').value,
     max:      document.getElementById('fmax').value,
     sort:     document.getElementById('fsort').value,
     in_stock: document.getElementById('fstock').checked ? '1' : '',
   };
-}
-async function loadCatChips(){
-  const box = document.getElementById('catchips');
-  try{
-    const j = await (await fetch(`${API}/categories.php?top=16`)).json();
-    if(!j.ok || !j.categories.length){ box.style.display = 'none'; return; }
-    const chip = (val, label) => `<button class="chip ${CATCHIP.active===val?'on':''}" data-cat="${escapeHtml(val)}">${escapeHtml(label)}</button>`;
-    box.innerHTML = chip('', 'Todas') + j.categories.map(c => chip(c.name, c.name)).join('');
-    box.style.display = '';
-  }catch(e){ box.style.display = 'none'; }
 }
 
 async function loadCategories(){
@@ -658,7 +641,6 @@ async function loadGrid(){
   if(f.q)        params.set('q', f.q);
   if(f.store)    params.set('store', f.store);
   if(f.category) params.set('category', f.category);
-  if(f.cat_name) params.set('cat_name', f.cat_name);
   if(f.min)      params.set('min', f.min);
   if(f.max)      params.set('max', f.max);
   if(f.in_stock) params.set('in_stock', f.in_stock);
@@ -705,7 +687,6 @@ async function loadMore(){
   if(f.q) params.set('q', f.q);
   if(f.store) params.set('store', f.store);
   if(f.category) params.set('category', f.category);
-  if(f.cat_name) params.set('cat_name', f.cat_name);
   if(f.min) params.set('min', f.min);
   if(f.max) params.set('max', f.max);
   if(f.in_stock) params.set('in_stock', f.in_stock);
@@ -957,13 +938,14 @@ function applyFilters(){ PAGE.offset = 0; loadGrid(); }
   }));
 ['fsort','fcategory','fstock'].forEach(id =>
   document.getElementById(id).addEventListener('change', applyFilters));
-document.getElementById('fstore').addEventListener('change', applyFilters);
+document.getElementById('fstore').addEventListener('change', async () => {
+  await loadCategories(); applyFilters();
+});
 document.getElementById('fclear').addEventListener('click', () => {
   ['fq','fstore','fmin','fmax'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('fsort').value = 'name';
   document.getElementById('fstock').checked = true;
-  CATCHIP.active = '';
-  document.querySelectorAll('#catchips .chip').forEach(c => c.classList.toggle('on', c.dataset.cat === ''));
+  const fc = document.getElementById('fcategory'); fc.value = ''; fc.style.display = 'none';
   applyFilters();
 });
 
@@ -1175,13 +1157,6 @@ checkAuth().then(() => {
 });
 loadChanges();
 loadGrid();
-loadCatChips();
-document.getElementById('catchips').addEventListener('click', (e) => {
-  const b = e.target.closest('.chip'); if(!b) return;
-  CATCHIP.active = b.dataset.cat || '';
-  document.querySelectorAll('#catchips .chip').forEach(c => c.classList.toggle('on', c.dataset.cat === CATCHIP.active));
-  applyFilters();
-});
 </script>
 </body>
 </html>
