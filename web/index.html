@@ -92,6 +92,9 @@
   .pager select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:.85rem}
   .pg-btn{padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font-size:.85rem}
   .pg-btn:disabled{opacity:.4;cursor:default}
+  .load-more{padding:12px 28px;border:1px solid var(--brand);background:#fff;color:var(--brand-dk);border-radius:10px;cursor:pointer;font-size:.95rem;font-weight:800}
+  .load-more:hover{background:var(--brand);color:#fff}
+  .load-more:disabled{opacity:.6;cursor:default}
   .page-info{min-width:130px;text-align:center;font-variant-numeric:tabular-nums}
   .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;
     background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
@@ -291,6 +294,9 @@
       <button id="fclear" class="pg-btn">Limpiar</button>
     </div>
     <div id="grid" class="grid"><div class="spinner">Cargando…</div></div>
+    <div id="loadMoreWrap" style="text-align:center;margin-top:20px;display:none">
+      <button id="loadMore" class="load-more">Ver más</button>
+    </div>
   </section>
 </main>
 
@@ -543,14 +549,53 @@ async function loadGrid(){
     if(!storesLoaded && Array.isArray(j.stores)){ populateStores(j.stores); storesLoaded = true; }
     if(!j.ok || !j.items.length){
       grid.innerHTML = `<div class="empty">No hay productos que coincidan con la búsqueda.</div>`;
-      updatePager(0); return;
+      updatePager(0); updateLoadMore(); return;
     }
     grid.innerHTML = j.items.map(cardHtml).join('');
-    wireCards(grid);
     updatePager(j.items.length);
+    updateLoadMore();
   }catch(e){
     grid.innerHTML = `<div class="empty">No se pudo cargar. Intentá de nuevo.</div>`;
+    updateLoadMore();
   }
+}
+
+// Cuántas tarjetas hay renderizadas ahora (para el "Ver más" acumulativo).
+function gridCardCount(){ return document.querySelectorAll('#grid .card').length; }
+
+function updateLoadMore(){
+  const wrap = document.getElementById('loadMoreWrap');
+  if(!wrap) return;
+  const remaining = PAGE.size === 'all' ? 0 : (PAGE.total - (PAGE.offset + gridCardCount()));
+  const btn = document.getElementById('loadMore');
+  if(remaining > 0){
+    wrap.style.display = '';
+    btn.disabled = false;
+    btn.textContent = `Ver más (${nf.format(remaining)} restantes)`;
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+async function loadMore(){
+  const btn = document.getElementById('loadMore');
+  btn.disabled = true; btn.textContent = 'Cargando…';
+  const f = getFilters();
+  const params = new URLSearchParams({ limit: PAGE.size, offset: PAGE.offset + gridCardCount(), sort: f.sort });
+  if(f.q) params.set('q', f.q);
+  if(f.store) params.set('store', f.store);
+  if(f.category) params.set('category', f.category);
+  if(f.min) params.set('min', f.min);
+  if(f.max) params.set('max', f.max);
+  if(f.in_stock) params.set('in_stock', f.in_stock);
+  try{
+    const j = await (await fetch(`${API}/products.php?${params}`)).json();
+    if(j.ok && Array.isArray(j.items) && j.items.length){
+      document.getElementById('grid').insertAdjacentHTML('beforeend', j.items.map(cardHtml).join(''));
+    }
+    updatePager(gridCardCount());
+    updateLoadMore();
+  }catch(e){ btn.disabled = false; btn.textContent = 'Error, reintentá'; }
 }
 
 function updatePager(shown){
@@ -943,6 +988,11 @@ async function openPlanes(){
   sec.scrollIntoView({ behavior:'smooth', block:'start' });
 }
 document.getElementById('navPlanes').addEventListener('click', openPlanes);
+// Delegación: abre la ficha para cualquier tarjeta (incluidas las de "Ver más").
+document.getElementById('grid').addEventListener('click', (e) => {
+  const c = e.target.closest('.card'); if(c && c.dataset.id) openDetail({ product_id: c.dataset.id });
+});
+document.getElementById('loadMore').addEventListener('click', loadMore);
 document.getElementById('navComparador').addEventListener('click', openComparador);
 document.getElementById('navSeguimientos').addEventListener('click', () => {
   AUTH.user ? openMyAlerts() : openAuth('login');
