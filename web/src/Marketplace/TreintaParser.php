@@ -24,31 +24,50 @@ final class TreintaParser
         return ['store_name' => self::storeName($html), 'items' => $items];
     }
 
-    /** Formato A: flight data escapado (catalogo.treinta.co). */
+    /**
+     * Formato A: flight data escapado (catalogo.treinta.co). Sirve también para
+     * la respuesta JSON del server-action (mismo shape de objeto).
+     * Enfoque por TROZOS: corta en cada "id":"UUID" y extrae campos del trozo,
+     * así evita el backtracking de un regex gigante y el falso positivo del
+     * objeto "tienda" (que no tiene price/isVisible).
+     */
     private static function parseFlight(string $html): array
     {
-        if (strpos($html, 'isVisible') === false) {
+        if (strpos($html, 'isVisible') === false && strpos($html, '\\"isVisible\\"') === false) {
             return [];
         }
-        // Deshace UNA capa de escape JSON (\" -> ", \\ -> \, \/ -> /) en una copia.
-        // strtr es de una sola pasada (sin recomponer), así evita el reprocesado.
+        // Deshace UNA capa de escape JSON (\" -> ", \\ -> \, \/ -> /). strtr es de
+        // una sola pasada, así no reprocesa lo ya reemplazado.
         $s = strtr($html, ['\\"' => '"', '\\\\' => '\\', '\\/' => '/']);
 
-        $re = '/"id":"([0-9a-f-]{36})","name":"((?:[^"\\\\]|\\\\.)*?)".*?"price":(\[[0-9.,]+\]|[0-9.]+).*?"imageUrl":"((?:[^"\\\\]|\\\\.)*?)".*?"isVisible":([01]).*?"stock":(-?\d+)/s';
-        if (!preg_match_all($re, $s, $ms, PREG_SET_ORDER)) {
+        if (!preg_match_all('/"id":"[0-9a-f-]{36}"/', $s, $mm, PREG_OFFSET_CAPTURE)) {
             return [];
         }
         $out = [];
-        foreach ($ms as $m) {
-            if ((int) $m[5] !== 1) { continue; }          // isVisible=0 → oculto
-            $price = self::priceOf($m[3]);
-            $name  = self::unesc($m[2]);
-            if ($name === '') { continue; }
+        $n   = count($mm[0]);
+        $len = strlen($s);
+        for ($i = 0; $i < $n; $i++) {
+            $start = $mm[0][$i][1];
+            $end   = ($i + 1 < $n) ? $mm[0][$i + 1][1] : min($len, $start + 3000);
+            $chunk = substr($s, $start, $end - $start);
+
+            // Debe ser un PRODUCTO: tener price + isVisible dentro de su propio trozo.
+            if (!preg_match('/"price":(\[[0-9.,]+\]|[0-9.]+)/', $chunk, $mp)) { continue; }
+            if (!preg_match('/"isVisible":([01])/', $chunk, $mv) || (int) $mv[1] !== 1) { continue; }
+
+            preg_match('/"id":"([0-9a-f-]{36})"/', $chunk, $mid);
+            preg_match('/"name":"((?:[^"\\\\]|\\\\.)*?)"/', $chunk, $mn);
+            preg_match('/"imageUrl":(?:"((?:[^"\\\\]|\\\\.)*?)"|null)/', $chunk, $mi);
+
+            $price = self::priceOf($mp[1]);
+            $name  = isset($mn[1]) ? self::unesc($mn[1]) : '';
+            if ($name === '' || $price === null) { continue; }
+
             $out[] = [
-                'ext_id'    => $m[1],
+                'ext_id'    => $mid[1],
                 'name'      => $name,
                 'price'     => $price,
-                'image_url' => self::unesc($m[4]),
+                'image_url' => isset($mi[1]) ? self::unesc($mi[1]) : '',
                 'in_stock'  => 1,                          // isVisible ⇒ disponible (no confiamos en 'stock')
                 'currency'  => 'NIO',
             ];
