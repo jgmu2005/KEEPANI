@@ -96,6 +96,12 @@ if (count($live) >= 2) {
 }
 $chartSvg = PriceChart::svg($seriesByStore, $cur);
 
+// Gate de indexación: sólo indexamos fichas con CONTENIDO REAL — historial
+// suficiente para dibujar el gráfico, o que estén en el comparador (≥2 tiendas).
+// Las fichas "finas" (1 solo punto) quedan noindex,follow: se crawlean y pasan
+// enlace, pero no ensucian la calidad del dominio; maduran solas con los días.
+$indexable = (count($live) >= 2) || (($p['group_stores'] ?? 0) >= 2);
+
 // SEO copy.
 $brandTxt = $p['brand'] ? $p['brand'] . ' · ' : '';
 $metaTitle = 'Rastreador de precios de ' . $title . ' en Nicaragua';
@@ -149,7 +155,7 @@ $ldBreadcrumb = [
 <meta property="og:url" content="<?= $h($pageUrl) ?>">
 <?php if ($image): ?><meta property="og:image" content="<?= $h($image) ?>"><?php endif; ?>
 <meta name="twitter:card" content="summary_large_image">
-<?= Seo::head($settings, true) ?>
+<?= Seo::head($settings, $indexable) ?>
 <script type="application/ld+json"><?= json_encode($ld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
 <script type="application/ld+json"><?= json_encode($ldBreadcrumb, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
 <style>

@@ -19,8 +19,11 @@ $base = rtrim(Verification::baseUrl(), '/');
 $h    = static fn($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 
 const PER_PAGE = 5000;
+// Sólo productos "maduros" (con historial en ≥2 días) — coincide con el filtro
+// de sitemap_productos.php y con el gate de indexación de precio.php.
 $totalProducts = (int) $db->query(
-    'SELECT COUNT(*) FROM products WHERE is_active = 1 AND title IS NOT NULL'
+    'SELECT COUNT(*) FROM products
+      WHERE is_active = 1 AND title IS NOT NULL AND DATE(first_seen_at) < DATE(last_seen_at)'
 )->fetchColumn();
 $pages = max(1, (int) ceil($totalProducts / PER_PAGE));
 

@@ -27,10 +27,13 @@ const PER_PAGE = 5000;
 $page   = max(1, (int) ($_GET['page'] ?? 1));
 $offset = ($page - 1) * PER_PAGE;
 
+// Sólo productos "maduros": rastreados en ≥2 días distintos ⇒ tienen historial
+// (así el sitemap no ofrece a Google fichas finas de 1 solo punto).
 $st = $db->prepare(
     'SELECT id, title, last_seen_at
        FROM products
       WHERE is_active = 1 AND title IS NOT NULL
+        AND DATE(first_seen_at) < DATE(last_seen_at)
       ORDER BY id
       LIMIT ' . PER_PAGE . ' OFFSET ' . $offset
 );
