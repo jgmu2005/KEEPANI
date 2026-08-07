@@ -139,16 +139,28 @@ final class Matcher
         $img = self::hamming($a['img_dhash'] ?? null, $b['img_dhash'] ?? null);
         $jac = self::jaccard($ta, $tb);
 
-        // Descartes por señal débil.
-        if ($img !== null && $img > 24) { return $no; }        // imágenes claramente distintas
-        if (($img === null || $img > 14) && $jac < 0.5) { return $no; } // sin imagen fuerte ni título parecido
+        // El dHash 9x8 COLISIONA entre fotos de producto sobre fondo blanco
+        // (objetos distintos → misma silueta → dist baja). Por eso la imagen NO
+        // puede crear un match por sí sola: el TÍTULO/MODELO es el filtro
+        // principal, y la imagen solo confirma.
+        $imgConfirms    = $img !== null && $img <= 12; // misma/muy parecida foto
+        $imgContradicts = $img !== null && $img > 22;  // fotos claramente distintas
 
-        $imgScore = $img !== null ? max(0, 100 - $img * 5) : 0; // 0→100, 14→30
-        $jacScore = (int) round($jac * 100);
-        $score    = min(100, max($imgScore, (int) round($jacScore * 0.9)));
-        $method   = ($img !== null && $img <= 14) ? 'image' : 'title';
+        if ($imgContradicts) {
+            return $no;
+        }
+        // Umbral de título: más bajo si la imagen confirma; más alto si no hay
+        // imagen o es dudosa (evita falsos por título flojo).
+        $jacMin = $imgConfirms ? 0.35 : 0.55;
+        if ($jac < $jacMin) {
+            return $no;
+        }
 
-        if ($score < 40) { return $no; }
+        $score  = (int) round($jac * 100) + ($imgConfirms ? 20 : 0);
+        $score  = min(100, $score);
+        $method = $imgConfirms ? 'image' : 'title';
+
+        if ($score < 55) { return $no; }
         return ['ok' => true, 'score' => $score, 'method' => $method, 'img' => $img, 'jac' => round($jac, 3)];
     }
 }
