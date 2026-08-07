@@ -83,6 +83,13 @@ final class IngestService
         $sel->execute([$storeId, $sku]);
         $id = $sel->fetchColumn();
 
+        // Sanea UTF-8 inválido en el texto scrapeado (ej. OG de Gallo) para que
+        // json_encode no falle después en cualquier endpoint que lo devuelva.
+        $it['title']     = self::scrub($it['title'] ?? null);
+        $it['brand']     = self::scrub($it['brand'] ?? null);
+        $it['image_url'] = self::scrub($it['image_url'] ?? null);
+        $it['url']       = self::scrub($it['url'] ?? null);
+
         // Identidad para el comparador (ver Normalizer / docs/comparador-matcher.md).
         $ean       = isset($it['ean']) && $it['ean'] !== '' ? (string) $it['ean'] : null;
         $brandNorm = Normalizer::brand($it['brand'] ?? null);
@@ -173,6 +180,17 @@ final class IngestService
 
         // rowCount()==1 => INSERT nuevo; ==2 => UPDATE por ON DUPLICATE KEY.
         return $stmt->rowCount() === 1;
+    }
+
+    /** Quita bytes UTF-8 inválidos (evita que json_encode devuelva false luego). */
+    private static function scrub(?string $s): ?string
+    {
+        if ($s === null) {
+            return null;
+        }
+        return function_exists('mb_scrub')
+            ? mb_scrub($s, 'UTF-8')
+            : (string) @mb_convert_encoding($s, 'UTF-8', 'UTF-8');
     }
 
     /** Normaliza captured_at a 'Y-m-d H:i:s' UTC. */

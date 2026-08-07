@@ -43,7 +43,10 @@ final class ClaroMapper
             }
             $imgs = $it['images'] ?? [];
             if (!empty($imgs[0])) {
-                $image = self::CDN . $imgs[0];
+                // La API da ".../NAME_1.jpg?ver" pero el CDN solo sirve la variante
+                // CON tamaño (..._1.jpg → 302; ..._1_210x180.jpg → 200).
+                $path  = preg_replace('/\.jpg(\?|$)/i', '_210x180.jpg$1', (string) $imgs[0], 1);
+                $image = self::CDN . $path;
             }
             break;
         }

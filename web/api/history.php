@@ -23,7 +23,7 @@ header('Access-Control-Allow-Origin: *'); // lectura pública (dashboard + exten
 function out(int $status, array $payload): never
 {
     http_response_code($status);
-    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 }
 

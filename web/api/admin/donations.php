@@ -33,4 +33,4 @@ $rows = array_map(static function (array $r): array {
     ];
 }, $db->query($sql)->fetchAll());
 
-echo json_encode(['ok' => true, 'donations' => $rows], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+echo json_encode(['ok' => true, 'donations' => $rows], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);

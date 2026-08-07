@@ -19,4 +19,4 @@ echo json_encode([
     'alerts' => Alerts::listForUser($db, $u['id']),
     'limit'  => $u['alert_limit'],
     'tier'   => $u['tier'],
-], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);

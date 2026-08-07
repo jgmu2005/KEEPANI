@@ -19,7 +19,7 @@ use OjoAlPrecio\Web\Db;
 
 header('Content-Type: application/json; charset=utf-8');
 
-function out(int $s, array $p): never { http_response_code($s); echo json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit; }
+function out(int $s, array $p): never { http_response_code($s); echo json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE); exit; }
 
 $cfg = Db::config();
 $sent = $_SERVER['HTTP_X_API_KEY'] ?? '';
