@@ -636,8 +636,10 @@ async function createAlert(productId, type='price'){
     if(j.ok){ msg.textContent = j.updated ? '✔ Alerta actualizada' : '✔ ¡Alerta creada!'; msg.style.color = 'var(--ok)'; }
     else {
       msg.style.color = 'var(--bad)';
-      if(j.limit_reached && window.DONATE_KOFI){
-        msg.innerHTML = escapeHtml(j.error) + ` <a href="${window.DONATE_KOFI}" target="_blank" rel="noopener" style="color:var(--brand-dk)">Doná</a>`;
+      if(j.limit_reached){
+        msg.innerHTML = escapeHtml(j.error) + ` <a href="#" id="limitPlanes" style="color:var(--brand-dk);font-weight:700">Ver planes →</a>`;
+        const lp = document.getElementById('limitPlanes');
+        if(lp) lp.addEventListener('click', (e) => { e.preventDefault(); document.getElementById('overlay').classList.remove('open'); openPlanes(); });
       } else { msg.textContent = j.error || 'Error'; }
     }
   }catch(e){ msg.textContent = 'Error de red'; msg.style.color = 'var(--bad)'; }
@@ -649,8 +651,8 @@ async function openMyAlerts(){
   let j;
   try{ j = await (await fetch(`${API}/alerts/list.php`)).json(); }catch(e){ j = {ok:false}; }
   if(!j.ok){ detail.innerHTML = `<div class="spinner">Necesitás iniciar sesión.</div>`; return; }
-  const cta = (j.tier !== 'subscriber' && window.DONATE_KOFI)
-    ? `<div class="cta-donate">¿Querés rastrear más? <a href="${window.DONATE_KOFI}" target="_blank" rel="noopener">Doná o suscribite</a> con el correo de tu cuenta y subimos tu tope solo.</div>`
+  const cta = (j.tier !== 'subscriber')
+    ? `<div class="cta-donate">¿Querés rastrear más productos? <a href="#" onclick="document.getElementById('overlay').classList.remove('open');openPlanes();return false;">Ver planes →</a></div>`
     : '';
   let html = `<div style="padding:22px">
     <h3 style="margin:0 0 4px">🔔 Mis alertas</h3>
