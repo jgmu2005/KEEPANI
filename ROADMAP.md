@@ -5,6 +5,40 @@ Esfuerzo: S (chico) · M (medio) · L (grande)
 
 ---
 
+## 🗓️ Cierre — semana del 11–15 ago 2026
+
+Objetivo: dejar **desplegado, verificado y monitoreado** todo lo construido (refresco Premium, comparador de celulares, SEO indexable, marketplace Treinta) — sin features grandes nuevos.
+
+### 1. Deploy pendiente (SFTP) — primero 🔴 S
+- [ ] Gate SEO: `web/precio.php`, `web/sitemap.php`, `web/sitemap_productos.php`
+- [ ] Orden marketplace: `web/marketplace.php`, `web/src/Marketplace/MarketplaceRepo.php`
+- [ ] Confirmar que ya estén arriba: `mk_ingest.php`, `Verification.php` (fix baseUrl), `CategoryClassifier.php`, `Seo.php`, `PriceChart.php`, `index.html`, `admin.html`
+- [ ] Migraciones corridas: **027** (cat_key) y **028** (marketplace)
+
+### 2. Ops / crons 🔴 S
+- [ ] **Google Search Console**: verificar dominio (DNS TXT o archivo HTML) + enviar `sitemap.xml`
+- [ ] Marketplace: confirmar que el workflow de GitHub trajo catálogos completos → **DESACTIVAR el cron FatCow `crawl_marketplace.php`** (si no, borra todo menos 12) → dejar sólo el workflow diario
+- [ ] cron-job.org: confirmar `refresh_tracked.php?tiers=subscriber` (cada 4h) + `?tiers=onetime` (2×/día) + `alerts_check.php`
+- [ ] Encadenar/ordenar los crons de comparador: `build_groups` → `build_phone_groups` → `build_categories`
+
+### 3. Monitoreo (durante la semana) 🟡 S
+- [ ] GA4: primeras visitas / fuentes
+- [ ] Search Console: cobertura (cuántas fichas indexa), errores de rastreo
+- [ ] Ver que las fichas "maduren" y entren solas al sitemap (gate por historial)
+
+### 4. Pulido si hay tiempo 🟢 S/M
+- [ ] Marketplace: **buscador por nombre** dentro de `/marketplace` (S)
+- [ ] Sumar más tiendas Treinta desde el admin (S)
+- [ ] Revisar la **cola de matches** en admin para sumar comparaciones cross-store (S)
+- [ ] **Hubs por categoría** (una página SEO por categoría con sus productos) — joya SEO (M)
+
+### 5. Backlog / futuro (NO esta semana)
+- Clasificación de categorías con **IA** (100% del catálogo + mejores títulos SEO)
+- Marketplace: landing SEO por tienda si tracciona; catálogo completo estable
+- Más tiendas del tracker
+
+---
+
 ## Ya hecho ✅
 3 tiendas (Sinsa, Siman, Copasa) · ~5,000 productos · seed masivo · refresco diario (GitHub Actions) · dashboard con gráficas · buscador + filtros combinados + paginación · alta on-demand · cuentas · panel admin (branding, SMTP, usuarios) · alertas de precio por email.
 
