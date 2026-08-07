@@ -16,9 +16,15 @@ final class Verification
     {
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        // Raíz de la app = SCRIPT_NAME sin el tramo /api/... o /cron/... (sirve para cualquier endpoint).
-        $root = preg_replace('#/(api|cron)/.*$#', '', str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? ''));
-        return $scheme . '://' . $host . rtrim((string) $root, '/');
+        // Raíz de la app desde SCRIPT_NAME:
+        //  1) quita el tramo de endpoint (/api|cron|cli/...) → sirve para esos scripts;
+        //  2) quita el archivo .php de las páginas top-level (producto.php, precio.php…),
+        //     que antes dejaba la raíz como ".../precio.php" y rompía las URLs (canónica,
+        //     WhatsApp: ".../precio.php/precio/123/...").
+        $path = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+        $path = preg_replace('#/(api|cron|cli)/.*$#', '', $path);
+        $path = preg_replace('#/[^/]+\.php$#', '', $path);
+        return $scheme . '://' . $host . rtrim((string) $path, '/');
     }
 
     /**

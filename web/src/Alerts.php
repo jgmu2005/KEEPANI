@@ -116,4 +116,77 @@ final class Alerts
     {
         $db->prepare('UPDATE alerts SET last_triggered_at = NULL WHERE id = ?')->execute([$alertId]);
     }
+
+    /**
+     * Revisa las alertas activas y notifica (precio + restock). Reusable por
+     * alerts_check (todas) y refresh_tracked (scope opcional por productos).
+     * @param int[]|null $onlyProductIds si se pasa, solo revisa esos productos.
+     */
+    public static function notify(PDO $db, ?Mailer $mailer, array $cfg, string $siteName, string $base, ?array $onlyProductIds = null): array
+    {
+        $fmt  = static fn($v): string => 'C$' . number_format((float) $v, 2);
+        $only = $onlyProductIds !== null ? array_flip(array_map('intval', $onlyProductIds)) : null;
+        $key  = (string) ($cfg['ingest_api_key'] ?? '');
+
+        $unsub = static function (int $id) use ($base, $key): string {
+            return $base . '/api/alerts/unsubscribe.php?a=' . $id . '&t=' . hash_hmac('sha256', 'unsub:' . $id, $key);
+        };
+
+        $alerts = self::allActiveWithPrice($db);
+        $checked = 0; $emailed = 0; $restocked = 0; $rearmed = 0; $noPrice = 0; $pending = 0;
+
+        foreach ($alerts as $a) {
+            if ($only !== null && !isset($only[(int) $a['product_id']])) { continue; }
+            $checked++;
+            $type    = $a['alert_type'] ?? 'price';
+            $already = $a['last_triggered_at'] !== null;
+
+            // ---- Restock: dispara al pasar de agotado a disponible ----
+            if ($type === 'restock') {
+                $inStock = (int) $a['in_stock'] === 1;
+                if ($inStock) {
+                    if ($already)  { continue; }
+                    if (!$mailer)  { $pending++; continue; }
+                    $priceLine = $a['price'] !== null ? '<p style="font-size:1.2rem;margin:8px 0"><b>' . $fmt($a['price']) . '</b></p>' : '';
+                    $html = '<div style="font-family:system-ui,sans-serif;max-width:520px">'
+                        . '<h2 style="color:#16a34a;margin:0 0 8px">🎉 ¡Volvió a estar disponible!</h2>'
+                        . '<p style="margin:0 0 4px"><b>' . htmlspecialchars((string) $a['title']) . '</b></p>' . $priceLine
+                        . '<p><a href="' . htmlspecialchars((string) $a['url']) . '" style="background:#0ea5e9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Ver el producto ↗</a></p>'
+                        . '<p style="color:#94a3b8;font-size:.8rem;margin-top:20px">Recibís esto por una alerta que creaste en ' . htmlspecialchars($siteName) . '. '
+                        . '<a href="' . htmlspecialchars($unsub((int) $a['id'])) . '" style="color:#94a3b8">Dejar de recibir estas alertas</a>.</p></div>';
+                    $res = $mailer->send((string) $a['email'], '🎉 Volvió a estar disponible: ' . $a['title'], $html);
+                    if ($res['ok']) { self::markTriggered($db, (int) $a['id'], (float) ($a['price'] ?? 0)); $emailed++; $restocked++; }
+                    else { $pending++; }
+                } elseif ($already) {
+                    self::rearm($db, (int) $a['id']); $rearmed++;
+                }
+                continue;
+            }
+
+            // ---- Precio ----
+            if ($a['price'] === null) { $noPrice++; continue; }
+            $price  = (float) $a['price'];
+            $target = (float) $a['target_price'];
+            if ($price <= $target) {
+                if ($already) { continue; }
+                if (!$mailer) { $pending++; continue; }
+                $html = '<div style="font-family:system-ui,sans-serif;max-width:520px">'
+                    . '<h2 style="color:#16a34a;margin:0 0 8px">📉 ¡Bajó de precio!</h2>'
+                    . '<p style="margin:0 0 4px"><b>' . htmlspecialchars((string) $a['title']) . '</b></p>'
+                    . '<p style="font-size:1.3rem;margin:8px 0"><b>' . $fmt($price) . '</b> <span style="color:#64748b;font-size:.9rem">(tu objetivo: ' . $fmt($target) . ')</span></p>'
+                    . '<p><a href="' . htmlspecialchars((string) $a['url']) . '" style="background:#0ea5e9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Ver el producto ↗</a></p>'
+                    . '<p style="color:#94a3b8;font-size:.8rem;margin-top:20px">Recibís esto por una alerta que creaste en ' . htmlspecialchars($siteName) . '. '
+                    . '<a href="' . htmlspecialchars($unsub((int) $a['id'])) . '" style="color:#94a3b8">Dejar de recibir estas alertas</a>.</p></div>';
+                $res = $mailer->send((string) $a['email'], '📉 Bajó de precio: ' . $a['title'], $html);
+                if ($res['ok']) { self::markTriggered($db, (int) $a['id'], $price); $emailed++; }
+                else { $pending++; }
+            } elseif ($already) {
+                self::rearm($db, (int) $a['id']); $rearmed++;
+            }
+        }
+
+        return ['checked' => $checked, 'emailed' => $emailed, 'restocked' => $restocked,
+                'rearmed' => $rearmed, 'no_price' => $noPrice, 'mail_pending' => $pending,
+                'mail_configured' => (bool) $mailer];
+    }
 }

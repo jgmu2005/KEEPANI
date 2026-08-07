@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /cron/
+Disallow: /cli/
+Disallow: /admin.html
+Disallow: /reset.html
+
+Sitemap: https://ojoalprecio.online/sitemap.xml

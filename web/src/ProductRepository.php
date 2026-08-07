@@ -211,6 +211,32 @@ final class ProductRepository
         );
     }
 
+    /**
+     * Buckets de categoría cross-store CON productos (para los chips del catálogo).
+     * Solo cuenta productos con stock. Devuelve [{key,label,count}] en el orden
+     * de CategoryClassifier::LABELS.
+     */
+    public function categoryBuckets(): array
+    {
+        $rows = $this->db->query(
+            'SELECT p.cat_key AS k, COUNT(*) AS n
+               FROM products p
+               JOIN price_history ph ON ph.id = (
+                    SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
+              WHERE p.is_active = 1 AND p.cat_key IS NOT NULL AND ph.in_stock = 1
+              GROUP BY p.cat_key'
+        )->fetchAll(\PDO::FETCH_KEY_PAIR);
+
+        $out = [];
+        foreach (CategoryClassifier::LABELS as $key => $label) {
+            $n = (int) ($rows[$key] ?? 0);
+            if ($n > 0) {
+                $out[] = ['key' => $key, 'label' => $label, 'count' => $n];
+            }
+        }
+        return $out;
+    }
+
     /** Categorías de una tienda que tienen al menos un producto (para el filtro). */
     public function categoriesWithProducts(string $storeSlug): array
     {
@@ -264,6 +290,10 @@ final class ProductRepository
         if (!empty($f['category'])) {
             $where[] = 'p.category_external_id = :cat';
             $params[':cat'] = (int) $f['category'];
+        }
+        if (!empty($f['cat_key'])) {
+            $where[] = 'p.cat_key = :catkey';
+            $params[':catkey'] = (string) $f['cat_key'];
         }
         $whereSql = implode(' AND ', $where);
 
@@ -340,10 +370,13 @@ final class ProductRepository
         }
         $days = max(7, min($days, 180));
         $in   = implode(',', $ids); // ints ya saneados: seguro para interpolar
+        // Sólo capturas EN STOCK: las agotadas traen precio-centinela (ej. Siman
+        // C$10,000,000) que falseaba el mínimo/máximo histórico y los sparklines.
         $sql  = "SELECT product_id, captured_date AS d, price_final AS p
                    FROM price_history
                   WHERE product_id IN ($in)
                     AND price_final IS NOT NULL
+                    AND in_stock = 1
                     AND captured_date >= DATE_SUB(CURDATE(), INTERVAL $days DAY)
                   ORDER BY product_id, captured_date";
         $out = [];
@@ -415,28 +448,48 @@ final class ProductRepository
      * Lista de grupos multi-tienda (para la vitrina "Comparador"), con su rango
      * de precio actual entre tiendas. @return array{total:int, items:array}
      */
-    public function groupsList(int $limit = 24, int $offset = 0, string $sort = 'discrepancy'): array
+    public function groupsList(int $limit = 24, int $offset = 0, string $sort = 'discrepancy', ?string $method = null): array
     {
         $limit  = max(1, min($limit, 100));
         $offset = max(0, $offset);
-        $total  = (int) $this->db->query('SELECT COUNT(*) FROM product_groups WHERE store_count >= 2')->fetchColumn();
+
+        // Filtro opcional por método de agrupamiento ('model' = celulares).
+        $where  = 'g.store_count >= 2';
+        $params = [];
+        if ($method !== null && $method !== '') {
+            $where .= ' AND g.method = :method';
+            $params[':method'] = $method;
+        }
+
+        // Sólo cuentan las ofertas EN STOCK: las agotadas traen precio-centinela
+        // (ej. Siman marca C$10,000,000) que inflaba el máximo y el % de ahorro.
+        // Se recalcula el # de tiendas con stock y se exige que sigan siendo ≥2.
+        $base = 'FROM product_groups g
+                  JOIN products p ON p.group_id = g.id AND p.is_active = 1
+                  JOIN price_history ph ON ph.id = (
+                        SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
+                 WHERE ' . $where . ' AND ph.in_stock = 1 AND ph.price_final IS NOT NULL
+                 GROUP BY g.id
+                 HAVING COUNT(DISTINCT p.store_id) >= 2';
+
+        $cnt = $this->db->prepare('SELECT COUNT(*) FROM (SELECT g.id ' . $base . ') t');
+        $cnt->execute($params);
+        $total = (int) $cnt->fetchColumn();
 
         // Orden: por diferencia de precio % entre tiendas (default) o por # de tiendas.
         $order = $sort === 'stores'
-            ? 'g.store_count DESC, g.updated_at DESC'
-            : '(MAX(ph.price_final) - MIN(ph.price_final)) / NULLIF(MIN(ph.price_final), 0) DESC, g.store_count DESC';
+            ? 'store_count DESC, g.updated_at DESC'
+            : '(MAX(ph.price_final) - MIN(ph.price_final)) / NULLIF(MIN(ph.price_final), 0) DESC, store_count DESC';
 
-        $sql = 'SELECT g.slug, g.canonical_title AS title, g.brand, g.image_url, g.store_count,
+        $sql = 'SELECT g.slug, g.canonical_title AS title, g.brand, g.image_url,
+                       COUNT(DISTINCT p.store_id) AS store_count,
                        MIN(ph.price_final) AS min_price, MAX(ph.price_final) AS max_price,
                        MAX(ph.currency) AS currency
-                  FROM product_groups g
-                  JOIN products p ON p.group_id = g.id AND p.is_active = 1
-                  LEFT JOIN price_history ph ON ph.id = (
-                        SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
-                 WHERE g.store_count >= 2
-                 GROUP BY g.id
+                  ' . $base . '
                  ORDER BY ' . $order . '
                  LIMIT ' . $limit . ' OFFSET ' . $offset;
+        $st = $this->db->prepare($sql);
+        $st->execute($params);
 
         $items = array_map(static function (array $r): array {
             return [
@@ -449,7 +502,7 @@ final class ProductRepository
                 'max_price'   => $r['max_price'] !== null ? (float) $r['max_price'] : null,
                 'currency'    => $r['currency'] ?? 'NIO',
             ];
-        }, $this->db->query($sql)->fetchAll());
+        }, $st->fetchAll());
 
         return ['total' => $total, 'items' => $items];
     }

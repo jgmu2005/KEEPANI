@@ -57,6 +57,36 @@ foreach ($rows as $r) {
     }
 }
 
+// --- Diagnóstico: ?debug=1 muestra por qué no se forman clusters cruzados ---
+if (!empty($_GET['debug'])) {
+    $names = [];
+    foreach ($db->query('SELECT id, slug FROM stores') as $s) { $names[(int) $s['id']] = $s['slug']; }
+
+    $byStore = [];                       // tienda => # productos-teléfono (con firma)
+    foreach ($clusters as $items) {
+        foreach ($items as $p) { $byStore[$names[(int) $p['store_id']] ?? '?'] = ($byStore[$names[(int) $p['store_id']] ?? '?'] ?? 0) + 1; }
+    }
+    arsort($byStore);
+
+    $sigInfo = [];
+    foreach ($clusters as $sig => $items) {
+        $st = array_values(array_unique(array_map(static fn(array $p): string => $names[(int) $p['store_id']] ?? '?', $items)));
+        $sigInfo[] = ['sig' => $sig, 'n' => count($items), 'stores' => $st, 'store_count' => count($st)];
+    }
+    usort($sigInfo, static fn($a, $b) => $b['store_count'] <=> $a['store_count'] ?: $b['n'] <=> $a['n']);
+
+    out(200, [
+        'ok'                 => true,
+        'debug'              => true,
+        'phone_products'     => count($rows),
+        'with_signature'     => array_sum(array_map('count', $clusters)),
+        'distinct_sigs'      => count($clusters),
+        'by_store'           => $byStore,
+        'multi_store_sigs'   => count(array_filter($sigInfo, static fn($x) => $x['store_count'] >= 2)),
+        'top_signatures'     => array_slice($sigInfo, 0, 40),
+    ]);
+}
+
 $upsert = $db->prepare(
     'INSERT INTO product_groups (match_key, slug, canonical_title, brand, image_url, member_count, store_count, method)
      VALUES (:mk, :slug, :title, :brand, :img, :n, :stores, :method)

@@ -1,0 +1,110 @@
+<?php
+declare(strict_types=1);
+
+namespace OjoAlPrecio\Web\Marketplace;
+
+/**
+ * Parser de catálogos Treinta. Dos formatos:
+ *  A) catalogo.treinta.co — Next.js: productos en el "flight data" (JSON escapado
+ *     una capa). Campos: id(UUID), name, price(num o [min,max]), imageUrl,
+ *     isVisible, stock. Precio en córdobas (NIO).
+ *  B) tienda.treinta.co — schema.org JSON-LD (Product + offers). Precio string.
+ *
+ * Sólo lectura pública (sin auth). Devuelve productos normalizados.
+ */
+final class TreintaParser
+{
+    /** @return array{store_name:?string, items:array<array{ext_id:string,name:string,price:?float,image_url:string,in_stock:int,currency:string}>} */
+    public static function parse(string $html): array
+    {
+        $items = self::parseFlight($html);
+        if (!$items) {
+            $items = self::parseJsonLd($html);
+        }
+        return ['store_name' => self::storeName($html), 'items' => $items];
+    }
+
+    /** Formato A: flight data escapado (catalogo.treinta.co). */
+    private static function parseFlight(string $html): array
+    {
+        if (strpos($html, 'isVisible') === false) {
+            return [];
+        }
+        // Deshace UNA capa de escape JSON (\" -> ", \\ -> \, \/ -> /) en una copia.
+        // strtr es de una sola pasada (sin recomponer), así evita el reprocesado.
+        $s = strtr($html, ['\\"' => '"', '\\\\' => '\\', '\\/' => '/']);
+
+        $re = '/"id":"([0-9a-f-]{36})","name":"((?:[^"\\\\]|\\\\.)*?)".*?"price":(\[[0-9.,]+\]|[0-9.]+).*?"imageUrl":"((?:[^"\\\\]|\\\\.)*?)".*?"isVisible":([01]).*?"stock":(-?\d+)/s';
+        if (!preg_match_all($re, $s, $ms, PREG_SET_ORDER)) {
+            return [];
+        }
+        $out = [];
+        foreach ($ms as $m) {
+            if ((int) $m[5] !== 1) { continue; }          // isVisible=0 → oculto
+            $price = self::priceOf($m[3]);
+            $name  = self::unesc($m[2]);
+            if ($name === '') { continue; }
+            $out[] = [
+                'ext_id'    => $m[1],
+                'name'      => $name,
+                'price'     => $price,
+                'image_url' => self::unesc($m[4]),
+                'in_stock'  => 1,                          // isVisible ⇒ disponible (no confiamos en 'stock')
+                'currency'  => 'NIO',
+            ];
+        }
+        return $out;
+    }
+
+    /** Formato B: JSON-LD (tienda.treinta.co). */
+    private static function parseJsonLd(string $html): array
+    {
+        $re = '/"name":"((?:[^"\\\\]|\\\\.)*?)","offers":\{"@type":"Offer","price":"([0-9.]+)","priceCurrency":"([A-Z]{3})","availability":"([^"]*)"/';
+        if (!preg_match_all($re, $html, $ms, PREG_SET_ORDER)) {
+            return [];
+        }
+        $out = [];
+        foreach ($ms as $m) {
+            $name = self::unesc($m[1]);
+            if ($name === '') { continue; }
+            $out[] = [
+                'ext_id'    => substr(md5($name), 0, 32),
+                'name'      => $name,
+                'price'     => (float) $m[2],
+                'image_url' => '',
+                'in_stock'  => str_contains($m[4], 'InStock') ? 1 : 0,
+                'currency'  => $m[3] ?: 'NIO',
+            ];
+        }
+        return $out;
+    }
+
+    /** Nombre de la tienda desde el JSON-LD (Store / LocalBusiness). */
+    private static function storeName(string $html): ?string
+    {
+        if (preg_match('/"@type":"(?:Store|LocalBusiness)","name":"([^"]+)"/', $html, $m)) {
+            return self::unesc($m[1]);
+        }
+        return null;
+    }
+
+    /** price puede ser número o [min,max]; devuelve el mínimo (>0) o null. */
+    private static function priceOf(string $raw): ?float
+    {
+        if ($raw !== '' && $raw[0] === '[') {
+            $nums = array_map('floatval', array_filter(explode(',', trim($raw, '[]')), 'strlen'));
+            $nums = array_filter($nums, static fn($v) => $v > 0);
+            return $nums ? min($nums) : null;
+        }
+        $v = (float) $raw;
+        return $v > 0 ? $v : null;
+    }
+
+    /** Deshace escapes que hayan quedado en un valor capturado. */
+    private static function unesc(string $s): string
+    {
+        $s = strtr($s, ['\\"' => '"', '\\\\' => '\\', '\\/' => '/', '\\n' => ' ']);
+        $s = preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/', static fn($m) => mb_chr((int) hexdec($m[1]), 'UTF-8'), $s) ?? $s;
+        return trim($s);
+    }
+}

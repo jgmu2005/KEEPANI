@@ -11,3 +11,22 @@
     ExpiresActive On
     ExpiresByType text/html "access plus 0 seconds"
 </IfModule>
+
+# URL propia y compartible para el comparador de celulares.
+# Rewrite INTERNO a index.html (mismo directorio ⇒ las rutas relativas del SPA
+# —./api, producto.php— siguen resolviendo igual). El SPA detecta la ruta y abre
+# la vista de celulares. Se usa sin barra final (así lo genera history.pushState).
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^compara-telefonos$ index.html [L]
+
+    # URL amigable y con keywords por producto: /precio/{id}/{slug-opcional}
+    # → precio.php?id={id} (server-rendered; los links internos usan URL absoluta).
+    RewriteRule ^precio/([0-9]+)(/[^/]*)?$ precio.php?id=$1 [L,QSA]
+
+    # Índice de sitemaps con nombre canónico.
+    RewriteRule ^sitemap\.xml$ sitemap.php [L]
+
+    # Marketplace de tiendas locales (Treinta), aislado del tracker.
+    RewriteRule ^marketplace$ marketplace.php [L,QSA]
+</IfModule>

@@ -15,6 +15,8 @@ use OjoAlPrecio\Web\Db;
 use OjoAlPrecio\Web\ProductRepository;
 use OjoAlPrecio\Web\Settings;
 use OjoAlPrecio\Web\Verification;
+use OjoAlPrecio\Web\Seo;
+use OjoAlPrecio\Web\PriceChart;
 
 $slug = isset($_GET['slug']) ? trim((string) $_GET['slug']) : '';
 $db   = Db::conn();
@@ -45,58 +47,6 @@ $usd  = static function (?float $v) use ($usdRate): string {
     return '≈ US$' . number_format($v / $usdRate, 2);
 };
 
-/** Gráfico SVG de líneas del precio por tienda (server-rendered, sin JS). */
-function price_chart_svg(array $seriesByStore, string $cur): string
-{
-    $colors = ['#0ea5e9', '#16a34a', '#f59e0b', '#8b5cf6', '#dc2626', '#0891b2'];
-    $W = 720; $H = 300; $Lp = 58; $Rp = 14; $Tp = 12; $Bp = 34;
-    $pw = $W - $Lp - $Rp; $ph = $H - $Tp - $Bp;
-
-    $allTs = []; $allP = [];
-    foreach ($seriesByStore as $s) {
-        foreach ($s as $pt) { $allTs[] = strtotime($pt['d']); $allP[] = (float) $pt['p']; }
-    }
-    if (count($allP) < 2) { return ''; }
-    $minTs = min($allTs); $maxTs = max($allTs); $minP = min($allP); $maxP = max($allP);
-    if ($maxTs == $minTs) { $maxTs = $minTs + 86400; }
-    if ($maxP == $minP)  { $maxP  = $minP + 1; }
-
-    $x = static fn($ts): float => $Lp + ($ts - $minTs) / ($maxTs - $minTs) * $pw;
-    $y = static fn($p): float  => $Tp + (1 - ($p - $minP) / ($maxP - $minP)) * $ph;
-    $lbl = static fn($v): string => ($cur === 'USD' ? 'US$' : 'C$') . number_format($v, 0);
-
-    $svg = '<svg viewBox="0 0 ' . $W . ' ' . $H . '" class="chart" role="img" aria-label="Historial de precios">';
-    for ($i = 0; $i <= 3; $i++) {
-        $val = $minP + ($maxP - $minP) * $i / 3; $yy = round($y($val), 1);
-        $svg .= '<line x1="' . $Lp . '" y1="' . $yy . '" x2="' . ($W - $Rp) . '" y2="' . $yy . '" stroke="#e2e8f0"/>';
-        $svg .= '<text x="' . ($Lp - 6) . '" y="' . ($yy + 3) . '" text-anchor="end" font-size="10" fill="#94a3b8">' . $lbl($val) . '</text>';
-    }
-    $svg .= '<text x="' . round($x($minTs), 1) . '" y="' . ($H - 12) . '" font-size="10" fill="#94a3b8">' . date('d/m', $minTs) . '</text>';
-    $svg .= '<text x="' . round($x($maxTs), 1) . '" y="' . ($H - 12) . '" text-anchor="end" font-size="10" fill="#94a3b8">' . date('d/m', $maxTs) . '</text>';
-
-    $ci = 0;
-    foreach ($seriesByStore as $s) {
-        $col = $colors[$ci % count($colors)]; $ci++;
-        $pts = [];
-        foreach ($s as $pt) { $pts[] = round($x(strtotime($pt['d'])), 1) . ',' . round($y((float) $pt['p']), 1); }
-        if (count($pts) === 1) {
-            [$px, $py] = explode(',', $pts[0]);
-            $svg .= '<circle cx="' . $px . '" cy="' . $py . '" r="3.5" fill="' . $col . '"/>';
-        } else {
-            $svg .= '<polyline points="' . implode(' ', $pts) . '" fill="none" stroke="' . $col . '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
-        }
-    }
-    $svg .= '</svg>';
-
-    $ci = 0; $leg = '<div class="legend">';
-    foreach ($seriesByStore as $store => $s) {
-        $col = $colors[$ci % count($colors)]; $ci++;
-        $leg .= '<span><i style="background:' . $col . '"></i>' . htmlspecialchars((string) $store, ENT_QUOTES, 'UTF-8') . '</span>';
-    }
-    $leg .= '</div>';
-    return $svg . $leg;
-}
-
 if (!$data || !$data['offers']) {
     http_response_code(404);
     ?><!doctype html><html lang="es"><head><meta charset="utf-8">
@@ -111,22 +61,32 @@ if (!$data || !$data['offers']) {
 
 $g       = $data['group'];
 $offers  = $data['offers'];
-$priced  = array_values(array_filter($offers, static fn($o) => $o['price_final'] !== null));
+// Sólo las ofertas EN STOCK entran a la comparación: las agotadas traen un
+// precio-centinela (ej. Siman C$10,000,000) que inflaba el ahorro y el máximo.
+$priced  = array_values(array_filter($offers, static fn($o) => $o['in_stock'] && $o['price_final'] !== null));
+$soldOut = array_values(array_filter($offers, static fn($o) => !$o['in_stock']));
+// Fallback: si TODO está agotado, mostramos igual las ofertas con precio.
+if (!$priced) {
+    $priced  = array_values(array_filter($offers, static fn($o) => $o['price_final'] !== null));
+    $soldOut = [];
+}
 $low     = $priced ? min(array_map(static fn($o) => $o['price_final'], $priced)) : null;
 $high    = $priced ? max(array_map(static fn($o) => $o['price_final'], $priced)) : null;
-$cur     = $offers[0]['currency'] ?? 'NIO';
+$cur     = $priced[0]['currency'] ?? ($offers[0]['currency'] ?? 'NIO');
 $title   = $g['canonical_title'] ?: 'Producto';
 $image   = $g['image_url'] ?: ($offers[0]['image_url'] ?? '');
 $cheapest = $priced[0] ?? null; // ya vienen ordenadas por precio asc
 $trackId  = (int) ($cheapest['id'] ?? ($offers[0]['id'] ?? 0)); // para deep-link a la ficha
+// # de tiendas con stock (distintas) — no el conteo bruto del grupo.
+$storeCount = count(array_unique(array_map(static fn($o) => $o['store'], $priced)));
 $pageUrl = $base . '/producto.php?slug=' . rawurlencode((string) $g['slug']);
 
 // Series por tienda para el gráfico + mínimos/máximos históricos.
-$ids        = array_map(static fn($o) => $o['id'], $offers);
+$ids        = array_map(static fn($o) => $o['id'], $priced);
 $seriesById = $repo->priceSeries($ids, 90);
 $seriesByStore = [];
 $allPts = [];
-foreach ($offers as $o) {
+foreach ($priced as $o) {
     $s = $seriesById[$o['id']] ?? [];
     if ($s) {
         $seriesByStore[$o['store_name']] = $s;
@@ -135,19 +95,19 @@ foreach ($offers as $o) {
 }
 $histMin  = $allPts ? min($allPts) : $low;
 $histMax  = $allPts ? max($allPts) : $high;
-$chartSvg = price_chart_svg($seriesByStore, $cur);
+$chartSvg = PriceChart::svg($seriesByStore, $cur);
 
 $savingTxt = ($low !== null && $high !== null && $high > $low)
     ? ' Ahorrás hasta ' . $fmt($high - $low, $cur) . '.'
     : '';
-$desc = 'Compará el precio de "' . $title . '" en ' . $g['store_count'] . ' tienda'
-      . ($g['store_count'] === 1 ? '' : 's') . ' de Nicaragua'
+$desc = 'Compará el precio de "' . $title . '" en ' . $storeCount . ' tienda'
+      . ($storeCount === 1 ? '' : 's') . ' de Nicaragua'
       . ($low !== null ? ', desde ' . $fmt($low, $cur) . '.' : '.') . $savingTxt
       . ' Historial y ofertas en ' . $siteName . '.';
 
 // WhatsApp
 $waText = '💰 ' . $title . ($low !== null ? ' — desde ' . $fmt($low, $cur) : '')
-        . ' en ' . $g['store_count'] . ' tiendas. Compará acá: ' . $pageUrl;
+        . ' en ' . $storeCount . ' tiendas. Compará acá: ' . $pageUrl;
 $waUrl  = 'https://wa.me/?text=' . rawurlencode($waText);
 
 // JSON-LD (schema.org Product + AggregateOffer)
@@ -183,7 +143,7 @@ if ($priced) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title><?= $h($title) ?> — precio en <?= (int) $g['store_count'] ?> tiendas · <?= $h($siteName) ?></title>
+<title><?= $h($title) ?> — precio en <?= (int) $storeCount ?> tiendas · <?= $h($siteName) ?></title>
 <meta name="description" content="<?= $h($desc) ?>">
 <link rel="canonical" href="<?= $h($pageUrl) ?>">
 <meta property="og:type" content="product">
@@ -192,6 +152,7 @@ if ($priced) {
 <meta property="og:url" content="<?= $h($pageUrl) ?>">
 <?php if ($image): ?><meta property="og:image" content="<?= $h($image) ?>"><?php endif; ?>
 <meta name="twitter:card" content="summary_large_image">
+<?= Seo::head($settings, true) ?>
 <script type="application/ld+json"><?= json_encode($ld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
 <style>
   :root{--brand:#0ea5e9;--brand-dk:#0369a1;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--ok:#16a34a;--bad:#dc2626;--card:#fff}
@@ -273,7 +234,7 @@ if ($priced) {
       <?php if ($low !== null): ?>
         <div class="best">Desde <b><?= $fmt($low, $cur) ?></b>
           <?php if ($cheapest): ?>en <?= $h($cheapest['store_name']) ?><?php endif; ?>
-          · en <?= (int) $g['store_count'] ?> tienda<?= $g['store_count'] === 1 ? '' : 's' ?>
+          · en <?= (int) $storeCount ?> tienda<?= $storeCount === 1 ? '' : 's' ?>
         </div>
       <?php endif; ?>
       <div class="cta-row">
@@ -291,7 +252,7 @@ if ($priced) {
       <th>Tienda</th><th>Precio</th><th class="h-usd c-usd">USD</th><th>Estado</th><th></th>
     </tr></thead>
     <tbody>
-    <?php foreach ($offers as $i => $o):
+    <?php foreach ($priced as $i => $o):
         $isCheap = $cheapest && $o['price_final'] !== null && $o['price_final'] === $cheapest['price_final'];
         $hasDisc = $o['list_price'] !== null && $o['price_final'] !== null && $o['list_price'] > $o['price_final'];
     ?>
@@ -299,13 +260,16 @@ if ($priced) {
         <td><b><?= $h($o['store_name']) ?></b><?= $isCheap ? '<span class="tag">💚 más barato</span>' : '' ?></td>
         <td class="price"><?= $fmt($o['price_final'], $o['currency']) ?><?php if ($hasDisc): ?><span class="old"><?= $fmt($o['list_price'], $o['currency']) ?></span><?php endif; ?><?php if (!empty($o['tax_added'])): ?><small class="taxest">IVA estimado incluido</small><?php endif; ?></td>
         <td class="usd c-usd"><?= $h($usd($o['price_final'])) ?></td>
-        <td><span class="st <?= $o['in_stock'] ? 'in' : 'out' ?>"><?= $o['in_stock'] ? '● En stock' : '○ Agotado' ?></span></td>
+        <td><span class="st in">● En stock</span></td>
         <td><a class="go" href="<?= $h($o['url']) ?>" target="_blank" rel="noopener">Ver ↗</a></td>
       </tr>
     <?php endforeach; ?>
     </tbody>
   </table>
-  <?php if (array_filter($offers, static fn($o) => !empty($o['tax_added']))): ?>
+  <?php if ($soldOut): ?>
+    <div class="taxnote">○ Sin stock ahora mismo en: <b><?= $h(implode(', ', array_unique(array_map(static fn($o) => $o['store_name'], $soldOut)))) ?></b>. No se cuentan en la comparación hasta que vuelvan a estar disponibles.</div>
+  <?php endif; ?>
+  <?php if (array_filter($priced, static fn($o) => !empty($o['tax_added']))): ?>
     <div class="taxnote">ℹ️ En tiendas tipo club (ej. PriceSmart) el precio de góndola se muestra <b>sin IVA</b> y el impuesto se agrega en la caja. Acá lo mostramos <b>con IVA estimado (+15%)</b> para comparar de forma justa con el resto.</div>
   <?php endif; ?>
 
@@ -313,7 +277,7 @@ if ($priced) {
     <div class="s"><div class="k">Más barato ahora</div><div class="v lo"><?= $fmt($low, $cur) ?></div></div>
     <div class="s"><div class="k">Mínimo histórico</div><div class="v"><?= $fmt($histMin, $cur) ?></div></div>
     <div class="s"><div class="k">Máximo histórico</div><div class="v hi"><?= $fmt($histMax, $cur) ?></div></div>
-    <div class="s"><div class="k">Tiendas</div><div class="v"><?= (int) $g['store_count'] ?></div></div>
+    <div class="s"><div class="k">Tiendas</div><div class="v"><?= (int) $storeCount ?></div></div>
   </div>
 
   <h2>Historial de precios por tienda</h2>

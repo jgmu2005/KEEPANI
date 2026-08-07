@@ -19,6 +19,8 @@ final class Settings
         'site_name', 'tagline', 'hero_text', 'logo_emoji',
         'donate_kofi', 'donate_paypal', 'footer_note',
         'limit_free', 'limit_onetime', 'usd_rate',
+        // SEO / Google (se inyectan en el HTML público — no son secretos).
+        'ga_measurement_id', 'gsc_verification', 'seo_default_image', 'seo_indexable',
     ];
 
     public const SMTP_KEYS = [

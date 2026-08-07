@@ -76,6 +76,23 @@
     </div>
 
     <div class="card">
+      <h2>SEO / Google</h2>
+      <div id="seoMsg" class="msg"></div>
+      <label>Google Analytics (Measurement ID)</label>
+      <input id="ga_measurement_id" placeholder="G-XXXXXXXXXX">
+      <label>Verificación de Search Console (contenido del meta)</label>
+      <input id="gsc_verification" placeholder="ej: aBcD1234... (solo el content del meta google-site-verification)">
+      <label>Imagen por defecto para compartir (OG, opcional)</label>
+      <input id="seo_default_image" placeholder="https://ojoalprecio.online/assets/og.jpg">
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer">
+        <input type="checkbox" id="seo_indexable"> Permitir que Google indexe el sitio
+      </label>
+      <p style="font-size:.8rem;color:var(--muted);margin:8px 0 0">Destildá esto solo mientras armás el sitio (pone <code>noindex</code> en todo). El Analytics y la verificación se inyectan en <b>producto.php</b>, <b>precio.php</b> y el inicio.</p>
+      <div style="margin-top:14px"><button id="saveSeoBtn">Guardar SEO</button></div>
+      <p style="font-size:.8rem;color:var(--muted);margin-top:12px">Sitemap para Search Console: <code id="sitemapUrl"></code></p>
+    </div>
+
+    <div class="card">
       <h2>Correo (SMTP) — para enviar alertas</h2>
       <div id="smtpMsg" class="msg"></div>
       <div class="row">
@@ -132,17 +149,42 @@
     </div>
 
     <div class="card">
+      <h2>Marketplace (tiendas Treinta)</h2>
+      <p style="color:var(--muted);font-size:.88rem;margin-top:-4px">Tiendas locales que se muestran en <a href="marketplace" target="_blank">/marketplace</a> (aislado del tracker). Pegá la URL de una tienda Treinta para agregarla.</p>
+      <div id="mkMsg" class="msg"></div>
+      <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="mkUrl" placeholder="https://catalogo.treinta.co/nombretienda" style="flex:1;min-width:240px">
+        <button id="mkAddBtn">Agregar tienda</button>
+      </div>
+      <div id="mkStores" style="margin-top:12px"></div>
+      <p style="color:var(--muted);font-size:.82rem;margin-top:8px">El crawler corre por cron: <code id="mkCronUrl"></code></p>
+    </div>
+
+    <div class="card">
       <h2>Revisión de comparaciones <span id="matchCount" style="color:var(--muted);font-weight:400;font-size:.85rem"></span></h2>
       <p style="color:var(--muted);font-size:.88rem;margin-top:-4px">Candidatos “mismo producto” entre tiendas (matcher por marca + imagen + título). Aprobá para unirlos en una comparación.</p>
+      <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0">
+        <select id="mCategory" style="max-width:220px"><option value="">Todas las categorías</option></select>
+        <select id="mSort" style="max-width:200px">
+          <option value="score">Orden: mayor confianza</option>
+          <option value="recent">Orden: más recientes</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted);cursor:pointer;white-space:nowrap">
+          <input type="checkbox" id="mHideOos"> Ocultar agotados
+        </label>
+      </div>
       <div id="matchMsg" class="msg"></div>
       <div id="matchesBox"><div style="color:var(--muted)">Cargando…</div></div>
+      <div style="text-align:center;margin-top:12px;display:none" id="mMoreWrap">
+        <button id="mMore" style="background:#e2e8f0;color:#0f172a">Ver más</button>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
 const API = './api';
-const PUB_KEYS = ['site_name','tagline','hero_text','logo_emoji','donate_kofi','donate_paypal','footer_note','limit_free','limit_onetime','usd_rate'];
+const PUB_KEYS = ['site_name','tagline','hero_text','logo_emoji','donate_kofi','donate_paypal','footer_note','limit_free','limit_onetime','usd_rate','ga_measurement_id','gsc_verification','seo_default_image','seo_indexable'];
 const SMTP_KEYS = ['smtp_host','smtp_port','smtp_secure','smtp_user','smtp_from_email','smtp_from_name','smtp_pass'];
 const FORM_KEYS = [...PUB_KEYS, ...SMTP_KEYS, 'kofi_token'];
 const MASKED = ['smtp_pass', 'kofi_token'];
@@ -156,7 +198,7 @@ async function init(){
   try{ me = await api('auth/me.php'); }catch(e){ me = {user:null}; }
   if(me.user && me.user.is_admin){
     $('loginView').classList.add('hidden'); $('adminView').classList.remove('hidden');
-    loadSettings(); loadUsers(); loadDonations(); loadMatches();
+    loadSettings(); loadUsers(); loadDonations(); loadMatches(); loadMkStores();
   } else {
     $('adminView').classList.add('hidden'); $('loginView').classList.remove('hidden');
     if(me.user){ $('loginError').textContent = 'Esa cuenta no es administrador.'; $('loginError').style.display='block'; }
@@ -168,12 +210,13 @@ const mMoney = v => v==null ? '—' : 'C$'+Number(v).toLocaleString('en-US',{min
 function mSide(x){
   const img = x.img ? `<img src="${esc(x.img)}" style="width:52px;height:52px;object-fit:contain;background:#f8fafc;border-radius:6px;flex:none">`
                     : `<div style="width:52px;height:52px;display:grid;place-items:center;background:#f8fafc;border-radius:6px;flex:none">📦</div>`;
+  const stock = x.in_stock === false ? ' <span style="color:#dc2626;font-weight:700">· agotado</span>' : '';
   return `<a href="${esc(x.url)}" target="_blank" rel="noopener" style="flex:1;display:flex;gap:8px;align-items:center;min-width:0;color:inherit;text-decoration:none">
     ${img}
     <div style="min-width:0">
       <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase">${esc(x.store)}</div>
       <div style="font-size:.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.title||'')}</div>
-      <div style="font-weight:700">${mMoney(x.price)}</div>
+      <div style="font-weight:700">${mMoney(x.price)}${stock}</div>
     </div></a>`;
 }
 function mRow(m){
@@ -189,14 +232,39 @@ function mRow(m){
     </div>
   </div>`;
 }
-async function loadMatches(){
+const MPAGE = { offset: 0, size: 20, shown: 0, catsLoaded: false };
+function mQuery(offset){
+  const p = new URLSearchParams({ limit: MPAGE.size, offset, sort: $('mSort').value });
+  if($('mCategory').value) p.set('category', $('mCategory').value);
+  if($('mHideOos').checked) p.set('hide_oos', '1');
+  return p.toString();
+}
+async function loadMatches(reset = true){
   const box = $('matchesBox');
-  let j; try{ j = await api('admin/matches.php'); }catch(e){ box.innerHTML = '<div style="color:var(--muted)">Error al cargar.</div>'; return; }
+  if(reset){ MPAGE.offset = 0; MPAGE.shown = 0; box.innerHTML = '<div style="color:var(--muted)">Cargando…</div>'; }
+  let j; try{ j = await api('admin/matches.php?' + mQuery(reset ? 0 : MPAGE.shown)); }
+  catch(e){ box.innerHTML = '<div style="color:var(--muted)">Error al cargar.</div>'; return; }
   if(!j.ok){ box.innerHTML = '<div style="color:var(--muted)">No disponible.</div>'; return; }
   $('matchCount').textContent = j.pending ? `(${j.pending} pendientes)` : '';
-  box.innerHTML = j.items.length ? j.items.map(mRow).join('')
-    : '<div style="color:var(--muted)">No hay candidatos pendientes. 👌</div>';
+  if(!MPAGE.catsLoaded){
+    const sel = $('mCategory'); const cur = sel.value;
+    sel.innerHTML = '<option value="">Todas las categorías</option>' +
+      (j.categories||[]).map(c => `<option value="${c.key}">${esc(c.label)} (${c.count})</option>`).join('');
+    sel.value = cur; MPAGE.catsLoaded = true;
+  }
+  const html = j.items.map(mRow).join('');
+  if(reset){
+    box.innerHTML = j.items.length ? html : '<div style="color:var(--muted)">No hay candidatos con esos filtros. 👌</div>';
+    MPAGE.shown = j.items.length;
+  } else {
+    box.insertAdjacentHTML('beforeend', html);
+    MPAGE.shown += j.items.length;
+  }
+  $('mMoreWrap').style.display = MPAGE.shown < j.total ? '' : 'none';
 }
+['mSort','mCategory'].forEach(id => $(id).addEventListener('change', () => loadMatches(true)));
+$('mHideOos').addEventListener('change', () => loadMatches(true));
+$('mMore').addEventListener('click', () => loadMatches(false));
 $('matchesBox').addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-d]'); if(!btn) return;
   btn.disabled = true;
@@ -205,6 +273,37 @@ $('matchesBox').addEventListener('click', async (e) => {
   const row = btn.closest('.mrow');
   if(j.ok){ row.style.opacity = '.45'; row.querySelector('.macts').textContent = btn.dataset.d==='approve' ? '✅ Unido' : '❌ Descartado'; }
   else { btn.disabled = false; $('matchMsg').textContent = j.error || 'Error'; }
+});
+
+// Marketplace (tiendas Treinta)
+function mkRow(s){
+  return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:600">${esc(s.name)} <small style="color:var(--muted)">· ${s.product_count} prod.</small></div>
+      <div style="font-size:.75rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.url)}</div>
+    </div>
+    <label style="font-size:.8rem;display:flex;align-items:center;gap:5px;cursor:pointer">
+      <input type="checkbox" data-mk="${s.id}" ${Number(s.is_active)?'checked':''}> activa
+    </label>
+  </div>`;
+}
+async function loadMkStores(){
+  let j; try{ j = await api('admin/mk_stores.php'); }catch(e){ return; }
+  if(!j.ok) return;
+  $('mkStores').innerHTML = j.stores.length ? j.stores.map(mkRow).join('') : '<div style="color:var(--muted)">Sin tiendas aún.</div>';
+  if($('mkCronUrl')) $('mkCronUrl').textContent = location.origin + location.pathname.replace(/admin\.html$/, '') + 'cron/crawl_marketplace.php';
+}
+$('mkAddBtn').addEventListener('click', async () => {
+  const url = $('mkUrl').value.trim(); const msg = $('mkMsg'); msg.className='msg';
+  if(!url) return;
+  const j = await api('admin/mk_stores.php', {method:'POST',headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'add', url})});
+  msg.textContent = j.ok ? 'Agregada ✔ (corré el crawler para traer sus productos)' : (j.error||'Error');
+  msg.className = 'msg ' + (j.ok?'ok':'err');
+  if(j.ok){ $('mkUrl').value=''; if(j.stores) $('mkStores').innerHTML = j.stores.map(mkRow).join(''); }
+});
+$('mkStores').addEventListener('change', async (e) => {
+  const cb = e.target.closest('input[data-mk]'); if(!cb) return;
+  await api('admin/mk_stores.php', {method:'POST',headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'toggle', id:+cb.dataset.mk, on:cb.checked})});
 });
 
 // Login
@@ -221,18 +320,29 @@ $('lpass').addEventListener('keydown', e => { if(e.key==='Enter') $('loginBtn').
 async function loadSettings(){
   const j = await api('admin/settings_get.php');
   if(!j.ok) return;
-  FORM_KEYS.forEach(k => { if($(k) && !MASKED.includes(k)) $(k).value = j.settings[k] ?? ''; });
+  FORM_KEYS.forEach(k => { if($(k) && !MASKED.includes(k) && k !== 'seo_indexable') $(k).value = j.settings[k] ?? ''; });
+  if($('seo_indexable')) $('seo_indexable').checked = (j.settings.seo_indexable ?? '1') !== '0';
   if($('smtp_pass'))  $('smtp_pass').placeholder  = j.settings.smtp_pass_set  ? '•••••• (guardada — dejá vacío para no cambiar)' : 'contraseña';
   if($('kofi_token')) $('kofi_token').placeholder = j.settings.kofi_token_set ? '•••••• (guardado — dejá vacío para no cambiar)' : 'pegá el token de Ko-fi';
   if($('kofiUrl'))    $('kofiUrl').value = location.origin + location.pathname.replace(/admin\.html$/, '') + 'api/webhooks/kofi.php';
+  if($('sitemapUrl')) $('sitemapUrl').textContent = location.origin + location.pathname.replace(/admin\.html$/, '') + 'sitemap.xml';
 }
+const SEO_KEYS = ['ga_measurement_id','gsc_verification','seo_default_image','seo_indexable'];
+function readVal(k){ return k === 'seo_indexable' ? ($('seo_indexable').checked ? '1' : '0') : ($(k) ? $(k).value : ''); }
 $('saveBtn').addEventListener('click', async () => {
-  const payload = {}; FORM_KEYS.forEach(k => { if($(k)) payload[k] = $(k).value; });
+  const payload = {}; FORM_KEYS.forEach(k => { if($(k)) payload[k] = readVal(k); });
   const msg = $('setMsg'); msg.className='msg';
   const j = await api('admin/settings_save.php', {method:'POST',headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
   msg.textContent = j.ok ? 'Guardado ✔' : (j.error||'Error');
   msg.className = 'msg ' + (j.ok?'ok':'err');
   if(j.ok){ MASKED.forEach(k => { if($(k)) $(k).value = ''; }); }
+});
+$('saveSeoBtn').addEventListener('click', async () => {
+  const payload = {}; SEO_KEYS.forEach(k => payload[k] = readVal(k));
+  const msg = $('seoMsg'); msg.className='msg';
+  const j = await api('admin/settings_save.php', {method:'POST',headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  msg.textContent = j.ok ? 'Guardado ✔' : (j.error||'Error');
+  msg.className = 'msg ' + (j.ok?'ok':'err');
 });
 $('testBtn').addEventListener('click', async () => {
   const msg = $('smtpMsg'); msg.className='msg ok'; msg.textContent='Enviando…';

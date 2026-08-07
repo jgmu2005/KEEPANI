@@ -94,6 +94,7 @@ final class IngestService
         $ean       = isset($it['ean']) && $it['ean'] !== '' ? (string) $it['ean'] : null;
         $brandNorm = Normalizer::brand($it['brand'] ?? null);
         $modelNorm = Normalizer::model($it['title'] ?? null);
+        $catKey    = CategoryClassifier::classify($it['title'] ?? null, $brandNorm, $modelNorm);
 
         if ($id !== false) {
             // COALESCE(nuevo, actual): solo sobrescribe si viene valor no nulo.
@@ -103,6 +104,7 @@ final class IngestService
                         brand = COALESCE(?, brand),
                         brand_norm = COALESCE(?, brand_norm),
                         model_norm = COALESCE(?, model_norm),
+                        cat_key = COALESCE(?, cat_key),
                         ean = COALESCE(?, ean),
                         image_url = COALESCE(?, image_url),
                         url = COALESCE(?, url),
@@ -115,6 +117,7 @@ final class IngestService
                 $it['brand'] ?? null,
                 $brandNorm,
                 $modelNorm,
+                $catKey,
                 $ean,
                 $it['image_url'] ?? null,
                 $it['url'] ?? null,
@@ -126,8 +129,8 @@ final class IngestService
         }
 
         $ins = $this->db->prepare(
-            'INSERT INTO products (store_id, external_sku, ean, category_external_id, url, title, brand, brand_norm, model_norm, image_url, first_seen_at, last_seen_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO products (store_id, external_sku, ean, category_external_id, url, title, brand, brand_norm, model_norm, cat_key, image_url, first_seen_at, last_seen_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $ins->execute([
             $storeId,
@@ -139,6 +142,7 @@ final class IngestService
             $it['brand'] ?? null,
             $brandNorm,
             $modelNorm,
+            $catKey,
             $it['image_url'] ?? null,
             $capturedAt,
             $capturedAt,
