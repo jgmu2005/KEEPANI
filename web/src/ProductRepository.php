@@ -475,25 +475,74 @@ final class ProductRepository
                  ORDER BY cur.captured_at DESC
                  LIMIT ' . $limit;
 
-        return array_map(static function (array $r): array {
-            $now  = (float) $r['price_now'];
-            $prev = (float) $r['price_prev'];
-            return [
-                'id'         => (int) $r['id'],
-                'title'      => $r['title'],
-                'brand'      => $r['brand'],
-                'image_url'  => $r['image_url'],
-                'url'        => $r['url'],
-                'store'      => $r['store'],
-                'store_name' => $r['store_name'],
-                'price_now'  => $now,
-                'price_prev' => $prev,
-                'currency'   => $r['currency'] ?? 'NIO',
-                'in_stock'   => (bool) $r['in_stock'],
-                'date'       => $r['date_now'],
-                'direction'  => $now < $prev ? 'down' : 'up',
-                'delta_pct'  => $prev > 0 ? round(($now - $prev) / $prev * 100, 1) : null,
-            ];
-        }, $this->db->query($sql)->fetchAll());
+        return array_map([self::class, 'mapChange'], $this->db->query($sql)->fetchAll());
+    }
+
+    /**
+     * Todos los cambios de precio, ordenables: 'drop' (mayores bajas) o 'rise'
+     * (mayores subas). Con paginación por offset (para "Ver más"). Sin COUNT
+     * (se pagina hasta que devuelve menos de $limit).
+     */
+    public function changesList(string $sort, int $limit = 24, int $offset = 0): array
+    {
+        $limit  = max(1, min($limit, 60));
+        $offset = max(0, $offset);
+        $order  = $sort === 'rise' ? 'delta DESC' : 'delta ASC';
+
+        $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
+                       s.slug AS store, s.name AS store_name,
+                       cur.price_final  AS price_now,
+                       prev.price_final AS price_prev,
+                       cur.currency, cur.in_stock, cur.captured_date AS date_now,
+                       (cur.price_final - prev.price_final) / prev.price_final AS delta
+                  FROM products p
+                  JOIN stores s ON s.id = p.store_id
+                  JOIN price_history cur ON cur.id = (
+                        SELECT id FROM price_history WHERE product_id = p.id
+                        ORDER BY captured_at DESC LIMIT 1)
+                  JOIN price_history prev ON prev.id = (
+                        SELECT id FROM price_history WHERE product_id = p.id
+                          AND captured_date < cur.captured_date
+                        ORDER BY captured_at DESC LIMIT 1)
+                 WHERE cur.price_final IS NOT NULL AND prev.price_final IS NOT NULL
+                   AND cur.price_final <> prev.price_final AND prev.price_final > 0
+                 ORDER BY ' . $order . '
+                 LIMIT ' . $limit . ' OFFSET ' . $offset;
+
+        return array_map([self::class, 'mapChange'], $this->db->query($sql)->fetchAll());
+    }
+
+    /** La baja más fuerte de CADA tienda (1 por tienda) — para el home. */
+    public function topChangePerStore(): array
+    {
+        $seen = []; $out = [];
+        foreach ($this->changesList('drop', 200, 0) as $r) {
+            if ($r['direction'] !== 'down' || isset($seen[$r['store']])) { continue; }
+            $seen[$r['store']] = true;
+            $out[] = $r;
+        }
+        return $out;
+    }
+
+    private static function mapChange(array $r): array
+    {
+        $now  = (float) $r['price_now'];
+        $prev = (float) $r['price_prev'];
+        return [
+            'id'         => (int) $r['id'],
+            'title'      => $r['title'],
+            'brand'      => $r['brand'],
+            'image_url'  => $r['image_url'],
+            'url'        => $r['url'],
+            'store'      => $r['store'],
+            'store_name' => $r['store_name'],
+            'price_now'  => $now,
+            'price_prev' => $prev,
+            'currency'   => $r['currency'] ?? 'NIO',
+            'in_stock'   => (bool) $r['in_stock'],
+            'date'       => $r['date_now'],
+            'direction'  => $now < $prev ? 'down' : 'up',
+            'delta_pct'  => $prev > 0 ? round(($now - $prev) / $prev * 100, 1) : null,
+        ];
     }
 }

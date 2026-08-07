@@ -95,6 +95,8 @@
   .load-more{padding:12px 28px;border:1px solid var(--brand);background:#fff;color:var(--brand-dk);border-radius:10px;cursor:pointer;font-size:.95rem;font-weight:800}
   .load-more:hover{background:var(--brand);color:#fff}
   .load-more:disabled{opacity:.6;cursor:default}
+  .seg{padding:8px 14px;border:1px solid var(--line);background:#fff;border-radius:999px;cursor:pointer;font-weight:700;font-size:.85rem;color:var(--muted)}
+  .seg.on{background:var(--brand);color:#fff;border-color:var(--brand)}
   .page-info{min-width:130px;text-align:center;font-variant-numeric:tabular-nums}
   .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;
     background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
@@ -240,8 +242,23 @@
   </section>
 
   <section id="changes-section" style="display:none">
-    <h2>📉 Cambios recientes de precio</h2>
+    <div class="grid-head">
+      <h2>📉 Mejores bajadas por tienda</h2>
+      <a id="verTodosCambios" class="mini" style="cursor:pointer">Ver todos los cambios →</a>
+    </div>
     <div id="changes" class="grid"></div>
+  </section>
+
+  <section id="cambios-section" style="display:none">
+    <h2>📊 Cambios de precio</h2>
+    <div class="segbar" style="display:flex;gap:8px;margin:-4px 0 14px;flex-wrap:wrap">
+      <button class="seg on" data-sort="drop">▼ Mayores bajas</button>
+      <button class="seg" data-sort="rise">▲ Mayores subas</button>
+    </div>
+    <div id="cambios-grid" class="grid"></div>
+    <div id="cambiosMoreWrap" style="text-align:center;margin-top:20px;display:none">
+      <button id="cambiosMore" class="load-more">Ver más</button>
+    </div>
   </section>
 
   <section id="comparador-section" style="display:none">
@@ -430,30 +447,59 @@ function wireCards(container){
     c.addEventListener('click', () => openDetail({product_id: c.dataset.id})));
 }
 
+function changeCard(p){
+  const cur = p.currency || 'NIO';
+  const arrow = p.direction === 'down' ? '▼' : '▲';
+  const delta = p.delta_pct == null ? '' : `${arrow} ${Math.abs(p.delta_pct)}%`;
+  return `<div class="card" data-id="${p.id}">
+    <div class="img">${p.image_url ? `<img src="${p.image_url}" alt="" loading="lazy">` : '📦'}</div>
+    <div class="body">
+      <span class="badge">${p.store_name || p.store}</span>
+      <div class="title">${escapeHtml(p.title || '(sin título)')}</div>
+      <span class="delta ${p.direction}">${delta}</span>
+      <div class="price">${money(p.price_now, cur)} <span class="old-price">${money(p.price_prev, cur)}</span></div>
+    </div>
+  </div>`;
+}
 async function loadChanges(){
   const sec = document.getElementById('changes-section');
   const box = document.getElementById('changes');
   try{
-    const r = await fetch(`${API}/changes.php?limit=12`);
-    const j = await r.json();
+    const j = await (await fetch(`${API}/changes.php?mode=per_store`)).json();
     if(!j.ok || !j.items.length){ sec.style.display = 'none'; return; }
     sec.style.display = '';
-    box.innerHTML = j.items.map(p => {
-      const cur = p.currency || 'NIO';
-      const arrow = p.direction === 'down' ? '▼' : '▲';
-      const delta = p.delta_pct == null ? '' : `${arrow} ${Math.abs(p.delta_pct)}%`;
-      return `<div class="card" data-id="${p.id}">
-        <div class="img">${p.image_url ? `<img src="${p.image_url}" alt="" loading="lazy">` : '📦'}</div>
-        <div class="body">
-          <span class="badge">${p.store_name || p.store}</span>
-          <div class="title">${escapeHtml(p.title || '(sin título)')}</div>
-          <span class="delta ${p.direction}">${delta}</span>
-          <div class="price">${money(p.price_now, cur)} <span class="old-price">${money(p.price_prev, cur)}</span></div>
-        </div>
-      </div>`;
-    }).join('');
+    box.innerHTML = j.items.map(changeCard).join('');
     wireCards(box);
   }catch(e){ sec.style.display = 'none'; }
+}
+
+const CAMBIOS = { sort: 'drop', shown: 0 };
+async function openCambios(sort){
+  CAMBIOS.sort = sort || CAMBIOS.sort;
+  const sec = document.getElementById('cambios-section');
+  const box = document.getElementById('cambios-grid');
+  sec.style.display = '';
+  document.querySelectorAll('#cambios-section .seg').forEach(b => b.classList.toggle('on', b.dataset.sort === CAMBIOS.sort));
+  box.innerHTML = `<div class="spinner">Cargando…</div>`;
+  sec.scrollIntoView({ behavior:'smooth', block:'start' });
+  try{
+    const j = await (await fetch(`${API}/changes.php?sort=${CAMBIOS.sort}&limit=24&offset=0`)).json();
+    CAMBIOS.shown = (j.ok && j.items) ? j.items.length : 0;
+    box.innerHTML = CAMBIOS.shown ? j.items.map(changeCard).join('')
+      : `<div class="empty">Todavía no hay cambios de precio. Se llenan a medida que pasan los días. 📉</div>`;
+    document.getElementById('cambiosMoreWrap').style.display = CAMBIOS.shown >= 24 ? '' : 'none';
+  }catch(e){ box.innerHTML = `<div class="empty">No se pudo cargar.</div>`; }
+}
+async function loadMoreCambios(){
+  const btn = document.getElementById('cambiosMore');
+  btn.disabled = true; btn.textContent = 'Cargando…';
+  try{
+    const j = await (await fetch(`${API}/changes.php?sort=${CAMBIOS.sort}&limit=24&offset=${CAMBIOS.shown}`)).json();
+    const n = (j.ok && j.items) ? j.items.length : 0;
+    if(n){ document.getElementById('cambios-grid').insertAdjacentHTML('beforeend', j.items.map(changeCard).join('')); CAMBIOS.shown += n; }
+    document.getElementById('cambiosMoreWrap').style.display = n >= 24 ? '' : 'none';
+  }catch(e){}
+  btn.disabled = false; btn.textContent = 'Ver más';
 }
 
 function comparadorCard(g){
@@ -945,9 +991,13 @@ document.getElementById('authSubmit').addEventListener('click', submitAuth);
 document.getElementById('authForgot').addEventListener('click', forgotPassword);
 document.getElementById('authPass').addEventListener('keydown', e => { if(e.key==='Enter') submitAuth(); });
 
-document.getElementById('navOfertas').addEventListener('click', () => {
-  document.getElementById('fsort').value = 'discount';
-  PAGE.offset = 0; loadGrid(); gotoTopOfGrid();
+document.getElementById('navOfertas').addEventListener('click', () => openCambios('drop'));
+document.getElementById('verTodosCambios').addEventListener('click', () => openCambios('drop'));
+document.getElementById('cambiosMore').addEventListener('click', loadMoreCambios);
+document.querySelectorAll('#cambios-section .seg').forEach(b => b.addEventListener('click', () => openCambios(b.dataset.sort)));
+// Delegación de click para las tarjetas de cambios (abre la ficha).
+document.getElementById('cambios-grid').addEventListener('click', (e) => {
+  const c = e.target.closest('.card'); if(c && c.dataset.id) openDetail({ product_id: c.dataset.id });
 });
 document.getElementById('navCatalogo').addEventListener('click', () => {
   // Vista neutral del catálogo completo: sin filtro de nombre ni orden por descuento.
