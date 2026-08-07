@@ -47,6 +47,7 @@ function apiGet(string $url, string $key): ?array
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_TIMEOUT        => 40,
+        CURLOPT_USERAGENT      => ImageHash::UA, // el WAF bloquea el UA por defecto de curl (465)
         CURLOPT_HTTPHEADER     => ['X-Api-Key: ' . $key, 'Accept: application/json'],
     ]);
     $body = curl_exec($ch);
@@ -73,6 +74,7 @@ function apiPost(string $url, array $payload, string $key): int
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         CURLOPT_TIMEOUT        => 60,
+        CURLOPT_USERAGENT      => ImageHash::UA,
         CURLOPT_HTTPHEADER     => ['X-Api-Key: ' . $key, 'Content-Type: application/json'],
     ]);
     curl_exec($ch);

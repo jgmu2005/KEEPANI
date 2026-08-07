@@ -4,8 +4,8 @@
 (function () {
   'use strict';
 
-  const API  = 'https://agrotecnicaragua.com/ojoalprecio/api';
-  const SITE = 'https://agrotecnicaragua.com/ojoalprecio';
+  const API  = 'https://ojoalprecio.online/api';
+  const SITE = 'https://ojoalprecio.online';
 
   const host = location.hostname.replace(/^www\./, '');
   const CONF = {

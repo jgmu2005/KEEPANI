@@ -32,6 +32,7 @@ function apiGet(string $url, string $key): ?array
 {
     $ch = curl_init($url);
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 60,
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
         CURLOPT_HTTPHEADER => ['X-Api-Key: ' . $key, 'Accept: application/json']]);
     $body = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $cerr = curl_error($ch); curl_close($ch);
     if ($code !== 200 || $body === false) {
@@ -47,7 +48,9 @@ function apiPost(string $url, array $payload, string $key): int
     $ch = curl_init($url);
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        CURLOPT_TIMEOUT => 90, CURLOPT_HTTPHEADER => ['X-Api-Key: ' . $key, 'Content-Type: application/json']]);
+        CURLOPT_TIMEOUT => 90,
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        CURLOPT_HTTPHEADER => ['X-Api-Key: ' . $key, 'Content-Type: application/json']]);
     curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
     return $code;
 }
