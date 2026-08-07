@@ -36,6 +36,12 @@
     color:#fff;font-weight:700;font-size:1rem;cursor:pointer}
   .search button:hover{background:#0284c7}
   .hint{color:#94a3b8;font-size:.82rem;margin-top:8px}
+  .usd-toggle{display:inline-flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;color:#cbd5e1;font-size:.82rem;font-weight:600;user-select:none}
+  .usd-toggle input{display:none}
+  .usd-track{width:38px;height:22px;border-radius:999px;background:rgba(255,255,255,.22);position:relative;transition:background .15s;flex:none}
+  .usd-track::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+  .usd-toggle input:checked + .usd-track{background:var(--ok)}
+  .usd-toggle input:checked + .usd-track::after{transform:translateX(16px)}
 
   main{padding:26px 0 60px}
   h2{font-size:1.15rem;font-weight:800;letter-spacing:-.01em;color:var(--ink);margin:0 0 14px;display:flex;align-items:center;gap:8px}
@@ -66,6 +72,17 @@
   .card .title{font-size:.86rem;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;
     -webkit-box-orient:vertical;overflow:hidden;min-height:2.4em}
   .price{font-size:1.15rem;font-weight:800;margin-top:auto}
+  /* Recuadro de precio con color según el estado histórico. */
+  .price-box{align-self:flex-start;margin-top:auto;font-size:1.1rem;font-weight:800;padding:5px 11px;border-radius:10px;line-height:1.25}
+  .price-box.flat{background:#f1f5f9;color:var(--ink)}
+  .price-box.low{background:#dcfce7;color:#065f46}
+  .price-box.up{background:#fee2e2;color:#991b1b}
+  .price-box .old-price{font-weight:500}
+  .note-iva{font-size:.68rem;color:var(--muted)}
+  /* Stock sobre la imagen (abajo). Rojo si está agotado. */
+  .img-stock{position:absolute;bottom:8px;left:8px;z-index:1;font-size:.66rem;font-weight:800;padding:3px 9px;border-radius:999px;backdrop-filter:blur(2px)}
+  .img-stock.in{background:rgba(255,255,255,.85);color:var(--ok)}
+  .img-stock.out{background:#dc2626;color:#fff}
   .stock{font-size:.74rem;font-weight:600}
   .stock.in{color:var(--ok)} .stock.out{color:var(--bad)}
 
@@ -216,6 +233,7 @@
       <button id="go">Buscar</button>
     </div>
     <div class="hint">URL de un producto (Siman, Sinsa, Walmart, PriceSmart, La Curacao, RadioShack, Tropigas, El Gallo…) → lo rastrea · palabras → busca entre los rastreados. <a href="ayuda.html#tiendas">Ver tiendas</a></div>
+    <label class="usd-toggle"><input type="checkbox" id="usdSwitch"><span class="usd-track"></span><span>💵 Ver precios en USD</span></label>
     <nav class="topnav">
       <a id="navOfertas">🔥 Ofertas</a>
       <a id="navComparador">⚖️ Comparador</a>
@@ -374,11 +392,15 @@
 <script>
 const API = './api';
 window.USD_RATE = 36.6243; // se actualiza con applySettings
-const money = (v, cur='NIO') =>
-  v == null ? '—' : (cur === 'USD' ? '$' : 'C$') +
-  new Intl.NumberFormat('es-NI',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
-const usd = v => (v == null || !window.USD_RATE) ? '' :
-  '≈ $' + new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(v / window.USD_RATE);
+window.DISPLAY_USD = localStorage.getItem('oap_usd') === '1'; // toggle global persistente
+// money() respeta el toggle: si está en USD y el precio es NIO, lo convierte.
+const money = (v, cur='NIO') => {
+  if (v == null) return '—';
+  if (window.DISPLAY_USD && cur === 'NIO' && window.USD_RATE)
+    return 'US$ ' + new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v / window.USD_RATE);
+  return (cur === 'USD' ? 'US$' : 'C$') +
+    new Intl.NumberFormat('es-NI',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
+};
 
 let chart = null;
 
@@ -436,20 +458,24 @@ function cardHtml(p){
   const hasDisc = p.list_price != null && p.price_final != null && p.list_price > p.price_final;
   const saving  = hasDisc ? (p.list_price - p.price_final) : 0;
   const pct     = hasDisc ? (p.discount_pct != null ? Math.round(p.discount_pct) : Math.round(saving / p.list_price * 100)) : 0;
+  // Color del recuadro de precio: verde si mínimo histórico, rojo si subió.
+  let pcls = 'flat';
+  if (p.deal && p.deal.verdict === 'low') pcls = 'low';
+  else if (p.series && p.series.length >= 2 && p.series[p.series.length-1].p > p.series[p.series.length-2].p) pcls = 'up';
   return `<div class="card" data-id="${p.id}">
     <div class="img">
       ${dealBadge(p.deal)}
       ${p.image_url ? `<img src="${p.image_url}" alt="" loading="lazy">` : '📦'}
+      <span class="img-stock ${p.in_stock ? 'in':'out'}">${p.in_stock ? '● En stock' : '✕ Agotado'}</span>
     </div>
     <div class="body">
       <span class="badge">${p.store_name || p.store}</span>
       <div class="title">${escapeHtml(p.title || '(sin título)')}</div>
-      <div class="price">${money(p.price_final, cur)}${hasDisc ? ` <span class="old-price">${money(p.list_price, cur)}</span>` : ''}</div>
-      <div class="usd">${usd(p.price_final)}${p.tax_added ? ' · IVA est.' : ''}</div>
+      <div class="price-box ${pcls}">${money(p.price_final, cur)}${hasDisc ? ` <span class="old-price">${money(p.list_price, cur)}</span>` : ''}</div>
       ${hasDisc ? `<div class="save">Ahorrás ${money(saving, cur)}${pct ? ` · ${pct}%` : ''}</div>` : ''}
+      ${p.tax_added ? '<div class="note-iva">IVA est. incluido</div>' : ''}
       ${sparkline(p.series)}
       ${p.group_slug && p.group_stores >= 2 ? `<a class="cmp" href="producto.php?slug=${encodeURIComponent(p.group_slug)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">⚖️ en ${p.group_stores} tiendas</a>` : ''}
-      <div class="stock ${p.in_stock ? 'in':'out'}">${p.in_stock ? '● En stock' : '○ Agotado'}</div>
     </div>
   </div>`;
 }
@@ -724,7 +750,7 @@ async function openDetail(params, endpoint='history.php'){
       </div>
     </div>
     <div class="stats">
-      <div class="stat"><div class="k">Precio actual</div><div class="v">${money(s.current,cur)}</div><div class="usd">${usd(s.current)}</div></div>
+      <div class="stat"><div class="k">Precio actual</div><div class="v">${money(s.current,cur)}</div></div>
       <div class="stat"><div class="k">Mínimo histórico</div><div class="v min">${money(s.min,cur)}</div></div>
       <div class="stat"><div class="k">Máximo histórico</div><div class="v max">${money(s.max,cur)}</div></div>
       <div class="stat"><div class="k">Disponibilidad</div><div class="v" style="font-size:1rem">${s.in_stock ? '✅ En stock':'❌ Agotado'}</div></div>
@@ -1071,6 +1097,20 @@ document.getElementById('grid').addEventListener('click', (e) => {
   const c = e.target.closest('.card'); if(c && c.dataset.id) openDetail({ product_id: c.dataset.id });
 });
 document.getElementById('loadMore').addEventListener('click', loadMore);
+// Toggle global de moneda (NIO ↔ USD), persistente.
+(() => {
+  const sw = document.getElementById('usdSwitch');
+  if (!sw) return;
+  sw.checked = window.DISPLAY_USD;
+  sw.addEventListener('change', () => {
+    window.DISPLAY_USD = sw.checked;
+    localStorage.setItem('oap_usd', sw.checked ? '1' : '0');
+    loadGrid();
+    loadChanges();
+    if (document.getElementById('comparador-section').style.display !== 'none') openComparador();
+    if (document.getElementById('cambios-section').style.display !== 'none') openCambios();
+  });
+})();
 document.getElementById('navComparador').addEventListener('click', () => openComparador());
 document.getElementById('cmpMore').addEventListener('click', loadMoreComparador);
 document.querySelectorAll('#comparador-section .seg').forEach(b => b.addEventListener('click', () => openComparador(b.dataset.sort)));
