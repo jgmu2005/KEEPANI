@@ -127,6 +127,20 @@
   .feature-card p{margin:0;font-size:.88rem;color:var(--muted);line-height:1.5}
   .cta-donate{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:12px 14px;font-size:.88rem;color:#065f46;margin:0 0 16px}
   .cta-donate a{color:#047857;font-weight:700}
+  .planes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .plan{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 18px;display:flex;flex-direction:column}
+  .plan.featured{border-color:var(--brand);box-shadow:0 8px 30px rgba(14,165,233,.15)}
+  .plan.current{outline:2px solid var(--ok);outline-offset:-2px}
+  .plan-tag{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;font-size:.68rem;font-weight:800;padding:3px 12px;border-radius:999px;white-space:nowrap}
+  .plan-name{font-size:1.15rem;font-weight:800}
+  .plan-price{color:var(--brand-dk);font-weight:700;margin:2px 0 12px}
+  .plan-feats{list-style:none;padding:0;margin:0 0 16px;flex:1;display:flex;flex-direction:column;gap:8px}
+  .plan-feats li{font-size:.88rem;padding-left:22px;position:relative}
+  .plan-feats li::before{content:"✓";position:absolute;left:0;color:var(--ok);font-weight:800}
+  .plan-cta{display:block;text-align:center;background:var(--brand);color:#fff;padding:11px;border-radius:9px;font-weight:800;margin-top:auto}
+  .plan.featured .plan-cta{background:linear-gradient(135deg,var(--brand),var(--brand-dk))}
+  .plan-current{text-align:center;color:var(--ok);font-weight:800;padding:11px;margin-top:auto}
+  @media(max-width:680px){.planes-grid{grid-template-columns:1fr}}
   .usd{font-size:.78rem;color:var(--muted);margin-top:-1px}
   footer{background:#0f172a;color:#94a3b8;padding:26px 0;text-align:center;font-size:.86rem}
   footer .donate{margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
@@ -162,6 +176,7 @@
       <a id="navComparador">⚖️ Comparador</a>
       <a id="navCatalogo">📚 Catálogo completo</a>
       <a id="navSeguimientos">🔔 Mis seguimientos</a>
+      <a id="navPlanes">💛 Apoyá</a>
       <a href="ayuda.html">❓ Ayuda</a>
     </nav>
   </div>
@@ -195,6 +210,13 @@
     <h2>⚖️ Comparador entre tiendas</h2>
     <p class="note" style="margin:-6px 0 12px">El mismo producto en varias tiendas: mirá dónde está más barato.</p>
     <div id="comparador-grid" class="grid"></div>
+  </section>
+
+  <section id="planes-section" style="display:none">
+    <h2>💛 Apoyá Ojo al Precio</h2>
+    <p class="note" style="margin:-6px 0 14px">El sitio es gratis y sin publicidad. Si te sirve, podés apoyarlo con una donación y de paso rastrear más productos. No es un muro de pago: el plan gratis alcanza para la mayoría.</p>
+    <div id="planesGrid" class="planes-grid"></div>
+    <p id="planesHint" class="note" style="text-align:center;margin-top:14px"></p>
   </section>
 
   <section id="catalogo">
@@ -851,6 +873,39 @@ document.getElementById('navCatalogo').addEventListener('click', () => {
   document.getElementById('fsort').value = 'name';
   PAGE.offset = 0; loadGrid(); gotoTopOfGrid();
 });
+function renderPlanes(){
+  const kofi = window.DONATE_KOFI, paypal = window.DONATE_PAYPAL;
+  const lf = window.LIMIT_FREE || 5, lo = window.LIMIT_ONETIME || 10;
+  const cur = AUTH.user ? AUTH.user.tier : null;
+  const cta = (label) => kofi ? `<a class="plan-cta" href="${kofi}" target="_blank" rel="noopener">${label}</a>` : '';
+  const tiers = [
+    {key:'free', name:'Gratis', price:'C$0', tag:'',
+     feats:[`Hasta <b>${lf}</b> productos con alerta`, 'Historial de precios completo', 'Comparador entre tiendas', 'Detector de ofertas dudosas'], cta:''},
+    {key:'onetime', name:'Un pago', price:'Donación única', tag:'',
+     feats:[`Hasta <b>${lo}</b> productos con alerta`, 'No vence: para siempre', 'Todo lo del plan Gratis', 'Apoyás el proyecto 💛'], cta: cta('Doná una vez')},
+    {key:'subscriber', name:'Suscripción', price:'Aporte mensual', tag:'★ Máximo apoyo',
+     feats:['Alertas <b>ilimitadas</b>', 'Se renueva cada mes', 'Todo lo anterior', 'Sostenés el proyecto 🌟'], cta: cta('Suscribite')},
+  ];
+  document.getElementById('planesGrid').innerHTML = tiers.map(t => `
+    <div class="plan ${t.key==='subscriber'?'featured':''} ${cur===t.key?'current':''}">
+      ${t.tag?`<div class="plan-tag">${t.tag}</div>`:''}
+      <div class="plan-name">${t.name}</div>
+      <div class="plan-price">${t.price}</div>
+      <ul class="plan-feats">${t.feats.map(f=>`<li>${f}</li>`).join('')}</ul>
+      ${cur===t.key ? '<div class="plan-current">✓ Tu plan actual</div>' : t.cta}
+    </div>`).join('');
+  const hint = document.getElementById('planesHint');
+  if(!kofi){ hint.textContent = ''; }
+  else if(!AUTH.user){ hint.innerHTML = '💡 <b>Iniciá sesión</b> y doná con el correo de tu cuenta → subimos tu nivel automáticamente.'; }
+  else { hint.innerHTML = `Doná con <b>${escapeHtml(AUTH.user.email)}</b> (el correo de tu cuenta) y tu nivel sube solo.` + (paypal ? ` · También podés usar <a href="https://${paypal.replace(/^https?:\/\//,'')}" target="_blank" rel="noopener">PayPal</a>.` : ''); }
+}
+async function openPlanes(){
+  const sec = document.getElementById('planes-section');
+  sec.style.display = '';
+  renderPlanes();
+  sec.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+document.getElementById('navPlanes').addEventListener('click', openPlanes);
 document.getElementById('navComparador').addEventListener('click', openComparador);
 document.getElementById('navSeguimientos').addEventListener('click', () => {
   AUTH.user ? openMyAlerts() : openAuth('login');
@@ -864,6 +919,9 @@ async function applySettings(){
     const s = j.settings;
     window.TURNSTILE_SITEKEY = s.turnstile_site_key || '';
     window.USD_RATE = parseFloat(s.usd_rate) || 36.6243;
+    window.LIMIT_FREE = parseInt(s.limit_free, 10) || 5;
+    window.LIMIT_ONETIME = parseInt(s.limit_onetime, 10) || 10;
+    window.DONATE_PAYPAL = (s.donate_paypal||'').trim();
     if(s.site_name) document.title = `${s.site_name} — Historial de precios en tiendas de Nicaragua`;
     const bt = document.querySelector('.brand-text');
     if(bt) bt.innerHTML = `${escapeHtml(s.site_name||'Ojo al Precio')} <small>${escapeHtml(s.tagline||'')}</small>`;
