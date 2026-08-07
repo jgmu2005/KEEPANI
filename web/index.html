@@ -880,11 +880,11 @@ function renderPlanes(){
   const cta = (label) => kofi ? `<a class="plan-cta" href="${kofi}" target="_blank" rel="noopener">${label}</a>` : '';
   const tiers = [
     {key:'free', name:'Gratis', price:'C$0', tag:'',
-     feats:[`Hasta <b>${lf}</b> productos con alerta`, 'Historial de precios completo', 'Comparador entre tiendas', 'Detector de ofertas dudosas'], cta:''},
-    {key:'onetime', name:'Un pago', price:'Donación única', tag:'',
-     feats:[`Hasta <b>${lo}</b> productos con alerta`, 'No vence: para siempre', 'Todo lo del plan Gratis', 'Apoyás el proyecto 💛'], cta: cta('Doná una vez')},
-    {key:'subscriber', name:'Suscripción', price:'Aporte mensual', tag:'★ Máximo apoyo',
-     feats:['Alertas <b>ilimitadas</b>', 'Se renueva cada mes', 'Todo lo anterior', 'Sostenés el proyecto 🌟'], cta: cta('Suscribite')},
+     feats:[`Hasta <b>${lf}</b> productos con alerta`, 'Actualización de precios <b>1× al día</b>', 'Historial, comparador y detector de ofertas', 'Sin publicidad'], cta:''},
+    {key:'onetime', name:'Un pago', price:'Desde $1, una vez', tag:'',
+     feats:[`Hasta <b>${lo}</b> productos con alerta`, 'Actualización de precios <b>2× al día</b>', 'No vence: para siempre', 'Todo lo del plan Gratis'], cta: cta('Doná una vez')},
+    {key:'subscriber', name:'Suscripción', price:'$1 al mes', tag:'★ Máximo apoyo',
+     feats:['Alertas <b>ilimitadas</b>', 'Precios <b>6× al día</b> (lo más rápido)', 'Se renueva cada mes', 'Sostenés el proyecto 🌟'], cta: cta('Suscribite')},
   ];
   document.getElementById('planesGrid').innerHTML = tiers.map(t => `
     <div class="plan ${t.key==='subscriber'?'featured':''} ${cur===t.key?'current':''}">
