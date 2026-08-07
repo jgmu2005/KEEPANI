@@ -54,10 +54,19 @@ final class OgMetaAdapter implements StoreAdapter
         }
 
         $availRaw = strtolower((string) $this->meta($html, 'product:availability'));
-        // Si la tienda no publica disponibilidad (ej. Unicomer), asumimos en stock.
-        $inStock  = $availRaw === ''
-            ? true
-            : (str_contains($availRaw, 'in stock') || str_contains($availRaw, 'instock'));
+        if ($availRaw !== '') {
+            // Copasa / Gallo: la disponibilidad viene en el OG.
+            $inStock = str_contains($availRaw, 'in stock')
+                || str_contains($availRaw, 'instock')
+                || str_contains($availRaw, 'en stock');
+        } elseif (preg_match('/class="[^"]*stock\s+unavailable/i', $html)) {
+            // Unicomer (Magento sin OG availability): clase de stock del HTML.
+            $inStock = false;
+        } elseif (preg_match('/class="[^"]*stock\s+available/i', $html)) {
+            $inStock = true;
+        } else {
+            $inStock = true; // sin ninguna señal → asumir disponible
+        }
 
         // Precio de lista (Magento: data-price-amount; el mayor > precio = precio tachado).
         $list = null;
