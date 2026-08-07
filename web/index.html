@@ -263,8 +263,15 @@
 
   <section id="comparador-section" style="display:none">
     <h2>⚖️ Comparador entre tiendas</h2>
-    <p class="note" style="margin:-6px 0 12px">El mismo producto en varias tiendas: mirá dónde está más barato.</p>
+    <p class="note" style="margin:-6px 0 10px">El mismo producto en varias tiendas: dónde conviene comprarlo.</p>
+    <div class="segbar" style="display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap">
+      <button class="seg on" data-sort="discrepancy">💰 Mayor diferencia</button>
+      <button class="seg" data-sort="stores">🏪 Más tiendas</button>
+    </div>
     <div id="comparador-grid" class="grid"></div>
+    <div id="cmpMoreWrap" style="text-align:center;margin-top:20px;display:none">
+      <button id="cmpMore" class="load-more">Ver más</button>
+    </div>
   </section>
 
   <section id="planes-section" style="display:none">
@@ -504,34 +511,50 @@ async function loadMoreCambios(){
 
 function comparadorCard(g){
   const cur = g.currency || 'NIO';
-  const save = (g.min_price != null && g.max_price != null && g.max_price > g.min_price) ? (g.max_price - g.min_price) : 0;
+  const has = g.min_price != null && g.max_price != null && g.max_price > g.min_price;
+  const save = has ? (g.max_price - g.min_price) : 0;
+  const pct = has ? Math.round(save / g.max_price * 100) : 0; // cuánto más barato es la más barata vs la más cara
+  const badge = pct > 0
+    ? `<span class="lowest" style="background:#dcfce7;color:#065f46;border-color:#86efac">💰 hasta ${pct}% menos</span>`
+    : `<span class="lowest" style="background:#eff6ff;color:var(--brand-dk);border-color:#bfdbfe">⚖️ ${g.store_count} tiendas</span>`;
   return `<a class="card" href="producto.php?slug=${encodeURIComponent(g.slug)}" target="_blank" rel="noopener">
-    <div class="img">
-      <span class="lowest" style="background:#eff6ff;color:var(--brand-dk);border-color:#bfdbfe">⚖️ ${g.store_count} tiendas</span>
-      ${g.image_url ? `<img src="${g.image_url}" alt="" loading="lazy">` : '📦'}
-    </div>
+    <div class="img">${badge}${g.image_url ? `<img src="${g.image_url}" alt="" loading="lazy">` : '📦'}</div>
     <div class="body">
       ${g.brand ? `<span class="badge">${escapeHtml(g.brand)}</span>` : ''}
       <div class="title">${escapeHtml(g.title || '(sin título)')}</div>
+      <div class="note" style="font-size:.72rem;color:var(--muted)">en ${g.store_count} tiendas</div>
       <div class="price" style="margin-top:auto">${g.min_price != null ? 'desde ' + money(g.min_price, cur) : '—'}</div>
       ${save > 0 ? `<div class="save">Ahorrá hasta ${money(save, cur)}</div>` : ''}
     </div>
   </a>`;
 }
-async function openComparador(){
+const CMP = { sort: 'discrepancy', shown: 0 };
+async function openComparador(sort){
+  CMP.sort = sort || CMP.sort;
   const sec = document.getElementById('comparador-section');
   const box = document.getElementById('comparador-grid');
   sec.style.display = '';
+  document.querySelectorAll('#comparador-section .seg').forEach(b => b.classList.toggle('on', b.dataset.sort === CMP.sort));
   box.innerHTML = `<div class="spinner">Cargando…</div>`;
   sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
   try{
-    const j = await (await fetch(`${API}/groups.php?limit=48`)).json();
-    if(!j.ok || !j.items.length){
-      box.innerHTML = `<div class="empty">Todavía no hay productos en varias tiendas. Se van sumando a medida que crece el catálogo. ⚖️</div>`;
-      return;
-    }
-    box.innerHTML = j.items.map(comparadorCard).join('');
+    const j = await (await fetch(`${API}/groups.php?sort=${CMP.sort}&limit=24&offset=0`)).json();
+    CMP.shown = (j.ok && j.items) ? j.items.length : 0;
+    box.innerHTML = CMP.shown ? j.items.map(comparadorCard).join('')
+      : `<div class="empty">Todavía no hay productos en varias tiendas. Se van sumando a medida que crece el catálogo. ⚖️</div>`;
+    document.getElementById('cmpMoreWrap').style.display = CMP.shown >= 24 ? '' : 'none';
   }catch(e){ box.innerHTML = `<div class="empty">No se pudo cargar. Intentá de nuevo.</div>`; }
+}
+async function loadMoreComparador(){
+  const btn = document.getElementById('cmpMore');
+  btn.disabled = true; btn.textContent = 'Cargando…';
+  try{
+    const j = await (await fetch(`${API}/groups.php?sort=${CMP.sort}&limit=24&offset=${CMP.shown}`)).json();
+    const n = (j.ok && j.items) ? j.items.length : 0;
+    if(n){ document.getElementById('comparador-grid').insertAdjacentHTML('beforeend', j.items.map(comparadorCard).join('')); CMP.shown += n; }
+    document.getElementById('cmpMoreWrap').style.display = n >= 24 ? '' : 'none';
+  }catch(e){}
+  btn.disabled = false; btn.textContent = 'Ver más';
 }
 
 let storesLoaded = false;
@@ -1043,7 +1066,9 @@ document.getElementById('grid').addEventListener('click', (e) => {
   const c = e.target.closest('.card'); if(c && c.dataset.id) openDetail({ product_id: c.dataset.id });
 });
 document.getElementById('loadMore').addEventListener('click', loadMore);
-document.getElementById('navComparador').addEventListener('click', openComparador);
+document.getElementById('navComparador').addEventListener('click', () => openComparador());
+document.getElementById('cmpMore').addEventListener('click', loadMoreComparador);
+document.querySelectorAll('#comparador-section .seg').forEach(b => b.addEventListener('click', () => openComparador(b.dataset.sort)));
 document.getElementById('navSeguimientos').addEventListener('click', () => {
   AUTH.user ? openMyAlerts() : openAuth('login');
 });

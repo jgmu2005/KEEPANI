@@ -19,7 +19,8 @@ try {
     $repo   = new ProductRepository(Db::conn());
     $limit  = isset($_GET['limit'])  ? (int) $_GET['limit']  : 24;
     $offset = isset($_GET['offset']) ? (int) $_GET['offset'] : 0;
-    $res    = $repo->groupsList($limit, $offset);
+    $sort   = ($_GET['sort'] ?? 'discrepancy') === 'stores' ? 'stores' : 'discrepancy';
+    $res    = $repo->groupsList($limit, $offset, $sort);
 
     echo json_encode(
         ['ok' => true, 'total' => $res['total'], 'limit' => $limit, 'offset' => $offset, 'items' => $res['items']],

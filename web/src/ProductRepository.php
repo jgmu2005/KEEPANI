@@ -415,11 +415,16 @@ final class ProductRepository
      * Lista de grupos multi-tienda (para la vitrina "Comparador"), con su rango
      * de precio actual entre tiendas. @return array{total:int, items:array}
      */
-    public function groupsList(int $limit = 24, int $offset = 0): array
+    public function groupsList(int $limit = 24, int $offset = 0, string $sort = 'discrepancy'): array
     {
         $limit  = max(1, min($limit, 100));
         $offset = max(0, $offset);
         $total  = (int) $this->db->query('SELECT COUNT(*) FROM product_groups WHERE store_count >= 2')->fetchColumn();
+
+        // Orden: por diferencia de precio % entre tiendas (default) o por # de tiendas.
+        $order = $sort === 'stores'
+            ? 'g.store_count DESC, g.updated_at DESC'
+            : '(MAX(ph.price_final) - MIN(ph.price_final)) / NULLIF(MIN(ph.price_final), 0) DESC, g.store_count DESC';
 
         $sql = 'SELECT g.slug, g.canonical_title AS title, g.brand, g.image_url, g.store_count,
                        MIN(ph.price_final) AS min_price, MAX(ph.price_final) AS max_price,
@@ -430,7 +435,7 @@ final class ProductRepository
                         SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
                  WHERE g.store_count >= 2
                  GROUP BY g.id
-                 ORDER BY g.store_count DESC, g.updated_at DESC
+                 ORDER BY ' . $order . '
                  LIMIT ' . $limit . ' OFFSET ' . $offset;
 
         $items = array_map(static function (array $r): array {
