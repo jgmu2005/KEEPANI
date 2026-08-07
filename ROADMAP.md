@@ -5,37 +5,42 @@ Esfuerzo: S (chico) · M (medio) · L (grande)
 
 ---
 
-## 🗓️ Cierre — semana del 11–15 ago 2026
+## 🗓️ Roadmap — mejoras, ajustes y pendientes (semana del 11–15 ago 2026)
 
-Objetivo: dejar **desplegado, verificado y monitoreado** todo lo construido (refresco Premium, comparador de celulares, SEO indexable, marketplace Treinta) — sin features grandes nuevos.
+✅ Ya hecho: deploy de todo (SEO gate, marketplace, celulares, refresh) + ops (migraciones 027/028, Search Console + sitemap, crons, workflow marketplace, cron FatCow del marketplace de baja).
 
-### 1. Deploy pendiente (SFTP) — primero 🔴 S
-- [ ] Gate SEO: `web/precio.php`, `web/sitemap.php`, `web/sitemap_productos.php`
-- [ ] Orden marketplace: `web/marketplace.php`, `web/src/Marketplace/MarketplaceRepo.php`
-- [ ] Confirmar que ya estén arriba: `mk_ingest.php`, `Verification.php` (fix baseUrl), `CategoryClassifier.php`, `Seo.php`, `PriceChart.php`, `index.html`, `admin.html`
-- [ ] Migraciones corridas: **027** (cat_key) y **028** (marketplace)
+### A. Verificar / cabos sueltos 🔴 S
+- [ ] **Marketplace `tienda.treinta.co`** (multitiendaonlinemanagua): confirmar que el crawler nuevo le trae productos; si sigue trayendo pocos, darla de baja o dejarla como está.
+- [ ] Confirmar que el workflow de GitHub trajo los **catálogos completos** (ej. Rogama ~663) y que se ve bien en `/marketplace`.
+- [ ] **Ko-fi end-to-end** de nuevo (un pago + suscripción) tras todos los cambios → verificar auto-upgrade a onetime/subscriber.
+- [ ] **Mobile**: repasar el home, ficha `precio.php`, comparador y marketplace en celular (hubo un reporte viejo de "no es mobile-friendly").
 
-### 2. Ops / crons 🔴 S
-- [ ] **Google Search Console**: verificar dominio (DNS TXT o archivo HTML) + enviar `sitemap.xml`
-- [ ] Marketplace: confirmar que el workflow de GitHub trajo catálogos completos → **DESACTIVAR el cron FatCow `crawl_marketplace.php`** (si no, borra todo menos 12) → dejar sólo el workflow diario
-- [ ] cron-job.org: confirmar `refresh_tracked.php?tiers=subscriber` (cada 4h) + `?tiers=onetime` (2×/día) + `alerts_check.php`
-- [ ] Encadenar/ordenar los crons de comparador: `build_groups` → `build_phone_groups` → `build_categories`
+### B. SEO (alto valor) 🟡
+- [ ] **Hubs por categoría** `/categoria/{key}` — página única "Precios de {categoría} en Nicaragua" con sus productos. Es la mejor jugada SEO nueva (contenido único + capta long-tail). (M)
+- [ ] **Enlazado interno**: breadcrumbs y links precio ↔ producto ↔ hubs de categoría (ayuda al crawl y al ranking). (S)
+- [ ] Más "carne" en `precio.php`: texto único ("¿es buen precio?", contexto) para bajar aún más la thinness. (S)
+- [ ] Imagen OG por defecto (`seo_default_image`) para que se vea lindo al compartir. (S)
+- [ ] Iterar según Search Console (qué indexa, qué queda fuera).
 
-### 3. Monitoreo (durante la semana) 🟡 S
-- [ ] GA4: primeras visitas / fuentes
-- [ ] Search Console: cobertura (cuántas fichas indexa), errores de rastreo
-- [ ] Ver que las fichas "maduren" y entren solas al sitemap (gate por historial)
+### C. Marketplace 🟡🟢
+- [ ] **Buscador por nombre** dentro de `/marketplace`. (S)
+- [ ] Sumar más tiendas Treinta desde el admin. (S)
+- [ ] Filtro por **rango de precio** (min–máx) además del orden. (S)
+- [ ] Mini-variación/sparkline por producto cuando haya historial. (S)
 
-### 4. Pulido si hay tiempo 🟢 S/M
-- [ ] Marketplace: **buscador por nombre** dentro de `/marketplace` (S)
-- [ ] Sumar más tiendas Treinta desde el admin (S)
-- [ ] Revisar la **cola de matches** en admin para sumar comparaciones cross-store (S)
-- [ ] **Hubs por categoría** (una página SEO por categoría con sus productos) — joya SEO (M)
+### D. Comparador / datos 🟡🟢
+- [ ] Más comparaciones cross-store: correr `hash` + `match` periódicos y **revisar la cola de matches** en admin. (S, recurrente)
+- [ ] Sumar más tiendas al tracker. (M)
+- [ ] Categorías con **IA** — clasificar el 100% + mejores títulos SEO. (L, futuro)
 
-### 5. Backlog / futuro (NO esta semana)
-- Clasificación de categorías con **IA** (100% del catálogo + mejores títulos SEO)
-- Marketplace: landing SEO por tienda si tracciona; catálogo completo estable
-- Más tiendas del tracker
+### E. Premium / negocio 🟡🟢
+- [ ] **Empujar Premium**: ahora que `refresh_tracked` da valor real (6×/día), revisar que la landing/paywall lo comunique bien. (S)
+- [ ] Eventos en GA4 para medir conversión (clic en "Hacete Premium", crear alerta). (S)
+
+### F. Reliability / ops 🟢
+- [ ] Aviso si **falla un crawl** (notificación de GitHub Actions). (S)
+- [ ] **Backup** periódico de la BD. (S)
+- [ ] Retención/prune de `price_history` (~76k filas/día crecen rápido). (M, futuro)
 
 ---
 
