@@ -61,6 +61,14 @@ final class MarketplaceRepo
         return ['ok' => true, 'slug' => $slug];
     }
 
+    public function findStore(string $slug): ?array
+    {
+        $st = $this->db->prepare('SELECT * FROM mk_stores WHERE slug = ? LIMIT 1');
+        $st->execute([$slug]);
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
     public function setStoreActive(int $id, bool $active): void
     {
         $this->db->prepare('UPDATE mk_stores SET is_active = ? WHERE id = ?')->execute([$active ? 1 : 0, $id]);

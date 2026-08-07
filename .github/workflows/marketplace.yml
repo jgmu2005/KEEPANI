@@ -1,0 +1,41 @@
+name: Marketplace Treinta (catálogo completo)
+
+# Crawlea las tiendas Treinta del marketplace con navegador headless (Playwright),
+# dejando que su scroll infinito pagine, y postea el catálogo completo a
+# /api/mk_ingest.php. Robusto ante redespliegues de Treinta (usa navegador real).
+
+on:
+  workflow_dispatch:
+    inputs:
+      store:
+        description: 'Slug de una tienda puntual (vacío = todas)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '0 9 * * *'   # diario 09:00 UTC (~3:00 AM Managua)
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar Playwright (Chromium)
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.47.2
+          npx playwright install --with-deps chromium
+
+      - name: Crawl del marketplace
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+          STORE: ${{ github.event.inputs.store }}
+        run: node .github/scripts/crawl_treinta.mjs
