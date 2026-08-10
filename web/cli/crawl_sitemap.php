@@ -54,6 +54,12 @@ if ($ingestUrl === '' || $ingestKey === '') {
 $which   = $argv[1] ?? 'all';
 $targets = $which === 'all' ? array_keys(STORES) : [$which];
 
+// Sharding opcional (para tiendas grandes que no entran en el límite de tiempo):
+//   crawl_sitemap.php tropigas 1 3   → procesa el tercio 1 de 3 del sitemap.
+// Sólo aplica cuando se apunta a UNA tienda.
+$shard = max(1, (int) ($argv[2] ?? 1));
+$of    = max(1, (int) ($argv[3] ?? 1));
+
 $http = new Http(UA);
 $grand = 0;
 
@@ -76,6 +82,13 @@ foreach ($targets as $slug) {
         }
     }
     line('  productos en el sitemap: ' . count($urls));
+
+    // Si es una sola tienda y se pidió shard, procesamos sólo su porción.
+    if ($of > 1 && $which !== 'all') {
+        $size = (int) ceil(count($urls) / $of);
+        $urls = array_slice($urls, ($shard - 1) * $size, $size, true);
+        line("  shard $shard/$of → " . count($urls) . ' en este job');
+    }
 
     $adapter = new OgMetaAdapter($http, $slug, $cfg['base_url'], '', $cfg['currency'], $cfg['tax_included'], $cfg['tax_rate']);
     $batch = []; $sent = 0; $fails = 0; $i = 0; $lost = 0; $consec = 0;

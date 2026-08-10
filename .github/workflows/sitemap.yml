@@ -1,8 +1,8 @@
 name: Crawl Magento por sitemap (Gallo + Unicomer)
 
-# Cada tienda corre como un JOB PARALELO independiente (matriz), con su propio
-# presupuesto de ~6h. Antes iban las 4 en serie en un solo job y chocaban contra
-# el límite de tiempo (Tropigas ~9k productos, 1 fetch OG por producto).
+# Cada tienda corre como job paralelo (matriz). Las grandes se SHARDEAN en varios
+# jobs (porciones del sitemap) para no chocar el límite de ~6h de Actions:
+# Tropigas (~9k productos, 1 fetch OG c/u) se parte en 3 trozos de ~3k (~2h c/u).
 
 on:
   workflow_dispatch:
@@ -15,38 +15,44 @@ on:
     - cron: '30 8 * * *'   # diario 08:30 UTC — después del crawl VTEX
 
 jobs:
-  # Arma la lista de tiendas a crawlear (todas, o una puntual desde el dispatch).
+  # Arma la lista de jobs {store, shard, of}: Tropigas en 3 trozos, el resto entero.
   setup:
     runs-on: ubuntu-latest
     outputs:
-      stores: ${{ steps.pick.outputs.stores }}
+      jobs: ${{ steps.pick.outputs.jobs }}
     steps:
       - id: pick
         run: |
           STORE="${{ github.event.inputs.store || 'all' }}"
-          if [ "$STORE" = "all" ]; then
-            echo 'stores=["gallo","lacuracao","radioshack","tropigas"]' >> "$GITHUB_OUTPUT"
-          else
-            echo "stores=[\"$STORE\"]" >> "$GITHUB_OUTPUT"
-          fi
+          case "$STORE" in
+            all)
+              echo 'jobs=[{"store":"gallo","shard":1,"of":1},{"store":"lacuracao","shard":1,"of":1},{"store":"radioshack","shard":1,"of":1},{"store":"tropigas","shard":1,"of":3},{"store":"tropigas","shard":2,"of":3},{"store":"tropigas","shard":3,"of":3}]' >> "$GITHUB_OUTPUT"
+              ;;
+            tropigas)
+              echo 'jobs=[{"store":"tropigas","shard":1,"of":3},{"store":"tropigas","shard":2,"of":3},{"store":"tropigas","shard":3,"of":3}]' >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "jobs=[{\"store\":\"$STORE\",\"shard\":1,\"of\":1}]" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
 
   crawl:
     needs: setup
     runs-on: ubuntu-latest
-    timeout-minutes: 350   # por tienda (cada job es independiente)
+    timeout-minutes: 350
     strategy:
-      fail-fast: false     # si una tienda falla, las demás siguen
-      max-parallel: 4
+      fail-fast: false
+      max-parallel: 6
       matrix:
-        store: ${{ fromJson(needs.setup.outputs.stores) }}
+        job: ${{ fromJson(needs.setup.outputs.jobs) }}
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: curl, json
-      - name: Crawl ${{ matrix.store }}
+      - name: Crawl ${{ matrix.job.store }} (shard ${{ matrix.job.shard }}/${{ matrix.job.of }})
         env:
           OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
           OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
-        run: php web/cli/crawl_sitemap.php "${{ matrix.store }}"
+        run: php web/cli/crawl_sitemap.php "${{ matrix.job.store }}" "${{ matrix.job.shard }}" "${{ matrix.job.of }}"
