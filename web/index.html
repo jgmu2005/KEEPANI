@@ -131,6 +131,11 @@
   .cat-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
   .cat-chips[hidden]{display:none}
   .cat-chips:empty{display:none}
+  .usermenu{position:relative;display:inline-block}
+  .usermenu-pop{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-hover,0 8px 24px rgba(0,0,0,.18));min-width:210px;z-index:70;overflow:hidden}
+  .usermenu-pop[hidden]{display:none}
+  .usermenu-pop a{display:block;padding:11px 15px;color:var(--ink);font-size:.88rem;font-weight:600;text-decoration:none}
+  .usermenu-pop a:hover{background:#f1f5f9}
   .acct-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:720px){.acct-grid{grid-template-columns:1fr}}
   .acct-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
@@ -1126,17 +1131,30 @@ function renderAuth(){
     const warn = AUTH.user.is_verified ? '' :
       `<button class="btn-auth" id="verifyBtn" style="background:rgba(234,179,8,.22);border-color:rgba(234,179,8,.5)">⚠️ Verificá tu correo</button>`;
     a.innerHTML = `${warn}
-      <button class="btn-auth" id="myAlertsBtn">🔔 Mis alertas</button>
-      <span>${escapeHtml(AUTH.user.email)} · <b>${tier}</b></span>
-      <button class="btn-auth" id="logoutBtn">Salir</button>`;
+      <div class="usermenu">
+        <button class="btn-auth" id="userBtn">👤 ${escapeHtml(AUTH.user.email)} · <b>${tier}</b> <span style="opacity:.7">▾</span></button>
+        <div class="usermenu-pop" id="userPop" hidden>
+          <a href="#" id="umCuenta">⚙️ Mi cuenta y configuración</a>
+          <a href="#" id="umAlerts">🔔 Mis alertas</a>
+          <a href="#" id="umLogout">↩ Cerrar sesión</a>
+        </div>
+      </div>`;
     if(!AUTH.user.is_verified) document.getElementById('verifyBtn').addEventListener('click', resendVerification);
-    document.getElementById('myAlertsBtn').addEventListener('click', openMyAlerts);
-    document.getElementById('logoutBtn').addEventListener('click', doLogout);
+    const pop = document.getElementById('userPop');
+    document.getElementById('userBtn').addEventListener('click', () => { pop.hidden = !pop.hidden; });
+    document.getElementById('umCuenta').addEventListener('click', e => { e.preventDefault(); pop.hidden = true; openCuenta(); });
+    document.getElementById('umAlerts').addEventListener('click', e => { e.preventDefault(); pop.hidden = true; openMyAlerts(); });
+    document.getElementById('umLogout').addEventListener('click', e => { e.preventDefault(); pop.hidden = true; doLogout(); });
   } else {
     a.innerHTML = `<button class="btn-auth" id="loginBtn">Iniciar sesión</button>`;
     document.getElementById('loginBtn').addEventListener('click', () => openAuth('login'));
   }
 }
+// Cierra el menú de usuario al hacer clic afuera.
+document.addEventListener('click', (e) => {
+  const pop = document.getElementById('userPop');
+  if(pop && !pop.hidden && !e.target.closest('.usermenu')) pop.hidden = true;
+});
 function openAuth(mode){
   AUTH.mode = mode;
   const login = mode === 'login';
