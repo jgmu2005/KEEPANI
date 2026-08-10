@@ -53,6 +53,11 @@
   <!-- Panel (admin) -->
   <div id="adminView" class="hidden">
     <div class="card">
+      <h2>📊 Estadísticas</h2>
+      <div id="statsBox"><div style="color:var(--muted)">Cargando…</div></div>
+    </div>
+
+    <div class="card">
       <h2>Ajustes del sitio</h2>
       <div id="setMsg" class="msg"></div>
       <label>Nombre del sitio</label><input id="site_name">
@@ -198,11 +203,42 @@ async function init(){
   try{ me = await api('auth/me.php'); }catch(e){ me = {user:null}; }
   if(me.user && me.user.is_admin){
     $('loginView').classList.add('hidden'); $('adminView').classList.remove('hidden');
-    loadSettings(); loadUsers(); loadDonations(); loadMatches(); loadMkStores();
+    loadStats(); loadSettings(); loadUsers(); loadDonations(); loadMatches(); loadMkStores();
   } else {
     $('adminView').classList.add('hidden'); $('loginView').classList.remove('hidden');
     if(me.user){ $('loginError').textContent = 'Esa cuenta no es administrador.'; $('loginError').style.display='block'; }
   }
+}
+
+// Estadísticas
+async function loadStats(){
+  const box = $('statsBox');
+  let j; try{ j = await api('admin/stats.php'); }catch(e){ box.innerHTML = '<div style="color:var(--muted)">Error al cargar.</div>'; return; }
+  if(!j.ok){ box.innerHTML = '<div style="color:var(--muted)">No disponible.</div>'; return; }
+  const num = n => n==null ? '—' : Number(n).toLocaleString('es-NI');
+  const tile = (k,v,sub) => `<div style="background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px">
+    <div style="font-size:.68rem;text-transform:uppercase;color:var(--muted);letter-spacing:.02em">${k}</div>
+    <div style="font-size:1.4rem;font-weight:800;line-height:1.2">${v}</div>${sub?`<div style="font-size:.72rem;color:var(--muted);margin-top:2px">${sub}</div>`:''}</div>`;
+  const u=j.users, a=j.alerts, c=j.catalog, w=j.walmart, us=j.usage, d=j.donations;
+  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">
+    ${tile('Usuarios', num(u.total), `${num(u.subscriber)} susc · ${num(u.onetime)} pago · ${num(u.free)} gratis`)}
+    ${tile('Nuevos (7d)', num(u.new_7d), `${num(u.verified)} verificados`)}
+    ${tile('Alertas activas', num(a.active), `${num(a.notif_7d)} avisos (7d)`)}
+    ${tile('Donaciones', num(d.total), `${num(d.d7)} en 7d`)}
+    ${tile('Productos', num(c.products), `${num(c.price_points)} puntos de precio`)}
+    ${tile('Comparaciones', num(c.groups), `${num(c.matches_pending)} matches pend.`)}
+    ${tile('Walmart', num(w.products), `${num(w.drops_7d)} liquidaciones (7d)`)}
+    ${tile('Vistas (30d)', num(us.views_web_30d + us.views_ext_30d), `${num(us.views_web_30d)} web · ${num(us.views_ext_30d)} extensión`)}
+  </div>`;
+  if(c.by_store && c.by_store.length){
+    html += `<h3 style="margin:18px 0 8px;font-size:.95rem">Catálogo por tienda</h3><div style="display:flex;flex-wrap:wrap;gap:6px">`
+      + c.by_store.map(s=>`<span style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:4px 10px;font-size:.8rem">${esc(s.name)}: <b>${num(s.n)}</b></span>`).join('') + `</div>`;
+  }
+  if(us.top_viewed && us.top_viewed.length){
+    html += `<h3 style="margin:18px 0 8px;font-size:.95rem">Más vistos (30 días)</h3><ol style="margin:0;padding-left:20px;font-size:.86rem;line-height:1.8">`
+      + us.top_viewed.map(t=>`<li>${esc(t.title||'')} <span style="color:var(--muted)">· ${esc(t.store)} · ${num(t.hits)} vistas</span></li>`).join('') + `</ol>`;
+  }
+  box.innerHTML = html;
 }
 
 // Revisión de comparaciones (matcher 2b)

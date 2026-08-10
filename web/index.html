@@ -876,7 +876,9 @@ async function openDetail(params, endpoint='history.php'){
   overlay.classList.add('open');
   detail.innerHTML = `<div class="spinner">${endpoint==='track.php'?'Buscando y rastreando el producto…':'Cargando historial…'}</div>`;
 
-  const qs = new URLSearchParams(params).toString();
+  const p = { ...params };
+  if(endpoint === 'history.php') p.src = 'web';   // cuenta la vista desde la web
+  const qs = new URLSearchParams(p).toString();
   let j;
   try{
     const r = await fetch(`${API}/${endpoint}?${qs}`);
@@ -1329,6 +1331,12 @@ function renderCuenta(j){
       </details>
       <div style="margin-top:14px"><a href="#" id="myAlertsLink">🔔 Ver mis alertas de precio →</a></div>
       <div style="margin-top:12px"><button class="btn-auth" id="cuentaLogout">Cerrar sesión</button></div>
+      <details class="pw" style="margin-top:14px"><summary style="color:var(--bad)">Eliminar mi cuenta</summary>
+        <p class="note" style="margin:8px 0">Esto borra tu cuenta y todas tus alertas. No se puede deshacer.</p>
+        <input type="password" id="delPw" placeholder="Confirmá tu contraseña" autocomplete="current-password">
+        <button class="btn-auth" id="delBtn" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b">Eliminar definitivamente</button>
+        <span id="delMsg" class="note"></span>
+      </details>
     </div>
     <div class="acct-card">
       <h3>🔔 Notificaciones</h3>
@@ -1344,6 +1352,18 @@ function renderCuenta(j){
   const ml = box.querySelector('#myAlertsLink'); if(ml) ml.addEventListener('click', e => { e.preventDefault(); openMyAlerts(); });
   const gp = box.querySelector('#goPlanes2'); if(gp) gp.addEventListener('click', e => { e.preventDefault(); openPlanes(); });
   const pb = box.querySelector('#pwBtn'); if(pb) pb.addEventListener('click', changePassword);
+  const db = box.querySelector('#delBtn'); if(db) db.addEventListener('click', deleteAccount);
+}
+async function deleteAccount(){
+  const pw = document.getElementById('delPw').value, msg = document.getElementById('delMsg');
+  if(!pw){ msg.textContent = 'Ingresá tu contraseña.'; return; }
+  if(!confirm('¿Seguro que querés eliminar tu cuenta? Esta acción no se puede deshacer.')) return;
+  msg.textContent = 'Eliminando…';
+  try{
+    const j = await (await fetch(`${API}/account/delete.php`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})})).json();
+    if(j.ok){ alert('Tu cuenta fue eliminada. ¡Gracias por usar Ojo al Precio!'); AUTH.user = null; location.href = '/'; }
+    else { msg.textContent = j.error || 'Error'; }
+  }catch(e){ msg.textContent = 'Error'; }
 }
 async function saveCuenta(){
   const cats = [...document.querySelectorAll('.cat-pref:checked')].map(c => c.value);

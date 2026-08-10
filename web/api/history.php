@@ -41,6 +41,15 @@ try {
         out(404, ['ok' => false, 'error' => 'Producto no encontrado o aún no rastreado']);
     }
 
+    // Cuenta la vista (web = tarjeta, ext = extensión). No debe romper la respuesta.
+    try {
+        $src = ($_GET['src'] ?? '') === 'ext' ? 'ext' : 'web';
+        Db::conn()->prepare(
+            'INSERT INTO product_hits (product_id, source, day, hits) VALUES (?, ?, CURDATE(), 1)
+             ON DUPLICATE KEY UPDATE hits = hits + 1'
+        )->execute([$id, $src]);
+    } catch (\Throwable $e) { /* tracking best-effort */ }
+
     $product = $repo->product($id);
     $history = $repo->history($id);
 

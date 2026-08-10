@@ -159,7 +159,7 @@
     const reqUrl = location.href;
     cur = { url: reqUrl, state: 'loading', j: null };
     paint();
-    fetch(API + '/history.php?url=' + encodeURIComponent(reqUrl))
+    fetch(API + '/history.php?src=ext&url=' + encodeURIComponent(reqUrl))
       .then(r => r.json())
       .then(j => { if (cur.url !== reqUrl) return; cur.j = j; cur.state = j.ok ? 'chart' : 'track'; paint(); })
       .catch(() => { if (cur.url === reqUrl) { cur.state = 'error'; paint(); } });
