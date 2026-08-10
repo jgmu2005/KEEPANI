@@ -60,7 +60,7 @@ final class CategoryClassifier
         'electro_pequeno' => ['licuadora','batidora','cafetera','freidora','air fryer','tostadora','sandwichera','plancha de ropa','aspiradora','olla arrocera','olla de presion','olla electrica','extractor de jugo','waflera',' grill'],
 
         'iluminacion'     => ['bombillo','bombilla',' foco','luminaria','lampara','reflector led','panel led','plafon','spot led',' spot ','tubo led','cinta led','riel de sobreponer','farol','candil','linterna','reflector','luz led',' led '],
-        'electrico'       => ['breaker','conduit','tomacorriente','toma corriente','interruptor','apagador','protector de voltaje','regulador de voltaje','extension electrica','multitoma','multicontacto','enchufe','tablero electrico','panel electrico','contactor','transformador','timbre','cable ','alambre electrico','caja electrica','canaleta','tubo emt','fotocelda','sensor de movimiento',' rele ','relevador','portalampara','porta lampara'],
+        'electrico'       => ['breaker','conduit','tomacorriente','toma corriente','interruptor','apagador','protector de voltaje','regulador de voltaje','extension electrica','multitoma','multicontacto','enchufe','tablero electrico','panel electrico','contactor','transformador','timbre','cable ','alambre electrico','caja electrica','canaleta','tubo emt','fotocelda','sensor de movimiento',' rele ','relevador','portalampara','porta lampara','coaxial','splitter','toma para','antena','conector rj','jack rj'],
         'plomeria'        => ['tuberia','tubo pvc','tubo cpvc',' pvc',' cpvc','codo ',' tee ','union lisa','union rosca','adaptador macho','adaptador hembra','tapon pvc','tapon hembra','tapon macho','niple','reduccion','valvula','llave de agua','llave angulo','llave de paso','llave de pase','llave ducha','llave para pantry','pantry','monomando','grifo','griferia','lavamano','lavamanos','lavatrastos','sanitario','inodoro','teflon','manguera','sifon','coladera','cisterna','tinaco','tanque para agua','tanque de agua','rotoplas','bomba de agua','bomba para agua','bomba para','presion de bomba',' bomba','purificador de agua','ducha','regadera','flotador','fluxometro','trampa p'],
         'herramientas'    => ['taladro','tenaza','prensa','sargento','escuadra','formon','serrucho','serucho','alicate','cuchilla','navaja','cortaperno','corta perno','corta pernos','destornillador','atornillador','martillo','mazo','sierra','serrote','esmeril','amoladora','pulidora','lijadora','disco de corte','disco corte',' broca','juego de broca','cincel','lima ','nivel de','cinta metrica','flexometro','llave inglesa','llave ajustable','llave allen','llave corona','llave combinada','llave de impacto','llave impacto','juego de llave','dado ',' pinza','gato hidraulico','soldadora','pistola de calor','pistola de silicon','remachadora','grapadora','tijera','tornillo de banco','morsa','engrapadora','carretilla','escalera','herramienta','sopladora','soplador','ahoyadora','neumatica','desarmador'],
         'pintura'         => ['pintura','pintar','brocha','rodillo','pincel','thinner','barniz','esmalte','laca',' spray','aerosol','espatula','lija de agua','sellador para','base coat','anticorrosivo'],
@@ -96,11 +96,28 @@ final class CategoryClassifier
         foreach (self::RULES as $key => $keywords) {
             foreach ($keywords as $kw) {
                 if (str_contains($t, $kw)) {
+                    // "para tv", toma/splitter/coaxial/soporte… son ACCESORIOS, no
+                    // televisores → saltamos el bucket TV y seguimos buscando.
+                    if ($key === 'tv' && self::isTvAccessory($t)) { continue 2; }
                     return $key;
                 }
             }
         }
         return null;
+    }
+
+    /** Marcadores de "accesorio para TV" (no es un televisor). */
+    private const TV_NOT = [
+        'para tv', 'toma para', 'toma tv', ' toma ', 'splitter', 'coaxial', 'soporte',
+        'mueble para tv', 'rack para tv', 'base para tv', 'antena', 'tv box', 'decodificador',
+        'convertidor', 'sintonizador', 'protector de pantalla', 'control remoto', 'cable ',
+    ];
+    private static function isTvAccessory(string $normTitle): bool
+    {
+        foreach (self::TV_NOT as $x) {
+            if (str_contains($normTitle, $x)) { return true; }
+        }
+        return false;
     }
 
     /**
