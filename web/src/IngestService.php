@@ -95,6 +95,7 @@ final class IngestService
         $brandNorm = Normalizer::brand($it['brand'] ?? null);
         $modelNorm = Normalizer::model($it['title'] ?? null);
         $catKey    = CategoryClassifier::classify($it['title'] ?? null, $brandNorm, $modelNorm);
+        $tvInches  = $catKey === 'tv' ? CategoryClassifier::tvInches($it['title'] ?? null) : null;
 
         if ($id !== false) {
             // COALESCE(nuevo, actual): solo sobrescribe si viene valor no nulo.
@@ -105,6 +106,7 @@ final class IngestService
                         brand_norm = COALESCE(?, brand_norm),
                         model_norm = COALESCE(?, model_norm),
                         cat_key = COALESCE(?, cat_key),
+                        tv_inches = COALESCE(?, tv_inches),
                         ean = COALESCE(?, ean),
                         image_url = COALESCE(?, image_url),
                         url = COALESCE(?, url),
@@ -118,6 +120,7 @@ final class IngestService
                 $brandNorm,
                 $modelNorm,
                 $catKey,
+                $tvInches,
                 $ean,
                 $it['image_url'] ?? null,
                 $it['url'] ?? null,
@@ -129,8 +132,8 @@ final class IngestService
         }
 
         $ins = $this->db->prepare(
-            'INSERT INTO products (store_id, external_sku, ean, category_external_id, url, title, brand, brand_norm, model_norm, cat_key, image_url, first_seen_at, last_seen_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO products (store_id, external_sku, ean, category_external_id, url, title, brand, brand_norm, model_norm, cat_key, tv_inches, image_url, first_seen_at, last_seen_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $ins->execute([
             $storeId,
@@ -143,6 +146,7 @@ final class IngestService
             $brandNorm,
             $modelNorm,
             $catKey,
+            $tvInches,
             $it['image_url'] ?? null,
             $capturedAt,
             $capturedAt,

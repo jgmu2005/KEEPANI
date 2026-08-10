@@ -103,6 +103,21 @@ final class CategoryClassifier
         return null;
     }
 
+    /**
+     * Pulgadas de pantalla de un TV, del título (NN", NN pulgadas, NN pulg).
+     * Devuelve null si no la dice (van al bucket "Otros"). Rango TV: 15–120".
+     */
+    public static function tvInches(?string $title): ?int
+    {
+        if ($title === null || $title === '') { return null; }
+        // "55\"", "55”", "55 pulgadas", "55pulg", "de 55 pulg"
+        if (preg_match('/(\d{2,3})\s*(?:"|”|″|\'\'|pulg|pulgadas)/iu', $title, $m)) {
+            $n = (int) $m[1];
+            if ($n >= 15 && $n <= 120) { return $n; }
+        }
+        return null;
+    }
+
     /** minúsculas sin acentos, no-alfanumérico → espacio (para matchear con ":", "/", etc.). */
     private static function norm(string $s): string
     {

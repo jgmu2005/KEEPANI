@@ -70,12 +70,13 @@ try {
          . ' ORDER BY id LIMIT ' . $limit . ' OFFSET ' . $offset;
     $rows = $db->query($sql)->fetchAll();
 
-    $upd = $db->prepare('UPDATE products SET cat_key = ? WHERE id = ?');
+    $upd = $db->prepare('UPDATE products SET cat_key = ?, tv_inches = ? WHERE id = ?');
     $counts = []; $classified = 0; $nulled = 0;
 
     foreach ($rows as $r) {
         $key = CategoryClassifier::classify($r['title'], $r['brand_norm'], $r['model_norm']);
-        $upd->execute([$key, (int) $r['id']]);
+        $tv  = $key === 'tv' ? CategoryClassifier::tvInches($r['title']) : null;
+        $upd->execute([$key, $tv, (int) $r['id']]);
         if ($key === null) { $nulled++; }
         else { $classified++; $counts[$key] = ($counts[$key] ?? 0) + 1; }
     }

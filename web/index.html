@@ -131,6 +131,8 @@
   .cat-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
   .cat-chips[hidden]{display:none}
   .cat-chips:empty{display:none}
+  .tv-chips{align-items:center;margin:-6px 0 14px;padding:8px 10px;background:#f8fafc;border:1px solid var(--line);border-radius:10px}
+  .tv-chips .tv-lbl{font-size:.8rem;font-weight:700;color:var(--muted);margin-right:2px}
   .chip{padding:6px 13px;border:1px solid var(--line);background:#fff;border-radius:999px;cursor:pointer;font-weight:600;font-size:.82rem;color:var(--ink);white-space:nowrap;transition:all .12s}
   .chip:hover{border-color:var(--brand);color:var(--brand-dk)}
   .chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
@@ -368,6 +370,7 @@
       <button id="catClear" class="cat-clear" type="button" style="display:none">✕ quitar</button>
     </div>
     <div id="catChips" class="cat-chips" hidden></div>
+    <div id="tvChips" class="cat-chips tv-chips" hidden></div>
     <div id="grid" class="grid"><div class="spinner">Cargando…</div></div>
     <div id="loadMoreWrap" style="text-align:center;margin-top:20px;display:none">
       <button id="loadMore" class="load-more">Ver más</button>
@@ -636,6 +639,8 @@ async function loadMoreComparador(){
 
 let storesLoaded = false;
 let CATSEL = ''; // bucket de categoría seleccionado (chip)
+let TVSEL  = ''; // tamaño de TV seleccionado (sub-chip, sólo si CATSEL==='tv')
+let TV_SIZES = [];
 
 function getFilters(){
   return {
@@ -643,11 +648,27 @@ function getFilters(){
     store:    document.getElementById('fstore').value,
     category: document.getElementById('fcategory').value,
     cat_key:  CATSEL,
+    tv_size:  CATSEL === 'tv' ? TVSEL : '',
     min:      document.getElementById('fmin').value,
     max:      document.getElementById('fmax').value,
     sort:     document.getElementById('fsort').value,
     in_stock: document.getElementById('fstock').checked ? '1' : '',
   };
+}
+
+// Sub-chips de tamaño de TV: se muestran sólo cuando "Televisores" está activo.
+function syncTvChips(){
+  const box = document.getElementById('tvChips');
+  if(CATSEL !== 'tv' || !TV_SIZES.length){ box.hidden = true; box.innerHTML = ''; TVSEL = ''; return; }
+  box.hidden = false;
+  box.innerHTML = '<span class="tv-lbl">Tamaño:</span>' + TV_SIZES.map(t =>
+    `<button class="chip${t.key === TVSEL ? ' on' : ''}" data-tv="${t.key}">${escapeHtml(t.label)} <small>${t.count}</small></button>`
+  ).join('');
+  box.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
+    TVSEL = (TVSEL === ch.dataset.tv) ? '' : ch.dataset.tv;
+    box.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x.dataset.tv === TVSEL));
+    PAGE.offset = 0; loadGrid();
+  }));
 }
 
 let CAT_LABELS = {}; // key -> etiqueta (para el indicador del botón)
@@ -673,6 +694,7 @@ async function loadCatChips(){
   try{
     const j = await (await fetch(`${API}/catbuckets.php`)).json();
     if(!j.ok || !j.categories.length){ box.innerHTML = ''; document.querySelector('.cat-toggle-row').style.display = 'none'; return; }
+    TV_SIZES = j.tv_sizes || [];
     CAT_LABELS = {}; j.categories.forEach(c => CAT_LABELS[c.key] = c.label);
     box.innerHTML = j.categories.map(c =>
       `<button class="chip${c.key === CATSEL ? ' on' : ''}" data-cat="${c.key}">${escapeHtml(c.label)} <small>${c.count}</small></button>`
@@ -682,6 +704,7 @@ async function loadCatChips(){
       box.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x.dataset.cat === CATSEL));
       updateCatToggle();
       setCatChipsOpen(false); // colapsa al elegir; el botón muestra la activa
+      syncTvChips();          // muestra/oculta los sub-chips de tamaño de TV
       PAGE.offset = 0;
       loadGrid();
     }));
@@ -692,9 +715,9 @@ document.getElementById('catToggle').addEventListener('click', () => {
   setCatChipsOpen(document.getElementById('catChips').hidden);
 });
 document.getElementById('catClear').addEventListener('click', () => {
-  CATSEL = '';
+  CATSEL = ''; TVSEL = '';
   document.querySelectorAll('#catChips .chip').forEach(x => x.classList.remove('on'));
-  updateCatToggle(); setCatChipsOpen(false);
+  updateCatToggle(); setCatChipsOpen(false); syncTvChips();
   PAGE.offset = 0; loadGrid();
 });
 
@@ -736,6 +759,7 @@ async function loadGrid(){
   if(f.store)    params.set('store', f.store);
   if(f.category) params.set('category', f.category);
   if(f.cat_key)  params.set('cat_key', f.cat_key);
+  if(f.tv_size)  params.set('tv_size', f.tv_size);
   if(f.min)      params.set('min', f.min);
   if(f.max)      params.set('max', f.max);
   if(f.in_stock) params.set('in_stock', f.in_stock);
@@ -783,6 +807,7 @@ async function loadMore(){
   if(f.store) params.set('store', f.store);
   if(f.category) params.set('category', f.category);
   if(f.cat_key) params.set('cat_key', f.cat_key);
+  if(f.tv_size) params.set('tv_size', f.tv_size);
   if(f.min) params.set('min', f.min);
   if(f.max) params.set('max', f.max);
   if(f.in_stock) params.set('in_stock', f.in_stock);
@@ -1042,8 +1067,9 @@ document.getElementById('fclear').addEventListener('click', () => {
   document.getElementById('fsort').value = 'name';
   document.getElementById('fstock').checked = true;
   const fc = document.getElementById('fcategory'); fc.value = ''; fc.style.display = 'none';
-  CATSEL = ''; document.querySelectorAll('#catChips .chip').forEach(x => x.classList.remove('on'));
+  CATSEL = ''; TVSEL = ''; document.querySelectorAll('#catChips .chip').forEach(x => x.classList.remove('on'));
   if(typeof updateCatToggle === 'function'){ updateCatToggle(); setCatChipsOpen(false); }
+  if(typeof syncTvChips === 'function') syncTvChips();
   applyFilters();
 });
 

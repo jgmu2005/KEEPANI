@@ -237,6 +237,40 @@ final class ProductRepository
         return $out;
     }
 
+    /**
+     * Conteo de TVs por rango de tamaño (para los sub-chips de "Televisores").
+     * Solo TVs con stock. @return array<int,array{key,label,count}> (los que tienen ≥1).
+     */
+    public function tvSizeBuckets(): array
+    {
+        $row = $this->db->query(
+            "SELECT
+                SUM(p.tv_inches <= 31)              AS s,
+                SUM(p.tv_inches BETWEEN 32 AND 40)  AS m,
+                SUM(p.tv_inches BETWEEN 41 AND 55)  AS l,
+                SUM(p.tv_inches >= 56)              AS xl,
+                SUM(p.tv_inches IS NULL)            AS na
+              FROM products p
+              JOIN price_history ph ON ph.id = (
+                    SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
+             WHERE p.is_active = 1 AND p.cat_key = 'tv' AND ph.in_stock = 1"
+        )->fetch() ?: [];
+
+        $labels = [
+            's'  => '📏 31\" o menos',
+            'm'  => '32–40\"',
+            'l'  => '41–55\"',
+            'xl' => '56\"+',
+            'na' => 'Otros',
+        ];
+        $out = [];
+        foreach ($labels as $k => $label) {
+            $n = (int) ($row[$k] ?? 0);
+            if ($n > 0) { $out[] = ['key' => $k, 'label' => $label, 'count' => $n]; }
+        }
+        return $out;
+    }
+
     /** Categorías de una tienda que tienen al menos un producto (para el filtro). */
     public function categoriesWithProducts(string $storeSlug): array
     {
@@ -294,6 +328,17 @@ final class ProductRepository
         if (!empty($f['cat_key'])) {
             $where[] = 'p.cat_key = :catkey';
             $params[':catkey'] = (string) $f['cat_key'];
+        }
+        // Filtro de tamaño de TV (pulgadas). 'na' = sin medida en el título.
+        $tvRange = [
+            's'  => 'p.tv_inches <= 31',
+            'm'  => 'p.tv_inches BETWEEN 32 AND 40',
+            'l'  => 'p.tv_inches BETWEEN 41 AND 55',
+            'xl' => 'p.tv_inches >= 56',
+            'na' => 'p.tv_inches IS NULL',
+        ];
+        if (!empty($f['tv_size']) && isset($tvRange[$f['tv_size']])) {
+            $where[] = $tvRange[$f['tv_size']];
         }
         $whereSql = implode(' AND ', $where);
 

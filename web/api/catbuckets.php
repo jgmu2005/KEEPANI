@@ -18,7 +18,7 @@ header('Access-Control-Allow-Origin: *');
 try {
     $repo = new ProductRepository(Db::conn());
     echo json_encode(
-        ['ok' => true, 'categories' => $repo->categoryBuckets()],
+        ['ok' => true, 'categories' => $repo->categoryBuckets(), 'tv_sizes' => $repo->tvSizeBuckets()],
         JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
     );
 } catch (\Throwable $e) {
