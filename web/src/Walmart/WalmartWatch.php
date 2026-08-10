@@ -133,4 +133,37 @@ final class WalmartWatch
 
         return ['total' => $total, 'items' => $items];
     }
+
+    /**
+     * Bajas nuevas (sin notificar) para el digest por email — en stock, recientes.
+     * @return array lista con id de wm_drops + datos del producto (mayor % primero).
+     */
+    public function pendingDrops(int $limit = 40): array
+    {
+        $limit = max(1, min($limit, 100));
+        $sql = 'SELECT d.id, p.title, p.brand, p.url, p.currency,
+                       d.old_price, d.new_price, d.ref_price, d.pct
+                  FROM wm_drops d
+                  JOIN wm_products p ON p.id = d.product_id
+                 WHERE d.notified_at IS NULL AND d.in_stock = 1
+                   AND d.detected_at >= DATE_SUB(NOW(), INTERVAL 3 DAY)
+                 ORDER BY d.pct DESC, d.id DESC
+                 LIMIT ' . $limit;
+        return $this->db->query($sql)->fetchAll();
+    }
+
+    /** Cuántas bajas sin notificar hay en total (para el "y N más"). */
+    public function pendingCount(): int
+    {
+        return (int) $this->db->query(
+            'SELECT COUNT(*) FROM wm_drops WHERE notified_at IS NULL AND in_stock = 1
+              AND detected_at >= DATE_SUB(NOW(), INTERVAL 3 DAY)'
+        )->fetchColumn();
+    }
+
+    /** Marca TODAS las bajas pendientes como notificadas (no re-enviar). */
+    public function markAllNotified(): int
+    {
+        return (int) $this->db->exec('UPDATE wm_drops SET notified_at = NOW() WHERE notified_at IS NULL');
+    }
 }

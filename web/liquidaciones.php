@@ -92,6 +92,7 @@ $mkUrl = static function (array $o = []) use ($base, $sort): string {
 <div class="wrap">
   <h1>🔥 Liquidaciones de Walmart</h1>
   <p class="lead">Productos de Walmart Nicaragua con <b>bajas de precio ≥30%</b> — las típicas de remate por bajo inventario. Se revisa el catálogo completo a diario.</p>
+  <p class="lead" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;color:#92400e">💎 Con la <a href="<?= $h($base) ?>/index.html#planes" style="color:#b45309;font-weight:700">suscripción mensual</a> te llegan estas liquidaciones <b>por email</b> apenas aparecen.</p>
 
   <div class="sortbar">
     <a href="<?= $h($mkUrl(['sort' => 'recent', 'page' => 1])) ?>" class="<?= $sort === 'recent' ? 'on' : '' ?>">🆕 Más recientes</a>
