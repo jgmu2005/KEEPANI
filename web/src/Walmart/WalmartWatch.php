@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace OjoAlPrecio\Web\Walmart;
 
 use PDO;
+use OjoAlPrecio\Web\CategoryClassifier;
 
 /**
  * "Cazaofertas Walmart" — detección de liquidaciones sobre el catálogo completo.
@@ -28,12 +29,12 @@ final class WalmartWatch
     {
         $sel = $this->db->prepare('SELECT id, price_current, price_ref FROM wm_products WHERE sku = ? LIMIT 1');
         $ins = $this->db->prepare(
-            'INSERT INTO wm_products (sku, title, brand, url, image_url, price_current, price_ref, in_stock, currency)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO wm_products (sku, title, brand, cat_key, url, image_url, price_current, price_ref, in_stock, currency)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $upd = $this->db->prepare(
             'UPDATE wm_products
-                SET title = COALESCE(?, title), brand = COALESCE(?, brand),
+                SET title = COALESCE(?, title), brand = COALESCE(?, brand), cat_key = COALESCE(?, cat_key),
                     url = COALESCE(?, url), image_url = COALESCE(?, image_url),
                     price_current = ?, price_ref = ?, in_stock = ?, currency = ?,
                     last_seen = NOW(), last_drop_at = ?
@@ -59,6 +60,7 @@ final class WalmartWatch
             $brand   = $it['brand']     ?? null;
             $url     = $it['url']       ?? null;
             $img     = $it['image_url'] ?? null;
+            $catKey  = CategoryClassifier::classify($title, null, null);
 
             $sel->execute([$sku]);
             $row = $sel->fetch();
@@ -67,7 +69,7 @@ final class WalmartWatch
             $refCand = max($list, $price);
 
             if (!$row) {
-                $ins->execute([$sku, $title, $brand, $url, $img, $price, $refCand, $inStock, $cur]);
+                $ins->execute([$sku, $title, $brand, $catKey, $url, $img, $price, $refCand, $inStock, $cur]);
                 $inserted++;
                 continue;
             }
@@ -82,7 +84,7 @@ final class WalmartWatch
                 $drop->execute([(int) $row['id'], $prev, $price, $newRef, round($pct * 100, 2), $inStock]);
                 $drops++;
             }
-            $upd->execute([$title, $brand, $url, $img, $price, $newRef, $inStock, $cur, $isDrop ? date('Y-m-d H:i:s') : null, (int) $row['id']]);
+            $upd->execute([$title, $brand, $catKey, $url, $img, $price, $newRef, $inStock, $cur, $isDrop ? date('Y-m-d H:i:s') : null, (int) $row['id']]);
         }
 
         return ['seen' => $seen, 'inserted' => $inserted, 'drops' => $drops];
@@ -141,7 +143,7 @@ final class WalmartWatch
     public function pendingDrops(int $limit = 40): array
     {
         $limit = max(1, min($limit, 100));
-        $sql = 'SELECT d.id, p.title, p.brand, p.url, p.currency,
+        $sql = 'SELECT d.id, p.title, p.brand, p.url, p.currency, p.cat_key,
                        d.old_price, d.new_price, d.ref_price, d.pct
                   FROM wm_drops d
                   JOIN wm_products p ON p.id = d.product_id

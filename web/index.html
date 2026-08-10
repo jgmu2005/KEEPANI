@@ -131,6 +131,22 @@
   .cat-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
   .cat-chips[hidden]{display:none}
   .cat-chips:empty{display:none}
+  .acct-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.acct-grid{grid-template-columns:1fr}}
+  .acct-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .acct-card h3{margin:0 0 12px;font-size:1.05rem}
+  .acct-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+  .acct-row span{color:var(--muted)}
+  .acct-warn{margin-top:10px;font-size:.82rem;color:#9a3412;background:#ffedd5;border-radius:8px;padding:8px 10px}
+  .acct-hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+  .pw{margin-top:12px;font-size:.9rem}
+  .pw summary{cursor:pointer;color:var(--brand-dk);font-weight:600}
+  .pw input{display:block;width:100%;margin:8px 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+  .cchk-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+  @media(max-width:480px){.cchk-grid{grid-template-columns:1fr}}
+  .cchk{display:flex;align-items:center;gap:7px;font-size:.85rem;cursor:pointer}
+  .switch-row{display:flex;align-items:flex-start;gap:9px;font-size:.9rem;cursor:pointer}
+  .lock-note{font-size:.82rem;color:var(--muted);margin-top:6px}
   .tv-chips{align-items:center;margin:-6px 0 14px;padding:8px 10px;background:#f8fafc;border:1px solid var(--line);border-radius:10px}
   .tv-chips .tv-lbl{font-size:.8rem;font-weight:700;color:var(--muted);margin-right:2px}
   .chip{padding:6px 13px;border:1px solid var(--line);background:#fff;border-radius:999px;cursor:pointer;font-weight:600;font-size:.82rem;color:var(--ink);white-space:nowrap;transition:all .12s}
@@ -264,6 +280,7 @@
       <a id="navPlanes" class="nav-premium">⭐ Hacete Premium</a>
       <a id="navCatalogo">📚 Catálogo completo</a>
       <a id="navSeguimientos">🔔 Mis seguimientos</a>
+      <a id="navCuenta">👤 Mi cuenta</a>
       <a href="ayuda.html">❓ Ayuda</a>
     </nav>
   </div>
@@ -330,6 +347,11 @@
     <p class="note" style="margin:-6px 0 14px">El sitio es gratis y sin publicidad. Si te sirve, podés apoyarlo con una donación y de paso rastrear más productos. No es un muro de pago: el plan gratis alcanza para la mayoría.</p>
     <div id="planesGrid" class="planes-grid"></div>
     <p id="planesHint" class="note" style="text-align:center;margin-top:14px"></p>
+  </section>
+
+  <section id="cuenta-section" style="display:none">
+    <h2>👤 Mi cuenta</h2>
+    <div id="cuentaBody"><div class="spinner">Cargando…</div></div>
   </section>
 
   <section id="catalogo">
@@ -1253,6 +1275,79 @@ window.addEventListener('popstate', () => {
   if (isPhonesRoute()) openComparador(undefined, 'phones');
   else if (CMP.kind === 'phones') openComparador(undefined, 'all');
 });
+// --- Mi cuenta (perfil + preferencias de notificaciones) ---
+async function openCuenta(){
+  if(!AUTH.user){ openAuth('login'); return; }
+  const sec = document.getElementById('cuenta-section');
+  const box = document.getElementById('cuentaBody');
+  sec.style.display = '';
+  box.innerHTML = '<div class="spinner">Cargando…</div>';
+  sec.scrollIntoView({ behavior:'smooth', block:'start' });
+  try{
+    const j = await (await fetch(`${API}/account/prefs.php`)).json();
+    if(!j.ok){ box.innerHTML = '<div class="empty">No se pudo cargar tu cuenta.</div>'; return; }
+    renderCuenta(j);
+  }catch(e){ box.innerHTML = '<div class="empty">No se pudo cargar. Intentá de nuevo.</div>'; }
+}
+function renderCuenta(j){
+  const box = document.getElementById('cuentaBody');
+  const isSub = j.tier === 'subscriber';
+  const cats = j.categories.map(c =>
+    `<label class="cchk"><input type="checkbox" class="cat-pref" value="${c.key}" ${j.notif_cats.includes(c.key)?'checked':''}> ${escapeHtml(c.label)}</label>`).join('');
+  const wm = isSub
+    ? `<label class="switch-row"><input type="checkbox" id="wmToggle" ${j.wm_alerts?'checked':''}> <span>Recibir <b>liquidaciones de Walmart</b> por email (bajas ≥30%)</span></label>`
+    : `<label class="switch-row" style="opacity:.55"><input type="checkbox" disabled> <span>Recibir <b>liquidaciones de Walmart</b> por email (bajas ≥30%)</span></label>
+       <div class="lock-note">🔒 Exclusivo de la <a href="#" id="goPlanes2">suscripción mensual</a>.</div>`;
+  box.innerHTML = `<div class="acct-grid">
+    <div class="acct-card">
+      <h3>Cuenta</h3>
+      <div class="acct-row"><span>Correo</span><b>${escapeHtml(j.email)}</b></div>
+      <div class="acct-row"><span>Nivel</span><b>${tierLabel(j.tier)}</b></div>
+      ${!j.is_verified ? '<div class="acct-warn">⚠️ Verificá tu correo para recibir alertas.</div>' : ''}
+      <details class="pw"><summary>Cambiar contraseña</summary>
+        <input type="password" id="pwCur" placeholder="Contraseña actual" autocomplete="current-password">
+        <input type="password" id="pwNew" placeholder="Nueva (mín. 8 caracteres)" autocomplete="new-password">
+        <button class="btn-auth" id="pwBtn">Cambiar</button> <span id="pwMsg" class="note"></span>
+      </details>
+      <div style="margin-top:14px"><a href="#" id="myAlertsLink">🔔 Ver mis alertas de precio →</a></div>
+      <div style="margin-top:12px"><button class="btn-auth" id="cuentaLogout">Cerrar sesión</button></div>
+    </div>
+    <div class="acct-card">
+      <h3>🔔 Notificaciones</h3>
+      <p class="note" style="margin:-4px 0 10px">Categorías que te interesan <b>(vacío = todas)</b>:</p>
+      <div class="cchk-grid">${cats}</div>
+      <hr class="acct-hr">
+      ${wm}
+      <div style="margin-top:16px"><button id="cuentaSave">Guardar preferencias</button> <span id="cuentaMsg" class="note"></span></div>
+    </div>
+  </div>`;
+  box.querySelector('#cuentaSave').addEventListener('click', saveCuenta);
+  box.querySelector('#cuentaLogout').addEventListener('click', doLogout);
+  const ml = box.querySelector('#myAlertsLink'); if(ml) ml.addEventListener('click', e => { e.preventDefault(); openMyAlerts(); });
+  const gp = box.querySelector('#goPlanes2'); if(gp) gp.addEventListener('click', e => { e.preventDefault(); openPlanes(); });
+  const pb = box.querySelector('#pwBtn'); if(pb) pb.addEventListener('click', changePassword);
+}
+async function saveCuenta(){
+  const cats = [...document.querySelectorAll('.cat-pref:checked')].map(c => c.value);
+  const wmEl = document.getElementById('wmToggle');
+  const payload = { notif_cats: cats };
+  if(wmEl) payload.wm_alerts = wmEl.checked;   // solo si es suscriptor (existe el toggle)
+  const msg = document.getElementById('cuentaMsg'); msg.textContent = 'Guardando…';
+  try{
+    const j = await (await fetch(`${API}/account/prefs.php`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})).json();
+    msg.textContent = j.ok ? 'Guardado ✔' : 'Error';
+  }catch(e){ msg.textContent = 'Error'; }
+}
+async function changePassword(){
+  const cur = document.getElementById('pwCur').value, nw = document.getElementById('pwNew').value, msg = document.getElementById('pwMsg');
+  msg.textContent = '…';
+  try{
+    const j = await (await fetch(`${API}/auth/change_password.php`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current:cur,new:nw})})).json();
+    msg.textContent = j.ok ? 'Cambiada ✔' : (j.error || 'Error');
+    if(j.ok){ document.getElementById('pwCur').value=''; document.getElementById('pwNew').value=''; }
+  }catch(e){ msg.textContent = 'Error'; }
+}
+document.getElementById('navCuenta').addEventListener('click', () => { AUTH.user ? openCuenta() : openAuth('login'); });
 document.getElementById('navSeguimientos').addEventListener('click', () => {
   AUTH.user ? openMyAlerts() : openAuth('login');
 });
