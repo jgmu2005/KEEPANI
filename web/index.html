@@ -876,9 +876,9 @@ async function openDetail(params, endpoint='history.php'){
   overlay.classList.add('open');
   detail.innerHTML = `<div class="spinner">${endpoint==='track.php'?'Buscando y rastreando el producto…':'Cargando historial…'}</div>`;
 
-  const p = { ...params };
-  if(endpoint === 'history.php') p.src = 'web';   // cuenta la vista desde la web
-  const qs = new URLSearchParams(p).toString();
+  const qp = { ...params };
+  if(endpoint === 'history.php') qp.src = 'web';   // cuenta la vista desde la web
+  const qs = new URLSearchParams(qp).toString();
   let j;
   try{
     const r = await fetch(`${API}/${endpoint}?${qs}`);
