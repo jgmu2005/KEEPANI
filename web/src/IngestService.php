@@ -196,9 +196,12 @@ final class IngestService
         if ($s === null) {
             return null;
         }
-        return function_exists('mb_scrub')
+        $s = function_exists('mb_scrub')
             ? mb_scrub($s, 'UTF-8')
             : (string) @mb_convert_encoding($s, 'UTF-8', 'UTF-8');
+        // Decodifica entidades HTML (Gallo OG trae &quot; &amp; &#39; …) para
+        // guardar texto limpio: mejor display y matcheo (ej. 43&quot; → 43").
+        return html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 
     /** Normaliza captured_at a 'Y-m-d H:i:s' UTC. */

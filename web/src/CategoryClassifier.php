@@ -110,6 +110,8 @@ final class CategoryClassifier
     public static function tvInches(?string $title): ?int
     {
         if ($title === null || $title === '') { return null; }
+        // Gallo (OG) guarda las comillas como &quot; → decodificamos entidades primero.
+        $title = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         // "55\"", "55”", "55 pulgadas", "55pulg", "de 55 pulg"
         if (preg_match('/(\d{2,3})\s*(?:"|”|″|\'\'|pulg|pulgadas)/iu', $title, $m)) {
             $n = (int) $m[1];
