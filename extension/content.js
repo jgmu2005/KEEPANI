@@ -93,7 +93,7 @@
       div.querySelector('#oap-track').textContent = 'Rastreando…';
       fetch(API + '/track.php?url=' + encodeURIComponent(location.href))
         .then(r => r.json())
-        .then(j => j.ok ? renderChart(div, j) : renderError(div))
+        .then(j => { if (j.ok) { cur.j = j; cur.state = 'chart'; renderChart(div, j); } else renderError(div); })
         .catch(() => renderError(div));
     });
   }
@@ -133,14 +133,6 @@
       + '</div>';
   }
 
-  function load(anchor) {
-    const div = mount(anchor, shell('<div class="oap-body oap-muted">Cargando historial…</div>'));
-    fetch(API + '/history.php?url=' + encodeURIComponent(location.href))
-      .then(r => r.json())
-      .then(j => j.ok ? renderChart(div, j) : renderTrack(div))
-      .catch(() => renderError(div));
-  }
-
   // Ancla del precio. En VTEX preferimos el precio PRINCIPAL (no el de un shelf
   // de "productos relacionados" que puede renderizar antes durante la hidratación).
   function getAnchor() {
@@ -150,18 +142,38 @@
         || all[0] || null;
   }
 
-  let processedUrl = '';
-  function tick() {
-    if (!isProduct()) { removeWidget(); processedUrl = ''; return; }
-    if (location.href === processedUrl) return;
+  // Estado del widget del producto actual. Guardamos los datos ya cargados para
+  // poder RE-MONTAR sin re-consultar la API cuando React (VTEX) borra el nodo.
+  let cur = { url: '', state: 'idle', j: null }; // state: loading|chart|track|error
+
+  function paint() {
     const anchor = getAnchor();
-    if (!anchor) return;                 // esperar a que el precio cargue
-    processedUrl = location.href;
-    load(anchor);
+    if (!anchor) return;
+    if (cur.state === 'loading')      mount(anchor, shell('<div class="oap-body oap-muted">Cargando historial…</div>'));
+    else if (cur.state === 'chart')   renderChart(mount(anchor, ''), cur.j);
+    else if (cur.state === 'track')   renderTrack(mount(anchor, ''));
+    else if (cur.state === 'error')   renderError(mount(anchor, ''));
   }
 
-  // SPAs (VTEX) cambian de producto sin recargar → observar + respaldo por intervalo.
+  function load() {
+    const reqUrl = location.href;
+    cur = { url: reqUrl, state: 'loading', j: null };
+    paint();
+    fetch(API + '/history.php?url=' + encodeURIComponent(reqUrl))
+      .then(r => r.json())
+      .then(j => { if (cur.url !== reqUrl) return; cur.j = j; cur.state = j.ok ? 'chart' : 'track'; paint(); })
+      .catch(() => { if (cur.url === reqUrl) { cur.state = 'error'; paint(); } });
+  }
+
+  function tick() {
+    if (!isProduct()) { removeWidget(); cur = { url: '', state: 'idle', j: null }; return; }
+    if (!getAnchor()) return;                                  // esperar a que el precio cargue
+    if (cur.url !== location.href) { load(); return; }         // producto nuevo → consultar
+    if (!document.getElementById('oap-widget')) { paint(); }   // React lo borró → re-montar (sin re-fetch)
+  }
+
+  // SPAs (VTEX) cambian de producto y re-renderizan sin recargar → observar + respaldo por intervalo.
   new MutationObserver(() => tick()).observe(document.documentElement, { childList: true, subtree: true });
-  setInterval(tick, 1500);
+  setInterval(tick, 1000);
   tick();
 })();
