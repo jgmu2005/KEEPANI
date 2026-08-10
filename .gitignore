@@ -9,3 +9,7 @@ vendor/
 *.log
 .DS_Store
 Thumbs.db
+
+# Artefactos de build de la extension
+ojo-al-precio-extension.zip
+extension/ojo-al-precio-extension.zip
