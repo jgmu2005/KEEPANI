@@ -129,10 +129,13 @@ final class MarketplaceRepo
      * Productos para la página pública, con precio actual + mín/máx histórico.
      * @return array{total:int, items:array}
      */
-    public function listProducts(?string $storeSlug, int $limit, int $offset, string $sort = 'recent'): array
+    public function listProducts(?string $storeSlug, int $limit, int $offset, string $sort = 'recent', bool $hideOutOfStock = true): array
     {
         $where  = 'p.is_active = 1 AND s.is_active = 1 AND p.price IS NOT NULL';
         $params = [];
+        if ($hideOutOfStock) {
+            $where .= ' AND p.in_stock = 1';
+        }
         if ($storeSlug) {
             $where .= ' AND s.slug = :slug';
             $params[':slug'] = $storeSlug;

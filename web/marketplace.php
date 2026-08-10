@@ -29,12 +29,13 @@ $fmt = static function (?float $v, string $cur = 'NIO'): string {
 
 $storeSlug = trim((string) ($_GET['store'] ?? '')) ?: null;
 $sort      = in_array($_GET['sort'] ?? '', ['price_asc', 'price_desc', 'name'], true) ? $_GET['sort'] : 'recent';
+$hideOos   = ($_GET['stock'] ?? '') !== 'all';   // por defecto: ocultar fuera de inventario
 $page      = max(1, (int) ($_GET['page'] ?? 1));
 $per       = 48;
 $offset    = ($page - 1) * $per;
 
 $stores = $repo->storeFilter();
-$res    = $repo->listProducts($storeSlug, $per, $offset, $sort);
+$res    = $repo->listProducts($storeSlug, $per, $offset, $sort, $hideOos);
 $items  = $res['items'];
 $total  = $res['total'];
 $pages  = max(1, (int) ceil($total / $per));
@@ -45,13 +46,15 @@ if ($storeSlug) {
 }
 
 // Construye una URL de /marketplace preservando tienda + orden (+ página).
-$mkUrl = static function (array $over = []) use ($base, $storeSlug, $sort): string {
-    $st = array_key_exists('store', $over) ? $over['store'] : $storeSlug;
-    $so = array_key_exists('sort',  $over) ? $over['sort']  : $sort;
-    $pg = $over['page'] ?? 1;
+$mkUrl = static function (array $over = []) use ($base, $storeSlug, $sort, $hideOos): string {
+    $st  = array_key_exists('store', $over) ? $over['store'] : $storeSlug;
+    $so  = array_key_exists('sort',  $over) ? $over['sort']  : $sort;
+    $stk = array_key_exists('stock', $over) ? $over['stock'] : ($hideOos ? 'hide' : 'all');
+    $pg  = $over['page'] ?? 1;
     $q = [];
     if ($st)                 { $q['store'] = $st; }
     if ($so && $so !== 'recent') { $q['sort'] = $so; }
+    if ($stk === 'all')      { $q['stock'] = 'all'; }
     if ($pg > 1)             { $q['page'] = $pg; }
     return $base . '/marketplace' . ($q ? '?' . http_build_query($q) : '');
 };
@@ -135,6 +138,7 @@ $pageUrl   = $base . '/marketplace' . ($storeSlug ? '?store=' . rawurlencode($st
     <?php foreach ($sortOpts as $k => $label): ?>
       <a href="<?= $h($mkUrl(['sort' => $k, 'page' => 1])) ?>" class="<?= $sort === $k ? 'on' : '' ?>"><?= $label ?></a>
     <?php endforeach; ?>
+    <a href="<?= $h($mkUrl(['stock' => $hideOos ? 'all' : 'hide', 'page' => 1])) ?>" class="<?= $hideOos ? 'on' : '' ?>" style="margin-left:auto"><?= $hideOos ? '✅' : '☐' ?> Ocultar agotados</a>
   </div>
 
   <?php if (!$items): ?>

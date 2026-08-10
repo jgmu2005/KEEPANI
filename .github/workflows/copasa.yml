@@ -1,0 +1,25 @@
+name: Crawl Copasa (electrodomésticos)
+
+# Enumera el catálogo de Copasa por sus listados paginados y baja precio/stock
+# de cada ficha (OG). Nombre = marca + modelo (Copasa no expone el nombre).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 9 * * *'   # diario 09:30 UTC (~3:30 AM Managua)
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+      - name: Crawl Copasa
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/crawl_copasa.php
