@@ -68,8 +68,13 @@
     const div = document.createElement('div');
     div.id = 'oap-widget';
     div.innerHTML = html;
+    // OJO VTEX: closest('[class*="sellingPrice"]') se devolvía a sí mismo (el
+    // span sellingPriceValue), inyectando el widget INLINE dentro del precio y
+    // clipeándolo. Subimos a un contenedor de bloque real del precio.
     const target = CONF.platform === 'vtex'
-      ? (anchor.closest('[class*="sellingPrice"]') || anchor.parentElement || anchor)
+      ? (anchor.closest('[class*="prices-container"]')
+         || anchor.closest('[class*="sellingPrice"]:not([class*="sellingPriceValue"])')
+         || anchor.parentElement || anchor)
       : anchor; // magento (.price-box), pricesmart (.sf-price), copasa (.name-product)
     target.parentNode.insertBefore(div, target.nextSibling);
     return div;
@@ -136,11 +141,20 @@
       .catch(() => renderError(div));
   }
 
+  // Ancla del precio. En VTEX preferimos el precio PRINCIPAL (no el de un shelf
+  // de "productos relacionados" que puede renderizar antes durante la hidratación).
+  function getAnchor() {
+    if (CONF.platform !== 'vtex') return document.querySelector(CONF.anchor);
+    const all = [...document.querySelectorAll('[class*="sellingPriceValue"]')];
+    return all.find(el => !el.closest('[class*="productSummary"], [class*="product-summary"], [class*="shelf"], [class*="Shelf"]'))
+        || all[0] || null;
+  }
+
   let processedUrl = '';
   function tick() {
     if (!isProduct()) { removeWidget(); processedUrl = ''; return; }
     if (location.href === processedUrl) return;
-    const anchor = document.querySelector(CONF.anchor);
+    const anchor = getAnchor();
     if (!anchor) return;                 // esperar a que el precio cargue
     processedUrl = location.href;
     load(anchor);
