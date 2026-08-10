@@ -88,16 +88,23 @@ if ($ingestUrl === '' || $ingestKey === '') { fail('Faltan OJO_INGEST_URL y/o OJ
 $http = new Http(UA);
 
 // --- 1) Enumerar SKUs ---
+// Copasa publica en la web SOLO lo que tiene con buen inventario (catálogo chico).
+// Barremos "Products" (destacados) + cada categoría de marca conocida, y dedup.
+$cats = array_merge(['Products'], BRANDS);
 $skus = [];
-for ($p = 1; $p <= MAX_PAGES; $p++) {
-    $html = getHtml(BASE . '/Catalog/Category/Catalog/Products/ALLBRANDS/0/0/0/' . $p);
-    if ($html === null) { break; }
-    preg_match_all('#/Product/Detail/([A-Za-z0-9_.\-]+)#', $html, $m);
-    $new = 0;
-    foreach ($m[1] as $sku) { if (!isset($skus[$sku])) { $skus[$sku] = true; $new++; } }
-    if ($new === 0) { break; } // página sin productos nuevos → fin
-    if ($p % 20 === 0) { line("  ...página $p · " . count($skus) . ' SKUs'); }
-    usleep(350000);
+foreach ($cats as $cat) {
+    $before = count($skus);
+    for ($p = 1; $p <= MAX_PAGES; $p++) {
+        $html = getHtml(BASE . '/Catalog/Category/Catalog/' . rawurlencode($cat) . '/ALLBRANDS/0/0/0/' . $p);
+        if ($html === null) { break; }
+        preg_match_all('#/Product/Detail/([A-Za-z0-9_.\-]+)#', $html, $m);
+        $new = 0;
+        foreach ($m[1] as $sku) { if (!isset($skus[$sku])) { $skus[$sku] = true; $new++; } }
+        if ($new === 0) { break; } // página sin productos nuevos → fin de esa categoría
+        usleep(300000);
+    }
+    $added = count($skus) - $before;
+    if ($added > 0) { line("  categoría $cat: +$added (total " . count($skus) . ')'); }
 }
 $skus = array_keys($skus);
 line('SKUs enumerados: ' . count($skus));
