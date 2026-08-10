@@ -41,6 +41,22 @@
 
 #oap-widget .oap-note { padding: 2px 12px 8px; font-size: 11px; color: #64748b; }
 
+#oap-widget .oap-badge-row { padding: 8px 12px 0; }
+#oap-widget .oap-deal {
+  display: inline-block; font-size: 11px; font-weight: 800;
+  padding: 3px 9px; border-radius: 999px;
+}
+#oap-widget .oap-deal-low  { color: #065f46; background: #d1fae5; }
+#oap-widget .oap-deal-fake { color: #9a3412; background: #ffedd5; }
+
+#oap-widget .oap-cmp-row { padding: 6px 12px 0; }
+#oap-widget .oap-cmp {
+  display: block; text-align: center; font-size: 12px; font-weight: 700;
+  color: #0369a1; background: #eff6ff; border: 1px solid #bfdbfe;
+  border-radius: 8px; padding: 8px; text-decoration: none;
+}
+#oap-widget .oap-cmp:hover { background: #dbeafe; }
+
 #oap-widget .oap-actions {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 10px 12px 12px; border-top: 1px solid #f1f5f9;

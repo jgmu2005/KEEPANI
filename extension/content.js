@@ -93,12 +93,26 @@
     });
   }
 
+  function dealBadge(deal) {
+    if (!deal) return '';
+    if (deal.verdict === 'low')  return '<span class="oap-deal oap-deal-low">🔥 Precio más bajo registrado</span>';
+    if (deal.verdict === 'fake') return '<span class="oap-deal oap-deal-fake">⚠️ Descuento poco fiable</span>';
+    return '';
+  }
+
   function renderChart(div, j) {
     const p = j.product, s = j.stats, h = j.history, cur = s.currency || 'NIO';
-    const link = SITE + '/?p=' + p.id;
+    const detail = SITE + '/?p=' + p.id;            // abre la ficha/alerta en el sitio
+    const page   = SITE + '/precio.php?id=' + p.id;  // página de historial (SEO)
+    const badge  = dealBadge(j.deal);
+    const cmp = (p.group_slug && p.group_stores >= 2)
+      ? '<div class="oap-cmp-row"><a class="oap-cmp" href="' + SITE + '/producto.php?slug=' + encodeURIComponent(p.group_slug)
+        + '" target="_blank" rel="noopener">⚖️ Comparar en ' + p.group_stores + ' tiendas ↗</a></div>'
+      : '';
     div.innerHTML =
       '<div class="oap-card">'
       + '<div class="oap-head"><span class="oap-logo">👁️ Ojo al Precio</span><span class="oap-store">' + esc(p.store_name || '') + '</span></div>'
+      + (badge ? '<div class="oap-badge-row">' + badge + '</div>' : '')
       + '<div class="oap-chart">' + sparkline(h.map(x => x.price_final)) + '</div>'
       + '<div class="oap-stats">'
       +   '<div><span>Actual</span><b>' + money(s.current, cur) + '</b></div>'
@@ -106,9 +120,10 @@
       +   '<div><span>Máximo</span><b class="oap-max">' + money(s.max, cur) + '</b></div>'
       + '</div>'
       + (h.length < 2 ? '<div class="oap-note">📅 Se necesitan más días para ver la tendencia.</div>' : '')
+      + cmp
       + '<div class="oap-actions">'
-      +   '<a class="oap-btn oap-primary" href="' + link + '" target="_blank" rel="noopener">🔔 Crear alerta</a>'
-      +   '<a class="oap-link" href="' + link + '" target="_blank" rel="noopener">Ver historial completo ↗</a>'
+      +   '<a class="oap-btn oap-primary" href="' + detail + '" target="_blank" rel="noopener">🔔 Trackear precio</a>'
+      +   '<a class="oap-link" href="' + page + '" target="_blank" rel="noopener">Ver historial ↗</a>'
       + '</div>'
       + '</div>';
   }

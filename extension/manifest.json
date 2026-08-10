@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Ojo al Precio",
-  "version": "0.2.0",
-  "description": "Muestra el historial de precios (Siman, Sinsa, Walmart, PriceSmart, El Gallo, La Curacao, RadioShack, Tropigas, Copasa) directo en la página del producto.",
+  "version": "0.3.0",
+  "description": "Historial de precios, comparación entre tiendas y alertas (Siman, Sinsa, Walmart, PriceSmart, El Gallo, La Curacao, RadioShack, Tropigas, Copasa) directo en la página del producto.",
   "content_scripts": [
     {
       "matches": [
@@ -31,8 +31,7 @@
     }
   ],
   "host_permissions": [
-    "https://ojoalprecio.online/*",
-    "https://agrotecnicaragua.com/*"
+    "https://ojoalprecio.online/*"
   ],
   "icons": {
     "16": "icons/icon-16.png",
