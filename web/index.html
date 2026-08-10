@@ -94,7 +94,7 @@
   .overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;
     align-items:flex-start;justify-content:center;padding:24px 16px;overflow:auto;z-index:50}
   .overlay.open{display:flex}
-  .panel{background:#fff;border-radius:16px;max-width:820px;width:100%;box-shadow:var(--shadow)}
+  .panel{background:#fff;border-radius:16px;max-width:820px;width:100%;box-shadow:var(--shadow);position:relative}
   .panel .head{display:flex;gap:16px;padding:20px;border-bottom:1px solid var(--line)}
   .panel .head img{width:96px;height:96px;object-fit:contain;background:#f8fafc;border-radius:10px;padding:6px;flex:none}
   .panel h3{margin:0 0 6px;font-size:1.1rem}
@@ -213,6 +213,8 @@
     /* Modal tipo "bottom sheet" con scroll interno. */
     .overlay{align-items:flex-end}
     .panel{border-radius:18px 18px 0 0;max-height:90vh;overflow-y:auto;width:100%}
+    /* La X: fija al viewport para que NO se pierda al scrollear la gráfica. */
+    .close{position:fixed;top:12px;right:12px;z-index:60;box-shadow:0 2px 10px rgba(15,23,42,.3)}
     .panel .head{padding:16px;gap:12px}
     .panel .head img{width:64px;height:64px}
     .panel h3{font-size:1rem}
