@@ -10,6 +10,7 @@ Esfuerzo: S (chico) · M (medio) · L (grande)
 ✅ Ya hecho: deploy de todo (SEO gate, marketplace, celulares, refresh) + ops (migraciones 027/028, Search Console + sitemap, crons, workflow marketplace, cron FatCow del marketplace de baja).
 
 ### A. Verificar / cabos sueltos 🔴 S
+- [ ] **Eliminar cuenta** (perfil): endpoint `api/account/delete.php` (requireUser + confirmar contraseña) que borra al usuario y sus datos (alerts, etc.) + botón en "Mi cuenta". Rápido y es buena práctica/requisito GDPR. **Prioridad alta.**
 - [ ] **Marketplace `tienda.treinta.co`** (multitiendaonlinemanagua): confirmar que el crawler nuevo le trae productos; si sigue trayendo pocos, darla de baja o dejarla como está.
 - [ ] Confirmar que el workflow de GitHub trajo los **catálogos completos** (ej. Rogama ~663) y que se ve bien en `/marketplace`.
 - [ ] **Ko-fi end-to-end** de nuevo (un pago + suscripción) tras todos los cambios → verificar auto-upgrade a onetime/subscriber.
@@ -37,10 +38,24 @@ Esfuerzo: S (chico) · M (medio) · L (grande)
 - [ ] **Empujar Premium**: ahora que `refresh_tracked` da valor real (6×/día), revisar que la landing/paywall lo comunique bien. (S)
 - [ ] Eventos en GA4 para medir conversión (clic en "Hacete Premium", crear alerta). (S)
 
+### E2. Perks para el suscriptor mensual (ideas priorizadas) 🟡🟢
+Hoy tiene: alertas ilimitadas · refresco 6×/día · liquidaciones Walmart por email.
+- [ ] **Alertas por WhatsApp** (además de email) — killer en NI donde WhatsApp manda. (M/L — requiere API WhatsApp/Twilio, tiene costo)
+- [ ] **Liquidaciones multi-tienda** — extender el cazaofertas ≥30% a Sinsa/Siman/etc. (subscriber ve el feed de todas). (M, reusa el patrón wm_*)
+- [ ] **Alertas instantáneas** vs digest — el suscriptor recibe apenas se detecta; free/onetime en resumen. (S)
+- [ ] **Reporte semanal personalizado** — "tus productos esta semana: X bajó, Y subió". (S/M)
+- [ ] **Señal "¿comprar o esperar?"** — indicador buy/wait por producto según su historial (perk exclusivo o más detallado). (M)
+- [ ] **Alerta por % / vs histórico** — "avisame si baja 20% del promedio", no solo precio fijo. (S)
+- [ ] **Export CSV / historial completo** del producto (free ve ventana corta). (S)
+- [ ] **Alerta de brecha entre tiendas** — "este producto está 30% más barato en otra tienda". (S, reusa comparador)
+
 ### F. Reliability / ops 🟢
 - [ ] Aviso si **falla un crawl** (notificación de GitHub Actions). (S)
 - [ ] **Backup** periódico de la BD. (S)
 - [ ] Retención/prune de `price_history` (~76k filas/día crecen rápido). (M, futuro)
+
+### G. Admin — panel de stats 🟡 (para cuando crezca)
+Endpoint `api/admin/stats.php` + sección en admin.html con: usuarios por nivel (free/onetime/subscriber) y nuevos por semana · alertas activas · notificaciones enviadas · donaciones/conversión · tamaño de catálogo por tienda y # de puntos de precio · productos más rastreados · liquidaciones detectadas · cola de matches pendientes · salud de crawls (última corrida por tienda). (M)
 
 ---
 
