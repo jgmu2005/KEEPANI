@@ -24,6 +24,9 @@
     # → precio.php?id={id} (server-rendered; los links internos usan URL absoluta).
     RewriteRule ^precio/([0-9]+)(/[^/]*)?$ precio.php?id=$1 [L,QSA]
 
+    # Cazaofertas Walmart (feed de liquidaciones) con URL propia.
+    RewriteRule ^liquidaciones$ liquidaciones.php [L,QSA]
+
     # Índice de sitemaps con nombre canónico.
     RewriteRule ^sitemap\.xml$ sitemap.php [L]
 

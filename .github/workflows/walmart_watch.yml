@@ -1,0 +1,26 @@
+name: Cazaofertas Walmart (liquidaciones)
+
+# Crawlea el catálogo COMPLETO de Walmart NI y registra sólo las bajas ≥30%
+# (subsistema aislado wm_*). No toca el tracker regular.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 13 * * *'   # diario 13:00 UTC (~7:00 AM Managua)
+    - cron: '0 23 * * *'   # y 23:00 UTC (~5:00 PM Managua) — 2×/día
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+      - name: Crawl Walmart completo
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/crawl_walmart_full.php

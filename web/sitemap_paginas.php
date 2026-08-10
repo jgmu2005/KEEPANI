@@ -16,6 +16,7 @@ $urls = [
     ['loc' => $base . '/',                   'freq' => 'daily',   'pri' => '1.0'],
     ['loc' => $base . '/compara-telefonos',  'freq' => 'daily',   'pri' => '0.9'],
     ['loc' => $base . '/marketplace',        'freq' => 'daily',   'pri' => '0.8'],
+    ['loc' => $base . '/liquidaciones',      'freq' => 'daily',   'pri' => '0.8'],
     ['loc' => $base . '/ayuda.html',         'freq' => 'monthly', 'pri' => '0.4'],
     ['loc' => $base . '/terminos.html',      'freq' => 'yearly',  'pri' => '0.2'],
 ];
