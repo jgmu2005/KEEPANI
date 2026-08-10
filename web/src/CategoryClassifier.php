@@ -92,6 +92,10 @@ final class CategoryClassifier
         if (str_contains($t, ' celular ') || str_contains($t, 'smartphone')) {
             return 'celulares';
         }
+        // Si dice "mueble" → Hogar, gane a cualquier otro bucket (ej. "mueble para TV").
+        if (str_contains($t, 'mueble')) {
+            return 'hogar';
+        }
 
         foreach (self::RULES as $key => $keywords) {
             foreach ($keywords as $kw) {
