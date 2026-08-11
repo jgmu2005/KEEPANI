@@ -2,6 +2,11 @@
 
 Contacto: **info@ojoalprecio.online** · Política: **https://ojoalprecio.online/privacidad.html**
 
+> ⚠️ **Rechazo "Keyword Spam" (ago-2026)**: Google marcó la lista de nombres de tiendas
+> en la descripción detallada como relleno de keywords. Solución: se quitó la lista y se
+> reemplazó por una frase genérica ("las principales tiendas… ver lista en el sitio").
+> El `manifest` no nombra tiendas (ya cumplía). Editar la descripción en el dashboard y reenviar.
+
 ---
 
 ## Ficha de la tienda (copiar/pegar)
@@ -23,15 +28,14 @@ Mirá el historial de precios, si es buen precio y en qué otras tiendas está �
 ```
 Ojo al Precio te muestra el historial de precios de un producto directo en la página de la tienda, para que sepas si el precio de hoy es bueno o no antes de comprar.
 
-Cuando entrás a un producto en una tienda soportada, aparece una tarjeta con:
+Cuando entrás a un producto en una tienda compatible, aparece una tarjeta con:
 • El precio actual, el más bajo y el más alto que registramos.
 • Un mini-gráfico de la tendencia del precio.
 • Un aviso si está en su precio más bajo, o si el "descuento" es poco fiable.
 • Un botón para comparar el mismo producto en otras tiendas.
 • La opción de crear una alerta y que te avisemos por correo cuando baje.
 
-Tiendas soportadas en Nicaragua:
-Sinsa, Siman, Walmart, PriceSmart, El Gallo más Gallo, La Curacao, RadioShack, Almacenes Tropigas y Copasa.
+Funciona en las principales tiendas de electrónica, hogar y electrodomésticos de Nicaragua. Podés ver la lista actualizada de tiendas compatibles en ojoalprecio.online.
 
 Privacidad: la extensión sólo lee la URL de la página de producto que estás viendo para traer su historial desde ojoalprecio.online. No recolecta datos personales, no rastrea tu navegación ni lee otras pestañas.
 
