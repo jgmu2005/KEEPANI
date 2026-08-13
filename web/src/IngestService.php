@@ -154,11 +154,24 @@ final class IngestService
         return (int) $this->db->lastInsertId();
     }
 
+    /** Precio "centinela" (Siman/Sinsa ponen 10.000.000 a lo que aún no tiene precio). */
+    private const SENTINEL_MIN = 1000000.0;
+
     /** Inserta la fila de precio del día. Devuelve true si fue nueva (no update por rerun). */
     private function insertPrice(int $productId, array $it): bool
     {
         $capturedAt = $this->capturedAt($it);
         $capturedDate = substr($capturedAt, 0, 10);
+
+        // Descarta el precio-centinela (no es un precio real): lo dejamos en null
+        // para no contaminar histórico ni generar falsos "-100%".
+        $pfin = isset($it['price_final']) && $it['price_final'] !== null ? (float) $it['price_final'] : null;
+        $pnat = isset($it['price_native']) && $it['price_native'] !== null ? (float) $it['price_native'] : null;
+        $lp   = isset($it['list_price'])  && $it['list_price']  !== null ? (float) $it['list_price']  : null;
+        $disc = $it['discount_pct'] ?? null;
+        if ($pfin !== null && $pfin >= self::SENTINEL_MIN) { $pfin = null; $pnat = null; }
+        if ($lp   !== null && $lp   >= self::SENTINEL_MIN) { $lp = null; $disc = null; }
+        if ($lp !== null && $pfin !== null && $lp <= $pfin) { $lp = null; $disc = null; } // lista no puede ser ≤ precio
 
         $sql = 'INSERT INTO price_history
                     (product_id, captured_date, captured_at, price_native, price_final,
@@ -178,10 +191,10 @@ final class IngestService
             ':pid'   => $productId,
             ':cdate' => $capturedDate,
             ':cat'   => $capturedAt,
-            ':pnat'  => $it['price_native'] ?? null,
-            ':pfin'  => $it['price_final']  ?? null,
-            ':lp'    => $it['list_price']   ?? null,
-            ':disc'  => $it['discount_pct'] ?? null,
+            ':pnat'  => $pnat,
+            ':pfin'  => $pfin,
+            ':lp'    => $lp,
+            ':disc'  => $disc,
             ':cur'   => $it['currency'] ?? 'NIO',
             ':stock' => !empty($it['in_stock']) ? 1 : 0,
         ]);
