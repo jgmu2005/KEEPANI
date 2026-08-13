@@ -117,15 +117,19 @@ final class ProductRepository
 
         // Delimitador ~ (no # ) porque el patrón contiene '#' dentro de [?#].
         $sku = match ($store['platform']) {
-            // VTEX: .../slug-del-producto-{ref-o-productId}/p
-            'vtex'    => (preg_match('~-(\d+)(?:/p)?/?(?:[?#].*)?$~', $url, $m) ? $m[1] : null),
+            // VTEX: .../slug-del-producto-{ref-o-productId}/p — el id debe tener ≥6
+            // dígitos (los de Sinsa/Siman tienen 9). Walmart usa URLs SOLO-slug sin id
+            // canónico, así que un token corto (…-163cm-7/p → "7") NO cuenta: devuelve
+            // null y el producto no rastreado se muestra como tal (evita colisiones).
+            'vtex'    => (preg_match('~-(\d{6,})(?:/p)?/?(?:[?#].*)?$~', $url, $m) ? $m[1] : null),
             // OG: Copasa (.../Product/Detail/{sku}), Gallo (.../slug-{id}) o Unicomer (.../slug-{id}/p)
             'og_meta' => (
                 preg_match('~/Product/Detail/([^/?#]+)~i', $url, $m) ? rawurldecode($m[1])
                     : (preg_match('~-(\d+)(?:/p)?/?(?:[?#].*)?$~', $url, $m2) ? $m2[1] : null)
             ),
-            // PriceSmart: .../es-ni/producto/{slug}/{pid} → el pid es el último número.
-            'bloomreach' => (preg_match('~/(\d+)/?(?:[?#].*)?$~', $url, $m) ? $m[1] : null),
+            // PriceSmart: .../es-ni/producto/{slug}-{pid}/{pid}-{ean} → el pid es el
+            // número al inicio del último segmento (antes del guion, si lo hay).
+            'bloomreach' => (preg_match('~/(\d+)(?:-\w+)?/?(?:[?#].*)?$~', $url, $m) ? $m[1] : null),
             default   => null,
         };
 
