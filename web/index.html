@@ -246,6 +246,17 @@
     .features-grid{grid-template-columns:1fr}
   }
   .usd{font-size:.78rem;color:var(--muted);margin-top:-1px}
+  /* Banner flotante de la extensión */
+  #extBanner{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(20px);z-index:200;
+    width:min(360px,calc(100vw - 24px));background:#fff;border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 12px 32px rgba(15,23,42,.22);padding:16px 16px 14px;text-align:center;opacity:0;transition:all .25s ease}
+  #extBanner.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #extBanner .eb-x{position:absolute;top:8px;right:10px;background:none;border:0;font-size:1.05rem;color:var(--muted);cursor:pointer;line-height:1}
+  #extBanner .eb-title{font-weight:800;font-size:.98rem;margin:2px 0 4px}
+  #extBanner .eb-sub{font-size:.82rem;color:var(--muted);margin:0 0 12px}
+  #extBanner .eb-btn{display:inline-block;background:var(--brand);color:#fff;font-weight:800;font-size:.9rem;padding:10px 20px;border-radius:9px;text-decoration:none}
+  #extBanner .eb-btn:hover{background:var(--brand-dk)}
+  #extBanner .eb-check{display:flex;align-items:center;justify-content:center;gap:7px;font-size:.8rem;color:var(--muted);margin-top:12px;cursor:pointer}
   .ext-btn{display:inline-block;margin-top:10px;background:var(--brand);color:#fff;font-weight:700;font-size:.86rem;padding:8px 14px;border-radius:8px;text-decoration:none}
   .ext-btn:hover{background:var(--brand-dk)}
   .topnav a.nav-ext{background:rgba(255,255,255,.12)}
@@ -1464,6 +1475,44 @@ checkAuth().then(() => {
 loadChanges();
 loadGrid();
 loadCatChips();
+
+// --- Banner flotante para instalar la extensión ---
+(function(){
+  const EXT_ID = 'moeikollgpcleldjkjogmeeeoglmncac';
+  const EXT_URL = 'https://chromewebstore.google.com/detail/ojo-al-precio/' + EXT_ID;
+  const WEEK = 7 * 24 * 3600 * 1000;
+  if (localStorage.getItem('oap_ext_dismissed') === '1') return;      // "ya la descargué" (permanente)
+
+  // Detección: si podemos cargar un recurso de la extensión, está instalada → no impulsar.
+  let installed = false;
+  const probe = new Image();
+  probe.onload = () => { installed = true; };
+  probe.src = 'chrome-extension://' + EXT_ID + '/icons/icon-16.png';
+
+  const last = +(localStorage.getItem('oap_ext_banner') || 0);
+  if (Date.now() - last < WEEK) return;                               // ya se mostró esta semana
+
+  function show(){
+    if (installed || localStorage.getItem('oap_ext_dismissed') === '1') return;
+    localStorage.setItem('oap_ext_banner', String(Date.now()));       // marca: 1×/semana
+    const el = document.createElement('div');
+    el.id = 'extBanner';
+    el.innerHTML = `<button class="eb-x" aria-label="Cerrar">✕</button>
+      <div class="eb-title">🧩 ¿Ya instalaste nuestra extensión?</div>
+      <div class="eb-sub">Mirá el historial de precios directo en la página del producto.</div>
+      <a class="eb-btn" href="${EXT_URL}" target="_blank" rel="noopener">➕ Instalar en Chrome</a>
+      <label class="eb-check"><input type="checkbox" id="ebDone"> Ya la descargué</label>`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    const close = () => { el.classList.remove('show'); setTimeout(() => el.remove(), 250); };
+    el.querySelector('.eb-x').addEventListener('click', close);
+    el.querySelector('#ebDone').addEventListener('change', (e) => {
+      if (e.target.checked) { localStorage.setItem('oap_ext_dismissed', '1'); close(); }
+    });
+    el.querySelector('.eb-btn').addEventListener('click', () => { localStorage.setItem('oap_ext_dismissed', '1'); });
+  }
+  setTimeout(show, 30000);                                            // a los 30 segundos
+})();
 </script>
 </body>
 </html>

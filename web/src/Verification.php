@@ -50,6 +50,10 @@ final class Verification
             . 'Tocá el botón para activar tu cuenta y poder crear alertas de precio:</p>'
             . '<p><a href="' . htmlspecialchars($url) . '" '
             . 'style="background:#0ea5e9;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;display:inline-block">Verificar mi correo</a></p>'
+            . '<div style="margin-top:22px;padding:14px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px">'
+            . '<p style="margin:0 0 8px;font-size:.9rem">🧩 <b>Tip:</b> instalá nuestra extensión de Chrome y mirá el historial de precios directo en la página del producto, mientras comprás.</p>'
+            . '<a href="https://chromewebstore.google.com/detail/ojo-al-precio/moeikollgpcleldjkjogmeeeoglmncac" '
+            . 'style="color:#0369a1;font-weight:700;text-decoration:none">➕ Instalar la extensión ↗</a></div>'
             . '<p style="color:#94a3b8;font-size:.8rem;margin-top:18px">Si no fuiste vos, ignorá este correo.</p></div>';
 
         $res = $mailer->send($email, 'Confirmá tu correo · ' . $site, $html);
