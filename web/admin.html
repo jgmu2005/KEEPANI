@@ -228,8 +228,18 @@ async function loadStats(){
     ${tile('Productos', num(c.products), `${num(c.price_points)} puntos de precio`)}
     ${tile('Comparaciones', num(c.groups), `${num(c.matches_pending)} matches pend.`)}
     ${tile('Walmart', num(w.products), `${num(w.drops_7d)} liquidaciones (7d)`)}
+    ${tile('Impresiones hoy', num(us.today.total), `${num(us.today.web)} web · ${num(us.today.ext)} ext`)}
     ${tile('Vistas (30d)', num(us.views_web_30d + us.views_ext_30d), `${num(us.views_web_30d)} web · ${num(us.views_ext_30d)} extensión`)}
   </div>`;
+  if(us.impressions_daily && us.impressions_daily.length){
+    const dd = us.impressions_daily, max = Math.max(1, ...dd.map(d=>d.total));
+    html += `<h3 style="margin:18px 0 8px;font-size:.95rem">Impresiones diarias (14 días)</h3>
+      <div style="display:flex;align-items:flex-end;gap:4px;height:100px">`
+      + dd.map(d=>`<div title="${d.day}: ${num(d.total)} impresiones (${num(d.web)} web, ${num(d.ext)} ext)" style="flex:1;background:#0ea5e9;border-radius:3px 3px 0 0;min-height:${d.total?2:0}px;height:${Math.round(d.total/max*100)}%"></div>`).join('')
+      + `</div><div style="display:flex;gap:4px;font-size:.6rem;color:var(--muted);margin-top:3px">`
+      + dd.map(d=>`<div style="flex:1;text-align:center">${d.day.slice(8)}</div>`).join('')
+      + `</div>`;
+  }
   if(c.by_store && c.by_store.length){
     html += `<h3 style="margin:18px 0 8px;font-size:.95rem">Catálogo por tienda</h3><div style="display:flex;flex-wrap:wrap;gap:6px">`
       + c.by_store.map(s=>`<span style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:4px 10px;font-size:.8rem">${esc(s.name)}: <b>${num(s.n)}</b></span>`).join('') + `</div>`;

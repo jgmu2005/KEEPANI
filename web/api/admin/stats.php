@@ -51,6 +51,20 @@ $topViewed = $rows(
       GROUP BY h.product_id ORDER BY hits DESC LIMIT 10"
 );
 
+// Impresiones diarias (últimos 14 días), separando web y extensión.
+$dailyRaw = [];
+foreach ($rows("SELECT day, source, SUM(hits) n FROM product_hits
+                 WHERE day >= DATE_SUB(CURDATE(), INTERVAL 13 DAY) GROUP BY day, source") as $r) {
+    $dailyRaw[$r['day']][$r['source']] = (int) $r['n'];
+}
+$impressionsDaily = [];
+for ($d = 13; $d >= 0; $d--) {
+    $day = date('Y-m-d', strtotime("-$d day"));
+    $web = $dailyRaw[$day]['web'] ?? 0;
+    $ext = $dailyRaw[$day]['ext'] ?? 0;
+    $impressionsDaily[] = ['day' => $day, 'web' => $web, 'ext' => $ext, 'total' => $web + $ext];
+}
+
 echo json_encode([
     'ok' => true,
     'users' => [
@@ -83,8 +97,10 @@ echo json_encode([
         'drops_7d'    => (int) ($one("SELECT COUNT(*) FROM wm_drops WHERE detected_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)") ?? 0),
     ],
     'usage' => [
-        'views_web_30d' => $hits30['web'] ?? 0,
-        'views_ext_30d' => $hits30['ext'] ?? 0,
-        'top_viewed'    => array_map(static fn($r) => ['title' => $r['title'], 'store' => $r['store'], 'hits' => (int) $r['hits']], $topViewed),
+        'views_web_30d'    => $hits30['web'] ?? 0,
+        'views_ext_30d'    => $hits30['ext'] ?? 0,
+        'today'            => end($impressionsDaily) ?: ['web' => 0, 'ext' => 0, 'total' => 0],
+        'impressions_daily'=> $impressionsDaily,
+        'top_viewed'       => array_map(static fn($r) => ['title' => $r['title'], 'store' => $r['store'], 'hits' => (int) $r['hits']], $topViewed),
     ],
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
