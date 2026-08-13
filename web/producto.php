@@ -296,7 +296,7 @@ if ($priced) {
         <?php if ($paypal !== ''): ?><a href="<?= $h($paypal) ?>" target="_blank" rel="noopener">💳 PayPal</a><?php endif; ?>
       </div>
     <?php endif; ?>
-    <p class="legal"><a href="index.html">Inicio</a> · <a href="ayuda.html">Ayuda</a> · <a href="terminos.html">Términos y privacidad</a></p>
+    <p class="legal"><a href="https://chromewebstore.google.com/detail/ojo-al-precio/moeikollgpcleldjkjogmeeeoglmncac" target="_blank" rel="noopener">🧩 Extensión de Chrome</a> · <a href="index.html">Inicio</a> · <a href="ayuda.html">Ayuda</a> · <a href="terminos.html">Términos y privacidad</a></p>
     <p>Precios referenciales, tomados de cada tienda. Verificá el precio final antes de comprar. · <?= $h($siteName) ?> 🇳🇮</p>
   </footer>
 </div>

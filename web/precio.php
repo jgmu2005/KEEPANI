@@ -256,7 +256,7 @@ $ldBreadcrumb = [
 
   <footer class="site-foot">
     <p>Precios referenciales tomados de <?= $h($p['store_name']) ?>. Verificá el precio final antes de comprar.</p>
-    <p><a href="<?= $h($base) ?>/index.html">Inicio</a> · <a href="<?= $h($base) ?>/ayuda.html">Ayuda</a> · <a href="<?= $h($base) ?>/terminos.html">Términos y privacidad</a> · <?= $h($siteName) ?> 🇳🇮</p>
+    <p><a href="https://chromewebstore.google.com/detail/ojo-al-precio/moeikollgpcleldjkjogmeeeoglmncac" target="_blank" rel="noopener">🧩 Extensión de Chrome</a> · <a href="<?= $h($base) ?>/index.html">Inicio</a> · <a href="<?= $h($base) ?>/ayuda.html">Ayuda</a> · <a href="<?= $h($base) ?>/terminos.html">Términos y privacidad</a> · <?= $h($siteName) ?> 🇳🇮</p>
   </footer>
 </div>
 </body>

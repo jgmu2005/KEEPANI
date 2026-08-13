@@ -246,7 +246,12 @@
     .features-grid{grid-template-columns:1fr}
   }
   .usd{font-size:.78rem;color:var(--muted);margin-top:-1px}
+  .ext-btn{display:inline-block;margin-top:10px;background:var(--brand);color:#fff;font-weight:700;font-size:.86rem;padding:8px 14px;border-radius:8px;text-decoration:none}
+  .ext-btn:hover{background:var(--brand-dk)}
+  .topnav a.nav-ext{background:rgba(255,255,255,.12)}
   footer{background:#0f172a;color:#94a3b8;padding:26px 0;text-align:center;font-size:.86rem}
+  footer .links{margin-top:8px}
+  footer .links a{color:#cbd5e1;font-weight:600;text-decoration:none;margin:0 6px}
   footer .donate{margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   footer .donate a{background:#1e293b;color:#e2e8f0;padding:8px 14px;border-radius:8px;font-weight:600}
   .spinner{text-align:center;color:var(--muted);padding:30px}
@@ -286,6 +291,7 @@
       <a id="navCatalogo">📚 Catálogo completo</a>
       <a id="navSeguimientos">🔔 Mis seguimientos</a>
       <a id="navCuenta">👤 Mi cuenta</a>
+      <a class="nav-ext" href="https://chromewebstore.google.com/detail/ojo-al-precio/moeikollgpcleldjkjogmeeeoglmncac" target="_blank" rel="noopener">🧩 Extensión</a>
       <a href="ayuda.html">❓ Ayuda</a>
     </nav>
   </div>
@@ -305,7 +311,8 @@
       </div>
       <div class="feature-card">
         <div class="fi">🧩</div><h3>Extensión de Chrome</h3>
-        <p>Mirá el historial de precios directo en la página del producto, justo debajo del precio. <a href="ayuda.html#extension" style="color:var(--brand-dk);font-weight:600">Ver cómo</a>.</p>
+        <p>Mirá el historial de precios directo en la página del producto, justo debajo del precio.</p>
+        <a class="ext-btn" href="https://chromewebstore.google.com/detail/ojo-al-precio/moeikollgpcleldjkjogmeeeoglmncac" target="_blank" rel="noopener">➕ Instalar en Chrome</a>
       </div>
     </div>
   </section>
@@ -444,7 +451,7 @@
       <a href="#" id="paypal" target="_blank" rel="noopener">💙 Donar (PayPal)</a>
     </div>
     <div class="legal-links" style="margin-top:12px;font-size:.82rem">
-      <a href="ayuda.html">Ayuda</a> · <a href="terminos.html">Términos y privacidad</a>
+      <a href="https://chromewebstore.google.com/detail/ojo-al-precio/moeikollgpcleldjkjogmeeeoglmncac" target="_blank" rel="noopener">🧩 Extensión de Chrome</a> · <a href="ayuda.html">Ayuda</a> · <a href="terminos.html">Términos y privacidad</a>
     </div>
   </div>
 </footer>

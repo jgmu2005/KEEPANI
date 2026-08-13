@@ -184,7 +184,7 @@ $pageUrl   = $base . '/marketplace' . ($storeSlug ? '?store=' . rawurlencode($st
   <div class="disc">ℹ️ El marketplace lista productos de tiendas locales de terceros (vía Treinta). Los precios y la disponibilidad los define cada tienda; verificá con ella antes de comprar. ¿Sos dueño de una tienda y no querés aparecer? Escribinos y la quitamos.</div>
 
   <footer class="site-foot">
-    <a href="<?= $h($base) ?>/index.html">Inicio</a> · <a href="<?= $h($base) ?>/ayuda.html">Ayuda</a> · <a href="<?= $h($base) ?>/terminos.html">Términos</a> · <?= $h($siteName) ?> 🇳🇮
+    <a href="https://chromewebstore.google.com/detail/ojo-al-precio/moeikollgpcleldjkjogmeeeoglmncac" target="_blank" rel="noopener">🧩 Extensión de Chrome</a> · <a href="<?= $h($base) ?>/index.html">Inicio</a> · <a href="<?= $h($base) ?>/ayuda.html">Ayuda</a> · <a href="<?= $h($base) ?>/terminos.html">Términos</a> · <?= $h($siteName) ?> 🇳🇮
   </footer>
 </div>
 </body>

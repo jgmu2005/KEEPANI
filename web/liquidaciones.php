@@ -133,7 +133,7 @@ $mkUrl = static function (array $o = []) use ($base, $sort): string {
   <div class="note">ℹ️ El "precio anterior" es el más alto que registramos para ese producto (su precio normal). Los precios son referenciales; verificá el precio final en Walmart antes de comprar.</div>
 
   <footer class="site-foot">
-    <a href="<?= $h($base) ?>/index.html">Inicio</a> · <a href="<?= $h($base) ?>/ayuda.html">Ayuda</a> · <?= $h($siteName) ?> 🇳🇮
+    <a href="https://chromewebstore.google.com/detail/ojo-al-precio/moeikollgpcleldjkjogmeeeoglmncac" target="_blank" rel="noopener">🧩 Extensión de Chrome</a> · <a href="<?= $h($base) ?>/index.html">Inicio</a> · <a href="<?= $h($base) ?>/ayuda.html">Ayuda</a> · <?= $h($siteName) ?> 🇳🇮
   </footer>
 </div>
 </body>
