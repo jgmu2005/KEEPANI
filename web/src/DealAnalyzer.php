@@ -42,13 +42,11 @@ final class DealAnalyzer
         $typ  = self::median($pts);
         $shows = $list !== null && $list > $price;
 
-        // 1) Está en (o muy cerca de) su mínimo registrado → buen precio.
-        if ($price <= $lo * 1.01) {
-            return self::result(
-                'low',
-                $price < $typ * 0.97 ? 'new_low' : 'at_low',
-                $typ, $list, $n
-            );
+        // 1) "Buen momento" SOLO si está por DEBAJO de su precio habitual (mediana).
+        //    Estar en el mínimo no alcanza: si el mínimo == el habitual (precio normal,
+        //    o el precio volvió a la normalidad tras un pico), NO es una oferta.
+        if ($price <= $lo * 1.01 && $price < $typ * 0.97) {
+            return self::result('low', 'new_low', $typ, $list, $n);
         }
 
         // 2) Oferta dudosa (solo si la tienda anuncia descuento y hay historia suficiente).
