@@ -43,18 +43,21 @@ $newByStore = $rows(
       WHERE p.first_seen_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
       GROUP BY s.id ORDER BY week DESC"
 );
-// Productos nuevos POR DÍA (últimos 14 días).
-$newRaw = [];
-foreach ($rows("SELECT DATE(first_seen_at) d, COUNT(*) n FROM products
-                 WHERE first_seen_at >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
-                 GROUP BY DATE(first_seen_at)") as $r) {
-    $newRaw[$r['d']] = (int) $r['n'];
+// Productos nuevos POR TIENDA y POR DÍA (últimos 14 días) — para el gráfico de líneas.
+$ndsRaw = [];
+foreach ($rows("SELECT s.name, DATE(p.first_seen_at) d, COUNT(*) n
+                  FROM products p JOIN stores s ON s.id = p.store_id
+                 WHERE p.first_seen_at >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
+                 GROUP BY s.id, DATE(p.first_seen_at)") as $r) {
+    $ndsRaw[$r['name']][$r['d']] = (int) $r['n'];
 }
-$newDaily = [];
-for ($d = 13; $d >= 0; $d--) {
-    $day = date('Y-m-d', strtotime("-$d day"));
-    $newDaily[] = ['day' => $day, 'n' => $newRaw[$day] ?? 0];
+$days = [];
+for ($d = 13; $d >= 0; $d--) { $days[] = date('Y-m-d', strtotime("-$d day")); }
+$newSeries = [];
+foreach ($ndsRaw as $store => $byDay) {
+    $newSeries[] = ['store' => $store, 'data' => array_map(static fn($day) => $byDay[$day] ?? 0, $days)];
 }
+$newDaily = ['days' => $days, 'stores' => $newSeries];
 
 // Puntos de precio: estimado rápido (evita COUNT(*) sobre millones de filas).
 $pricePoints = $one("SELECT table_rows FROM information_schema.tables

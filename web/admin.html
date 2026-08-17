@@ -187,6 +187,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 const API = './api';
 const PUB_KEYS = ['site_name','tagline','hero_text','logo_emoji','donate_kofi','donate_paypal','footer_note','limit_free','limit_onetime','usd_rate','ga_measurement_id','gsc_verification','seo_default_image','seo_indexable'];
@@ -244,13 +245,16 @@ async function loadStats(){
     html += `<h3 style="margin:18px 0 8px;font-size:.95rem">Catálogo por tienda</h3><div style="display:flex;flex-wrap:wrap;gap:6px">`
       + c.by_store.map(s=>`<span style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:4px 10px;font-size:.8rem">${esc(s.name)}: <b>${num(s.n)}</b></span>`).join('') + `</div>`;
   }
-  if(c.new_daily && c.new_daily.length){
-    const nd = c.new_daily, mx = Math.max(1, ...nd.map(d=>d.n));
-    html += `<h3 style="margin:18px 0 8px;font-size:.95rem">Productos nuevos por día (14 días)</h3>
-      <div style="display:flex;align-items:flex-end;gap:4px;height:90px">`
-      + nd.map(d=>`<div title="${d.day}: ${num(d.n)} nuevos" style="flex:1;background:#16a34a;border-radius:3px 3px 0 0;min-height:${d.n?2:0}px;height:${Math.round(d.n/mx*100)}%"></div>`).join('')
-      + `</div><div style="display:flex;gap:4px;font-size:.6rem;color:var(--muted);margin-top:3px">`
-      + nd.map(d=>`<div style="flex:1;text-align:center">${d.day.slice(8)}</div>`).join('') + `</div>`;
+  if(c.new_daily && c.new_daily.days && c.new_daily.days.length){
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:18px 0 6px">
+        <h3 style="margin:0;font-size:.95rem">Productos nuevos por tienda / día (14 días)</h3>
+        <label style="font-size:.75rem;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="ndLog" checked> escala comprimida (log)</label>
+      </div>
+      <div style="position:relative;height:260px"><canvas id="ndChart"></canvas></div>
+      <p style="font-size:.7rem;color:var(--muted);margin:6px 0 0;line-height:1.4">
+        Los primeros días incluyen la carga inicial del catálogo (miles de productos de golpe), por eso
+        con escala normal los días recientes parecen 0. La escala log deja ver ambos. Pasá el mouse para el número exacto por tienda.</p>`;
   }
   if(c.new_by_store && c.new_by_store.length){
     html += `<h3 style="margin:18px 0 8px;font-size:.95rem">Nuevos por tienda (hoy · 7 días)</h3><div style="display:flex;flex-wrap:wrap;gap:6px">`
@@ -261,6 +265,45 @@ async function loadStats(){
       + us.top_viewed.map(t=>`<li>${esc(t.title||'')} <span style="color:var(--muted)">· ${esc(t.store)} · ${num(t.hits)} vistas</span></li>`).join('') + `</ol>`;
   }
   box.innerHTML = html;
+  if(c.new_daily && c.new_daily.days) renderNdChart(c.new_daily);
+}
+
+let ndChartInst = null;
+const ND_COLORS = ['#16a34a','#0ea5e9','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16','#dc2626','#0891b2'];
+function renderNdChart(nd){
+  const cv = document.getElementById('ndChart');
+  if(!cv || !window.Chart) return;
+  const logEl = document.getElementById('ndLog');
+  const build = () => {
+    const useLog = logEl ? logEl.checked : true;
+    const ds = nd.stores.map((s,i)=>({
+      label: s.store,
+      // En log, 0 no existe: lo dejamos en null (hueco) para no romper la escala.
+      data: s.data.map(v => (useLog && v===0) ? null : v),
+      borderColor: ND_COLORS[i % ND_COLORS.length],
+      backgroundColor: ND_COLORS[i % ND_COLORS.length],
+      borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, tension: .25, spanGaps: true,
+    }));
+    if(ndChartInst) ndChartInst.destroy();
+    ndChartInst = new Chart(cv, {
+      type: 'line',
+      data: { labels: nd.days.map(d=>d.slice(5)), datasets: ds },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } },
+          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y==null?0:ctx.parsed.y} nuevos` } },
+        },
+        scales: {
+          y: { type: useLog ? 'logarithmic' : 'linear', beginAtZero: !useLog, ticks: { font: { size: 10 } } },
+          x: { ticks: { font: { size: 10 }, maxRotation: 0 } },
+        },
+      },
+    });
+  };
+  build();
+  if(logEl) logEl.onchange = build;
 }
 
 // Revisión de comparaciones (matcher 2b)
