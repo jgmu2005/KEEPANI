@@ -43,7 +43,23 @@ final class ProductRepository
             // 2) extraer tienda (por dominio) + sku (por plataforma) y buscar.
             [$slug, $extractedSku] = $this->parseUrl($url);
             if ($slug && $extractedSku) {
-                return $this->bySlugSku($slug, $extractedSku);
+                $byRef = $this->bySlugSku($slug, $extractedSku);
+                if ($byRef !== null) {
+                    return $byRef;
+                }
+                // 3) VTEX: la URL lleva el refId de UN SKU (talla/color), pero nosotros
+                //    guardamos el producto por su productId. Si la ficha muestra un SKU
+                //    distinto al que crawleamos, (1) y (2) fallan aunque SÍ lo rastreemos
+                //    (típico en Siman: la "Referencia" de la página ≠ la que guardamos).
+                //    Resolvemos refId→productId contra la API de la tienda (1 llamada,
+                //    sólo en este miss) y reintentamos por productId.
+                $pid = $this->vtexProductIdByRef($slug, $extractedSku);
+                if ($pid !== null && $pid !== $extractedSku) {
+                    $byPid = $this->bySlugSku($slug, $pid);
+                    if ($byPid !== null) {
+                        return $byPid;
+                    }
+                }
             }
         }
 
@@ -90,6 +106,48 @@ final class ProductRepository
         $st->execute([$slug, $sku]);
         $found = $st->fetchColumn();
         return $found !== false ? (int) $found : null;
+    }
+
+    /**
+     * VTEX: mapea el refId de un SKU (el número de la URL / la "Referencia" que
+     * muestra la ficha) al productId canónico, que es lo que guardamos en
+     * external_sku. Un producto con tallas/colores tiene varios refId pero un solo
+     * productId; la página puede mostrar cualquiera de ellos. Devuelve null si la
+     * tienda no es VTEX, no responde, o no hay match. Timeout corto: es un fallback
+     * en vivo dentro de la resolución, sólo cuando el match local ya falló.
+     */
+    private function vtexProductIdByRef(string $slug, string $refId): ?string
+    {
+        $store = $this->storeBySlug($slug);
+        if (!$store || (($store['platform'] ?? '') !== 'vtex')) {
+            return null;
+        }
+        $base = rtrim((string) $store['base_url'], '/');
+        $api  = $base . '/api/catalog_system/pub/products/search?fq=alternateIds_RefId:' . rawurlencode($refId);
+
+        $ch = curl_init($api);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 3,
+            CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_TIMEOUT        => 6,
+            CURLOPT_ENCODING       => '',
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; OjoAlPrecio/1.0)',
+            CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+        ]);
+        $body = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($body === false || $code < 200 || $code >= 300) {
+            return null;
+        }
+        $j = json_decode((string) $body, true);
+        if (!is_array($j) || !isset($j[0]['productId'])) {
+            return null;
+        }
+        return (string) $j[0]['productId'];
     }
 
     /** De una URL de producto deduce [slug_tienda, sku] según la plataforma. */
