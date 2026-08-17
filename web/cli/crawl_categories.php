@@ -86,16 +86,18 @@ function collectLeafPaths(array $nodes, array $prefix, array &$out): void
 
 /**
  * Crawlea una categoría (por su ruta) y envía sus productos.
+ * $extraFq: filtro VTEX adicional ya formateado, ej. '&fq=B:2000905' (marca),
+ *           para subdividir hojas que pasan el tope de 2.500.
  * @return array{sent:int, ok:bool, capped:bool}
  */
-function crawlCategory(array $path, array $ctx, array &$seen): array
+function crawlCategory(array $path, array $ctx, array &$seen, string $extraFq = ''): array
 {
     $catPath = implode('/', $path);
     $from = 0; $sent = 0; $ok = true; $capped = false;
 
     while ($from <= MAX_OFFSET) {
         $to  = $from + PAGE - 1;
-        $url = $ctx['base'] . '/api/catalog_system/pub/products/search?fq=C:/' . $catPath . '/&_from=' . $from . '&_to=' . $to;
+        $url = $ctx['base'] . '/api/catalog_system/pub/products/search?fq=C:/' . $catPath . '/' . $extraFq . '&_from=' . $from . '&_to=' . $to;
         $data = apiGet($url, $ctx['referer']);
         if ($data === null) { $ok = false; break; }
         if (count($data) === 0) { break; }
@@ -128,6 +130,53 @@ function crawlCategory(array $path, array $ctx, array &$seen): array
     }
 
     return ['sent' => $sent, 'ok' => $ok, 'capped' => $capped];
+}
+
+/** Clave normalizada de marca para casar facet↔brand/list (minúsculas, sin espacios extra). */
+function brandKey(string $name): string
+{
+    return mb_strtolower(trim(preg_replace('/\s+/', ' ', $name)), 'UTF-8');
+}
+
+/** Mapa nombre-normalizado => brandId de toda la tienda (una sola llamada). */
+function fetchBrandMap(array $ctx): array
+{
+    $list = apiGet($ctx['base'] . '/api/catalog_system/pub/brand/list', $ctx['referer']);
+    $map = [];
+    if (is_array($list)) {
+        foreach ($list as $b) {
+            $n = $b['name'] ?? null; $id = $b['id'] ?? null;
+            if ($n !== null && $id !== null) { $map[brandKey((string) $n)] = (int) $id; }
+        }
+    }
+    return $map;
+}
+
+/**
+ * Subdivide una hoja que pasó el tope: la recorre marca por marca (fq=B:{id}),
+ * porque ninguna marca dentro de una categoría suele pasar 2.500. Deduplica
+ * contra $seen (lo ya enviado por la pasada plana no se reenvía).
+ * @return array{sent:int, brands:int, unmapped:int, stillCapped:int}
+ */
+function crawlByBrand(array $path, array $ctx, array &$seen, array $brandMap): array
+{
+    $catPath = implode('/', $path);
+    $f = apiGet($ctx['base'] . '/api/catalog_system/pub/facets/search/*?map=c&fq=C:/' . $catPath . '/', $ctx['referer']);
+    $brands = (is_array($f) && !empty($f['Brands']) && is_array($f['Brands'])) ? $f['Brands'] : [];
+
+    $sent = 0; $done = 0; $unmapped = 0; $stillCapped = 0;
+    foreach ($brands as $b) {
+        $qty = (int) ($b['Quantity'] ?? 0);
+        if ($qty <= 0) { continue; }
+        $id = $brandMap[brandKey((string) ($b['Name'] ?? ''))] ?? null;
+        if ($id === null) { $unmapped += $qty; continue; } // marca sin id → se pierde (raro)
+        $r = crawlCategory($path, $ctx, $seen, '&fq=B:' . $id);
+        $sent += $r['sent'];
+        if ($r['capped']) { $stillCapped++; } // una marca >2.500 dentro de la categoría (rarísimo)
+        $done++;
+        usleep(250000);
+    }
+    return ['sent' => $sent, 'brands' => $done, 'unmapped' => $unmapped, 'stillCapped' => $stillCapped];
 }
 
 $ingestUrl = getenv('OJO_INGEST_URL') ?: '';
@@ -166,13 +215,26 @@ foreach ($targets as $slug) {
         line('  categorías hoja: ' . count($leaves));
     }
 
-    $sent = 0; $capped = 0; $seen = []; $failed = [];
+    $sent = 0; $capped = 0; $subdivided = 0; $unmapped = 0; $seen = []; $failed = [];
+    $brandMap = null; // se carga sólo si alguna hoja topa (una llamada por tienda)
 
     foreach ($leaves as $idx => $path) {
         $r = crawlCategory($path, $ctx, $seen);
         $sent += $r['sent'];
         if (!$r['ok'])   { $failed[] = $path; }
-        if ($r['capped']) { $capped++; }
+        if ($r['capped']) {
+            $capped++;
+            // Hoja con más de 2.500: rescatamos el resto subdividiendo por marca.
+            if ($brandMap === null) { $brandMap = fetchBrandMap($ctx); }
+            $sub = crawlByBrand($path, $ctx, $seen, $brandMap);
+            $sent += $sub['sent'];
+            $subdivided += $sub['sent'];
+            $unmapped   += $sub['unmapped'];
+            line('    ↳ C:/' . implode('/', $path) . '/ topó: +' . $sub['sent'] . ' por marca'
+                . ' (' . $sub['brands'] . ' marcas'
+                . ($sub['unmapped'] ? ', ' . $sub['unmapped'] . ' sin id' : '')
+                . ($sub['stillCapped'] ? ', ' . $sub['stillCapped'] . ' marcas aún al tope' : '') . ')');
+        }
         if (($idx + 1) % 50 === 0) {
             line('  ...' . ($idx + 1) . '/' . count($leaves) . ' categorías · ' . $sent . ' productos · ' . count($failed) . ' fallos');
         }
@@ -194,7 +256,8 @@ foreach ($targets as $slug) {
     }
 
     line("  ✔ $slug: $sent productos únicos"
-        . ($capped ? " ($capped categorías al tope 2500)" : '')
+        . ($capped ? " ($capped hojas topaban 2500 → +$subdivided rescatados por marca)" : '')
+        . ($unmapped ? " · $unmapped sin id de marca (perdidos)" : '')
         . ($failed ? ' · ' . count($failed) . ' categorías siguen fallando' : ''));
     $grand += $sent;
 }
