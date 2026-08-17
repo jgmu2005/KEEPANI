@@ -595,7 +595,14 @@ final class ProductRepository
     {
         $limit  = max(1, min($limit, 60));
         $offset = max(0, $offset);
-        $order  = $sort === 'rise' ? 'delta DESC' : 'delta ASC';
+        $isDrop = $sort !== 'rise';
+        $order  = $isDrop ? 'delta ASC' : 'delta DESC';
+
+        // Para BAJAS filtramos las "falsas ofertas" (volver a la normalidad tras un
+        // pico) contra la mediana del propio producto, así que traemos un pool más
+        // grande y paginamos en PHP tras filtrar. Para SUBAS no hace falta filtrar.
+        $poolLimit = $isDrop ? 300 : $limit;
+        $poolOff   = $isDrop ? 0 : $offset;
 
         $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
                        s.slug AS store, s.name AS store_name,
@@ -616,9 +623,26 @@ final class ProductRepository
                    AND cur.price_final <> prev.price_final AND prev.price_final > 0
                    AND cur.in_stock = 1
                  ORDER BY ' . $order . '
-                 LIMIT ' . $limit . ' OFFSET ' . $offset;
+                 LIMIT ' . $poolLimit . ' OFFSET ' . $poolOff;
 
-        return array_map([self::class, 'mapChange'], $this->db->query($sql)->fetchAll());
+        $rows = array_map([self::class, 'mapChange'], $this->db->query($sql)->fetchAll());
+
+        if ($isDrop) {
+            // Solo es descuento real si el precio actual está POR DEBAJO del habitual
+            // (mediana). Volver de un precio más alto al de siempre no es oferta.
+            $series = $this->priceSeries(array_map(static fn($r) => $r['id'], $rows), 45);
+            $rows = array_values(array_filter($rows, static function (array $r) use ($series): bool {
+                $prices = array_map(static fn($s) => (float) $s['p'], $series[$r['id']] ?? []);
+                if (count($prices) < 3) { return true; }   // sin historia suficiente → no filtramos
+                sort($prices);
+                $m = intdiv(count($prices), 2);
+                $median = count($prices) % 2 ? $prices[$m] : ($prices[$m - 1] + $prices[$m]) / 2;
+                return $median > 0 && $r['price_now'] < $median * 0.995;
+            }));
+            $rows = array_slice($rows, $offset, $limit);
+        }
+
+        return $rows;
     }
 
     /** La baja más fuerte de CADA tienda (1 por tienda) — para el home. */
