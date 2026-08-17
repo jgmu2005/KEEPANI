@@ -173,26 +173,9 @@ final class IngestService
         if ($lp   !== null && $lp   >= self::SENTINEL_MIN) { $lp = null; $disc = null; }
         if ($lp !== null && $pfin !== null && $lp <= $pfin) { $lp = null; $disc = null; } // lista no puede ser ≤ precio
 
-        // Guarda anti-pico: un precio que se dispara vs su HABITUAL (mediana de los
-        // últimos días) casi siempre es un error de la tienda (ej. 25.695 → 103.500).
-        // Al volver a la normalidad parecería un "descuento" falso, así que no lo
-        // registramos. Se usa la MEDIANA (robusta): un pico puntual no la mueve, pero
-        // una subida sostenida sí, así que un aumento real termina aceptándose.
-        if ($pfin !== null) {
-            $hs = $this->db->prepare(
-                'SELECT price_final FROM price_history
-                  WHERE product_id = ? AND price_final IS NOT NULL AND captured_date < ?
-                  ORDER BY captured_at DESC LIMIT 15'
-            );
-            $hs->execute([$productId, $capturedDate]);
-            $recent = array_map('floatval', $hs->fetchAll(\PDO::FETCH_COLUMN));
-            if (count($recent) >= 4) {
-                sort($recent);
-                $m = intdiv(count($recent), 2);
-                $median = count($recent) % 2 ? $recent[$m] : ($recent[$m - 1] + $recent[$m]) / 2;
-                if ($median > 0 && $pfin > $median * 3.5) { $pfin = null; $pnat = null; $lp = null; $disc = null; }
-            }
-        }
+        // Nota: los aumentos de precio (aunque sean picos) SÍ se guardan — son
+        // historial real. Que un precio alto no se muestre como "oferta" al volver
+        // a la normalidad se resuelve al leer (mediana), no borrando el dato.
 
         $sql = 'INSERT INTO price_history
                     (product_id, captured_date, captured_at, price_native, price_final,
