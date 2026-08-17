@@ -49,10 +49,15 @@ final class ProductRepository
                 }
                 // 3) VTEX: la URL lleva el refId de UN SKU (talla/color), pero nosotros
                 //    guardamos el producto por su productId. Si la ficha muestra un SKU
-                //    distinto al que crawleamos, (1) y (2) fallan aunque SÍ lo rastreemos
-                //    (típico en Siman: la "Referencia" de la página ≠ la que guardamos).
-                //    Resolvemos refId→productId contra la API de la tienda (1 llamada,
-                //    sólo en este miss) y reintentamos por productId.
+                //    distinto al que crawleamos, (1) y (2) fallan aunque SÍ lo rastreemos.
+                //    3a) Alias LOCAL refId→producto (poblado en cada ingesta): rápido y confiable.
+                $byAlias = $this->bySlugRefId($slug, $extractedSku);
+                if ($byAlias !== null) {
+                    return $byAlias;
+                }
+                // 3b) Puente EN VIVO refId→productId contra la API de la tienda. Sólo como
+                //     respaldo (mientras el crawl no pobló el alias, u on-demand); es una
+                //     llamada externa que puede fallar, por eso va de último.
                 $pid = $this->vtexProductIdByRef($slug, $extractedSku);
                 if ($pid !== null && $pid !== $extractedSku) {
                     $byPid = $this->bySlugSku($slug, $pid);
@@ -106,6 +111,31 @@ final class ProductRepository
         $st->execute([$slug, $sku]);
         $found = $st->fetchColumn();
         return $found !== false ? (int) $found : null;
+    }
+
+    /**
+     * Resuelve por refId de SKU usando el mapa local product_skus (poblado en cada
+     * ingesta desde VtexMapper). Es el camino rápido/confiable para productos VTEX
+     * con tallas/colores, cuya URL trae un refId distinto al productId guardado.
+     * Best-effort: si la tabla no existe todavía, devuelve null sin romper.
+     */
+    private function bySlugRefId(string $slug, string $refId): ?int
+    {
+        try {
+            $st = $this->db->prepare(
+                'SELECT ps.product_id
+                   FROM product_skus ps
+                   JOIN stores   s ON s.id = ps.store_id
+                   JOIN products p ON p.id = ps.product_id
+                  WHERE s.slug = ? AND ps.ref_id = ? AND p.is_active = 1
+                  LIMIT 1'
+            );
+            $st->execute([$slug, $refId]);
+            $found = $st->fetchColumn();
+            return $found !== false ? (int) $found : null;
+        } catch (\Throwable $e) {
+            return null; // product_skus aún no migrada
+        }
     }
 
     /**

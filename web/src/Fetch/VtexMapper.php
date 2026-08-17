@@ -45,6 +45,22 @@ final class VtexMapper
             }
         }
 
+        // refIds de TODOS los SKUs (+ productReference): son los números que aparecen
+        // en las URLs / la "Referencia" de la ficha. Los guardamos para resolver el
+        // producto por cualquiera de ellos (un producto con tallas tiene varios).
+        $refIds = [];
+        if (!empty($p['productReference'])) {
+            $refIds[] = (string) $p['productReference'];
+        }
+        foreach ($p['items'] ?? [] as $it) {
+            foreach ($it['referenceId'] ?? [] as $r) {
+                if (isset($r['Value']) && $r['Value'] !== '') {
+                    $refIds[] = (string) $r['Value'];
+                }
+            }
+        }
+        $refIds = array_values(array_unique($refIds));
+
         return new NormalizedProduct(
             storeSlug:   $slug,
             sku:         (string) $p['productId'],
@@ -60,6 +76,7 @@ final class VtexMapper
             listPrice:   $listPrice,
             categoryId:  isset($p['categoryId']) ? (int) $p['categoryId'] : null,
             ean:         $ean,
+            refIds:      $refIds,
         );
     }
 }

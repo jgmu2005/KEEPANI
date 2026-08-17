@@ -42,6 +42,11 @@ final class IngestService
                 $isNew     = $this->insertPrice($productId, $it);
 
                 $this->db->commit();
+
+                // Alias refId->producto (VTEX): best-effort, FUERA de la transacción para
+                // que un fallo (ej. tabla aún no migrada) nunca tumbe la ingesta del precio.
+                $this->insertSkuRefs((int) $stores[$slug], $productId, $it['ref_ids'] ?? []);
+
                 $isNew ? $inserted++ : $updated++;
             } catch (\Throwable $e) {
                 if ($this->db->inTransaction()) {
@@ -205,6 +210,34 @@ final class IngestService
 
         // rowCount()==1 => INSERT nuevo; ==2 => UPDATE por ON DUPLICATE KEY.
         return $stmt->rowCount() === 1;
+    }
+
+    /**
+     * Guarda los refId de los SKUs de un producto (VTEX) en product_skus para
+     * poder resolverlo por cualquiera de ellos. Best-effort: si la tabla no existe
+     * todavía o algún insert falla, se ignora (no debe afectar la ingesta).
+     * @param string[] $refs
+     */
+    private function insertSkuRefs(int $storeId, int $productId, array $refs): void
+    {
+        if (!$refs) {
+            return;
+        }
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO product_skus (store_id, ref_id, product_id) VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE product_id = VALUES(product_id)'
+            );
+            foreach ($refs as $r) {
+                $r = (string) $r;
+                if ($r === '') {
+                    continue;
+                }
+                $stmt->execute([$storeId, $r, $productId]);
+            }
+        } catch (\Throwable $e) {
+            // tabla no migrada o error puntual: ignorar (alias es un extra, no crítico).
+        }
     }
 
     /** Quita bytes UTF-8 inválidos (evita que json_encode devuelva false luego). */

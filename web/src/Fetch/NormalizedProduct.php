@@ -31,6 +31,8 @@ final class NormalizedProduct
         public string  $capturedAt = '',
         public ?int    $categoryId = null,
         public ?string $ean = null,
+        /** @var string[] refIds de TODOS los SKUs (VTEX): tallas/colores del mismo producto. */
+        public array   $refIds = [],
     ) {
         if ($this->capturedAt === '') {
             $this->capturedAt = gmdate('c');
@@ -82,6 +84,7 @@ final class NormalizedProduct
             'captured_at'  => $this->capturedAt,
             'category_id'  => $this->categoryId,
             'ean'          => $this->ean,
+            'ref_ids'      => $this->refIds,
         ];
     }
 }
