@@ -34,6 +34,28 @@ $byStore = $rows(
       WHERE p.is_active = 1 GROUP BY s.id ORDER BY n DESC"
 );
 
+// Productos NUEVOS por tienda (hoy y últimos 7 días) — según first_seen_at.
+$newByStore = $rows(
+    "SELECT s.name,
+            SUM(p.first_seen_at >= CURDATE()) AS today,
+            COUNT(*) AS week
+       FROM products p JOIN stores s ON s.id = p.store_id
+      WHERE p.first_seen_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      GROUP BY s.id ORDER BY week DESC"
+);
+// Productos nuevos POR DÍA (últimos 14 días).
+$newRaw = [];
+foreach ($rows("SELECT DATE(first_seen_at) d, COUNT(*) n FROM products
+                 WHERE first_seen_at >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
+                 GROUP BY DATE(first_seen_at)") as $r) {
+    $newRaw[$r['d']] = (int) $r['n'];
+}
+$newDaily = [];
+for ($d = 13; $d >= 0; $d--) {
+    $day = date('Y-m-d', strtotime("-$d day"));
+    $newDaily[] = ['day' => $day, 'n' => $newRaw[$day] ?? 0];
+}
+
 // Puntos de precio: estimado rápido (evita COUNT(*) sobre millones de filas).
 $pricePoints = $one("SELECT table_rows FROM information_schema.tables
                       WHERE table_schema = DATABASE() AND table_name = 'price_history'");
@@ -90,6 +112,8 @@ echo json_encode([
         'by_store'    => array_map(static fn($r) => ['name' => $r['name'], 'n' => (int) $r['n']], $byStore),
         'groups'      => (int) ($one("SELECT COUNT(*) FROM product_groups WHERE store_count >= 2") ?? 0),
         'matches_pending' => (int) ($one("SELECT COUNT(*) FROM match_review WHERE status = 'pending'") ?? 0),
+        'new_by_store'=> array_map(static fn($r) => ['name' => $r['name'], 'today' => (int) $r['today'], 'week' => (int) $r['week']], $newByStore),
+        'new_daily'   => $newDaily,
     ],
     'walmart' => [
         'products'    => (int) ($one("SELECT COUNT(*) FROM wm_products") ?? 0),
