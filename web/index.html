@@ -457,6 +457,9 @@
 <footer>
   <div class="wrap">
     <div id="footerNote">Hecho en Nicaragua 🇳🇮 · Los precios son referenciales y pueden variar. Verificá en la tienda antes de comprar.</div>
+    <div class="social" style="margin-top:14px">
+      <a href="https://whatsapp.com/channel/0029Vb8rtBl35fLzbo8lsb2b" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;padding:9px 18px;border-radius:999px;text-decoration:none;font-weight:700">🟢 Seguinos en WhatsApp — ofertas reales del día</a>
+    </div>
     <div class="donate">
       <a href="#" id="kofi" target="_blank" rel="noopener">☕ Apoyá el proyecto (Ko-fi)</a>
       <a href="#" id="paypal" target="_blank" rel="noopener">💙 Donar (PayPal)</a>
@@ -913,6 +916,13 @@ async function openDetail(params, endpoint='history.php'){
 
   const p = j.product, s = j.stats, h = j.history;
   const cur = s.currency || 'NIO';
+  // Enlace a compartir: el comparativo si está agrupado (más rico), si no su página SEO.
+  const permalink = (p.group_slug && p.group_stores >= 2)
+    ? `${location.origin}/producto.php?slug=${encodeURIComponent(p.group_slug)}`
+    : `${location.origin}/precio.php?id=${p.id}`;
+  const shareTxt = `💰 ${p.title || p.sku} — ${money(s.current, cur)} en Ojo al Precio`;
+  const waHref = `https://wa.me/?text=${encodeURIComponent(shareTxt + ' ' + permalink)}`;
+  const fbHref = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(permalink)}`;
   detail.innerHTML = `
     <div class="head">
       ${p.image_url ? `<img src="${p.image_url}" alt="">` : ''}
@@ -931,6 +941,12 @@ async function openDetail(params, endpoint='history.php'){
     ${p.tax_added ? `<div class="note" style="padding:2px 20px 0;color:var(--muted);font-size:.82rem">ℹ️ Precio con IVA estimado (+15%); en la tienda se muestra sin IVA (se suma en la caja).</div>` : ''}
     ${p.group_slug && p.group_stores >= 2 ? `<a class="compare-cta" href="producto.php?slug=${encodeURIComponent(p.group_slug)}" target="_blank" rel="noopener">⚖️ Comparar precio en ${p.group_stores} tiendas →</a>` : ''}
     ${dealSentence(j.deal, cur)}
+    <div class="share-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 20px 2px">
+      <span class="note" style="margin-right:2px">Compartir:</span>
+      <a href="${waHref}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#25D366;color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.85rem">🟢 WhatsApp</a>
+      <a href="${fbHref}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#1877F2;color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.85rem">🔵 Facebook</a>
+      <button type="button" onclick="navigator.clipboard.writeText('${permalink}').then(()=>{this.textContent='✅ ¡Copiado!';setTimeout(()=>this.textContent='🔗 Copiar enlace',1800)})" style="cursor:pointer;background:#eef2ff;color:#374151;border:1px solid #c7d2fe;padding:6px 12px;border-radius:8px;font-weight:600;font-size:.85rem">🔗 Copiar enlace</button>
+    </div>
     <div class="chart-box"><canvas id="chart" height="220"></canvas></div>
     ${h.length < 2 ? `<div class="note" style="padding:0 20px 4px">📅 Se necesitan más días de datos para ver la tendencia. Volvé pronto.</div>` : ''}
     <div class="alert-box" id="alertBox"></div>
