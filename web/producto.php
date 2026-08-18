@@ -81,6 +81,15 @@ $trackId  = (int) ($cheapest['id'] ?? ($offers[0]['id'] ?? 0)); // para deep-lin
 $storeCount = count(array_unique(array_map(static fn($o) => $o['store'], $priced)));
 $pageUrl = $base . '/producto.php?slug=' . rawurlencode((string) $g['slug']);
 
+// ¿Es el mismo producto en ≥2 tiendas de UNICOMER? (Tropigas, El Gallo, RadioShack,
+// La Curacao comparten catálogo; Unicomer les pone precio distinto y los rota).
+$unicomerSlugs = ['tropigas', 'gallo', 'radioshack', 'lacuracao'];
+$unicomerHere  = array_values(array_unique(array_filter(
+    array_map(static fn($o) => $o['store'], $priced),
+    static fn($slug) => in_array($slug, $unicomerSlugs, true)
+)));
+$sameChain = count($unicomerHere) >= 2;
+
 // Series por tienda para el gráfico + mínimos/máximos históricos.
 $ids        = array_map(static fn($o) => $o['id'], $priced);
 $seriesById = $repo->priceSeries($ids, 90);
@@ -179,6 +188,7 @@ if ($priced) {
   .old{color:var(--muted);text-decoration:line-through;font-size:.82rem;font-weight:500;margin-left:6px}
   .taxest{display:block;color:var(--muted);font-size:.66rem;font-weight:600}
   .taxnote{margin-top:10px;font-size:.8rem;color:var(--muted);background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+  .samechain{margin:2px 0 14px;font-size:.9rem;line-height:1.5;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:11px 14px}
   .usd{color:var(--muted);font-size:.72rem}
   .cheap{background:#f0fdf4}
   .tag{display:inline-block;font-size:.64rem;font-weight:800;color:#065f46;background:#d1fae5;padding:2px 7px;border-radius:999px;margin-left:6px}
@@ -247,6 +257,11 @@ if ($priced) {
   </div>
 
   <h2>Comparación de precios</h2>
+  <?php if ($sameChain): ?>
+    <div class="samechain">
+      ⚠️ <b>Es la misma empresa.</b> Almacenes Tropigas, El Gallo más Gallo, RadioShack y La Curacao son la <b>misma cadena (Unicomer)</b>: el mismo producto con precio distinto según la tienda. Comprá en la más barata 👇
+    </div>
+  <?php endif; ?>
   <table>
     <thead><tr>
       <th>Tienda</th><th>Precio</th><th class="h-usd c-usd">USD</th><th>Estado</th><th></th>
