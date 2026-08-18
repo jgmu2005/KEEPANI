@@ -44,7 +44,7 @@ if ($expected === '' || !is_string($sent) || !hash_equals($expected, $sent)) {
 $rows = $db->query(
     "SELECT id, store_id, brand, brand_norm, model_norm, title, image_url
        FROM products
-      WHERE is_active = 1 AND model_norm IS NOT NULL
+      WHERE is_active = 1 AND model_norm IS NOT NULL AND group_locked = 0
         AND brand_norm IN ('apple','samsung','xiaomi','honor','huawei','motorola',
                            'tecno','infinix','oppo','realme','zte','nokia','itel','alcatel','google')"
 )->fetchAll();

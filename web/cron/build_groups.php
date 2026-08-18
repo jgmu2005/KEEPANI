@@ -52,7 +52,7 @@ $UNI = "SELECT CONCAT('uni:', p.external_sku) AS match_key,
           FROM products p
           JOIN stores s ON s.id = p.store_id
          WHERE s.slug IN ('lacuracao','radioshack','tropigas')
-           AND p.is_active = 1 AND p.external_sku <> ''
+           AND p.is_active = 1 AND p.external_sku <> '' AND p.group_locked = 0
          GROUP BY p.external_sku
         HAVING COUNT(DISTINCT p.store_id) >= 2";
 
@@ -61,7 +61,7 @@ $EAN = "SELECT CONCAT('ean:', p.ean) AS match_key,
                MAX(p.title) AS title, MAX(p.brand) AS brand, MAX(p.image_url) AS image_url,
                GROUP_CONCAT(p.id) AS ids
           FROM products p
-         WHERE p.ean IS NOT NULL AND p.ean <> '' AND p.is_active = 1
+         WHERE p.ean IS NOT NULL AND p.ean <> '' AND p.is_active = 1 AND p.group_locked = 0
          GROUP BY p.ean
         HAVING COUNT(DISTINCT p.store_id) >= 2";
 

@@ -17,11 +17,21 @@ use OjoAlPrecio\Web\Settings;
 use OjoAlPrecio\Web\Verification;
 use OjoAlPrecio\Web\Seo;
 use OjoAlPrecio\Web\PriceChart;
+use OjoAlPrecio\Web\Auth;
 
 $slug = isset($_GET['slug']) ? trim((string) $_GET['slug']) : '';
 $db   = Db::conn();
 $repo = new ProductRepository($db);
 $data = $slug !== '' ? $repo->groupBySlug($slug) : null;
+
+// Panel de edición manual: sólo para el admin. Sólo consultamos la sesión si ya
+// hay cookie — así un visitante anónimo (o Googlebot) no arranca sesión en esta
+// página SEO ni recibe Set-Cookie.
+$isAdmin = false;
+if (isset($_COOKIE[session_name()])) {
+    $me = Auth::currentUser($db);
+    $isAdmin = $me !== null && !empty($me['is_admin']);
+}
 
 $settings = Settings::all($db);
 $siteName = $settings['site_name'] ?? 'Ojo al Precio';
@@ -189,6 +199,21 @@ if ($priced) {
   .taxest{display:block;color:var(--muted);font-size:.66rem;font-weight:600}
   .taxnote{margin-top:10px;font-size:.8rem;color:var(--muted);background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
   .samechain{margin:2px 0 14px;font-size:.9rem;line-height:1.5;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:11px 14px}
+  .admin-edit{margin-top:28px;background:var(--card);border:2px dashed #93c5fd;border-radius:14px;padding:18px 18px 20px}
+  .admin-edit h2{margin:0 0 4px}
+  .admin-badge{font-size:.6rem;font-weight:800;color:#1e40af;background:#dbeafe;padding:3px 8px;border-radius:999px;vertical-align:middle;margin-left:6px}
+  .ae-help{font-size:.84rem;color:var(--muted);margin:0 0 14px;line-height:1.5}
+  .ae-h3{font-size:.9rem;margin:16px 0 8px}
+  .ae-row{display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--line)}
+  .ae-row img{width:38px;height:38px;object-fit:contain;background:#f8fafc;border-radius:6px;flex:none}
+  .ae-info{flex:1;min-width:0;font-size:.85rem;overflow:hidden;text-overflow:ellipsis}
+  .ae-ingroup{color:#b45309;font-weight:700}
+  .admin-edit button{cursor:pointer;border:0;border-radius:8px;font-weight:700;font-size:.8rem;padding:6px 12px;flex:none}
+  .ae-remove{background:#fee2e2;color:#b91c1c}
+  .ae-add{background:#dcfce7;color:#166534}
+  .admin-edit input[type=search]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:.9rem;background:var(--card);color:inherit}
+  #aeResults{margin-top:4px}
+  .ae-msg{margin-top:10px;font-size:.85rem;color:#b91c1c}
   .usd{color:var(--muted);font-size:.72rem}
   .cheap{background:#f0fdf4}
   .tag{display:inline-block;font-size:.64rem;font-weight:800;color:#065f46;background:#d1fae5;padding:2px 7px;border-radius:999px;margin-left:6px}
@@ -302,6 +327,29 @@ if ($priced) {
     <div class="nodata">📅 Necesitamos algunos días más de datos para dibujar la tendencia. Volvé pronto.</div>
   <?php endif; ?>
 
+  <?php if ($isAdmin): ?>
+  <section class="admin-edit" id="adminEdit" data-slug="<?= $h($g['slug']) ?>">
+    <h2>🔧 Editar comparativo <span class="admin-badge">solo admin</span></h2>
+    <p class="ae-help">Agregá o quitá productos de esta comparación. Los cambios quedan <b>fijos</b> (el matcher automático ya no los toca). Si agregás un producto que ya está en otro comparativo, podés <b>traer todos</b> sus productos.</p>
+
+    <h3 class="ae-h3">En este comparativo (<?= count($offers) ?>)</h3>
+    <div id="aeMembers">
+      <?php foreach ($offers as $o): ?>
+        <div class="ae-row">
+          <?php if (!empty($o['image_url'])): ?><img src="<?= $h($o['image_url']) ?>" alt=""><?php endif; ?>
+          <div class="ae-info"><b><?= $h($o['store_name']) ?></b> · <?= $h($o['title']) ?></div>
+          <button class="ae-remove" data-id="<?= (int) $o['id'] ?>">Quitar ✕</button>
+        </div>
+      <?php endforeach; ?>
+    </div>
+
+    <h3 class="ae-h3">Agregar producto</h3>
+    <input type="search" id="aeSearch" placeholder="Buscar por nombre… (mín. 2 letras)" autocomplete="off">
+    <div id="aeResults"></div>
+    <div id="aeMsg" class="ae-msg"></div>
+  </section>
+  <?php endif; ?>
+
   <footer class="site-foot">
     <?php if ($footerNote !== ''): ?><p><?= $h($footerNote) ?></p><?php endif; ?>
     <?php if ($kofi !== '' || $paypal !== ''): ?>
@@ -316,5 +364,61 @@ if ($priced) {
     <p>Precios referenciales, tomados de cada tienda. Verificá el precio final antes de comprar. · <?= $h($siteName) ?> 🇳🇮</p>
   </footer>
 </div>
+<?php if ($isAdmin): ?>
+<script>
+(function(){
+  var root = document.getElementById('adminEdit');
+  if(!root) return;
+  var slug = root.dataset.slug;
+  var API = 'api/admin/group_edit.php';
+  var search = document.getElementById('aeSearch');
+  var results = document.getElementById('aeResults');
+  var msg = document.getElementById('aeMsg');
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function money(v,c){ return v==null?'—':(c==='NIO'?'C$':'')+Number(v).toLocaleString('en-US',{maximumFractionDigits:0}); }
+  async function post(payload){
+    var r = await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    return r.json();
+  }
+  // Quitar
+  root.addEventListener('click', async function(e){
+    var btn = e.target.closest('.ae-remove'); if(!btn) return;
+    if(!confirm('¿Quitar este producto del comparativo?')) return;
+    btn.disabled = true; msg.textContent = '';
+    var j = await post({action:'remove', group:slug, product:Number(btn.dataset.id)});
+    if(j.ok){ location.reload(); } else { msg.textContent = j.error || 'Error'; btn.disabled = false; }
+  });
+  // Buscar
+  var t;
+  search.addEventListener('input', function(){
+    clearTimeout(t);
+    var q = search.value.trim();
+    if(q.length < 2){ results.innerHTML = ''; return; }
+    t = setTimeout(async function(){
+      results.innerHTML = '<div class="ae-help">Buscando…</div>';
+      var r = await fetch(API + '?action=search&exclude_group=' + encodeURIComponent(slug) + '&q=' + encodeURIComponent(q));
+      var j = await r.json();
+      var its = j.items || [];
+      results.innerHTML = its.length ? its.map(function(it){
+        var tag = it.in_group ? ' · <span class="ae-ingroup">ya en otro comparativo ('+it.group_members+' prod.)</span>' : '';
+        return '<div class="ae-row"><div class="ae-info"><b>'+esc(it.store)+'</b> · '+esc(it.title)+' · '+money(it.price,it.currency)+tag+'</div>'+
+          '<button class="ae-add" data-id="'+it.id+'" data-ingroup="'+(it.in_group?1:0)+'" data-members="'+it.group_members+'">Agregar +</button></div>';
+      }).join('') : '<div class="ae-help">Sin resultados.</div>';
+    }, 300);
+  });
+  // Agregar
+  results.addEventListener('click', async function(e){
+    var btn = e.target.closest('.ae-add'); if(!btn) return;
+    var merge = false;
+    if(btn.dataset.ingroup === '1'){
+      merge = confirm('Este producto ya está en otro comparativo con '+btn.dataset.members+' productos.\n\nAceptar = traer TODOS esos productos a este comparativo (unir).\nCancelar = mover solo este producto.');
+    }
+    btn.disabled = true; msg.textContent = '';
+    var j = await post({action:'add', group:slug, product:Number(btn.dataset.id), merge:merge});
+    if(j.ok){ location.reload(); } else { msg.textContent = j.error || 'Error'; btn.disabled = false; }
+  });
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>
