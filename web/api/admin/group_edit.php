@@ -51,6 +51,8 @@ function recount(PDO $db, int $gid): void
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
+try {
+
 // ---- Buscar candidatos a agregar (lectura) ----
 if ($method === 'GET') {
     $q           = trim((string) ($_GET['q'] ?? ''));
@@ -134,3 +136,11 @@ if ($action === 'remove') {
 }
 
 out(400, ['ok' => false, 'error' => 'Acción inválida']);
+
+} catch (\Throwable $e) {
+    // El error más común: falta la migración 036 (columna group_locked).
+    $hint = str_contains($e->getMessage(), 'group_locked')
+        ? ' — falta correr la migración 036_group_locked.sql'
+        : '';
+    out(500, ['ok' => false, 'error' => $e->getMessage() . $hint]);
+}

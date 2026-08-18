@@ -377,8 +377,13 @@ if ($priced) {
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   function money(v,c){ return v==null?'—':(c==='NIO'?'C$':'')+Number(v).toLocaleString('en-US',{maximumFractionDigits:0}); }
   async function post(payload){
-    var r = await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-    return r.json();
+    try{
+      var r = await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      var txt = await r.text();
+      var j = null; try{ j = JSON.parse(txt); }catch(_){}
+      if(!j) return {ok:false, error:'HTTP '+r.status+': '+txt.slice(0,200)};
+      return j;
+    }catch(err){ return {ok:false, error:'Error de red: '+err.message}; }
   }
   // Quitar
   root.addEventListener('click', async function(e){
