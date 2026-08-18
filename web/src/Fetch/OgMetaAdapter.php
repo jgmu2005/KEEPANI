@@ -52,6 +52,19 @@ final class OgMetaAdapter implements StoreAdapter
         if ($priceRaw === null) {
             return null; // sin precio no hay nada que trackear
         }
+        $price = (float) $priceRaw;
+
+        // Robustez: algunas tiendas (La Curacao) a veces sirven el OG meta con el
+        // precio REGULAR en vez del de promo, generando picos falsos. El JSON-LD
+        // schema.org (Offer.price) es la fuente estructurada del precio de VENTA;
+        // tomamos el MENOR entre ambos (el que paga el cliente es el de promo).
+        $ldPrice = $this->jsonLdOfferPrice($html);
+        // Sólo corrige HACIA ABAJO y dentro de una banda razonable (≥25% del OG):
+        // así arregla el "precio regular" mal leído (promo real) sin agarrar cuotas
+        // ni accesorios sueltos que serían mucho más baratos.
+        if ($ldPrice !== null && $ldPrice < $price && $ldPrice >= $price * 0.25) {
+            $price = $ldPrice;
+        }
 
         $availRaw = strtolower((string) $this->meta($html, 'product:availability'));
         if ($availRaw !== '') {
@@ -72,7 +85,7 @@ final class OgMetaAdapter implements StoreAdapter
         $list = null;
         if (preg_match_all('/data-price-amount="([0-9.]+)"/', $html, $mm)) {
             $max = max(array_map('floatval', $mm[1]));
-            if ($max > (float) $priceRaw) {
+            if ($max > $price) {
                 $list = $max;
             }
         }
@@ -84,13 +97,38 @@ final class OgMetaAdapter implements StoreAdapter
             title:       $this->meta($html, 'og:title') ?: null,
             brand:       $this->meta($html, 'product:brand') ?: null,
             imageUrl:    $this->meta($html, 'og:image'),
-            priceNative: (float) $priceRaw,
+            priceNative: $price,
             currency:    $this->meta($html, 'product:price:currency') ?: $this->currencyFallback,
             inStock:     $inStock,
             taxIncluded: $this->taxIncluded,
             taxRate:     $this->taxRate,
             listPrice:   $list,
         );
+    }
+
+    /**
+     * Precio de venta desde el JSON-LD schema.org (Offer/AggregateOffer). Devuelve
+     * el MENOR "price"/"lowPrice" hallado dentro de los bloques <script ld+json>
+     * (el precio de promo), o null si no hay. Sólo mira esos bloques estructurados,
+     * no números sueltos del HTML, para no agarrar cuotas ni productos relacionados.
+     */
+    private function jsonLdOfferPrice(string $html): ?float
+    {
+        if (!preg_match_all('/<script[^>]*application\/ld\+json[^>]*>(.*?)<\/script>/is', $html, $blocks)) {
+            return null;
+        }
+        $best = null;
+        foreach ($blocks[1] as $block) {
+            if (preg_match_all('/"(?:low[Pp]rice|price)"\s*:\s*"?([0-9]+(?:\.[0-9]+)?)"?/', $block, $pm)) {
+                foreach ($pm[1] as $v) {
+                    $f = (float) $v;
+                    if ($f > 0 && ($best === null || $f < $best)) {
+                        $best = $f;
+                    }
+                }
+            }
+        }
+        return $best;
     }
 
     /** Extrae content de un <meta property="X"> (tolera orden de atributos). */
