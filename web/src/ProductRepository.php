@@ -570,7 +570,7 @@ final class ProductRepository
         }
 
         $st = $this->db->prepare(
-            'SELECT p.id, p.title, p.brand, p.image_url, p.url,
+            'SELECT p.id, p.title, p.brand, p.image_url, p.url, p.group_locked,
                     s.slug AS store, s.name AS store_name, s.tax_included,
                     ph.price_final, ph.list_price, ph.currency, ph.in_stock, ph.captured_date AS last_date
                FROM products p
@@ -596,6 +596,7 @@ final class ProductRepository
                 'in_stock'    => (bool) $r['in_stock'],
                 'tax_added'   => !(bool) $r['tax_included'], // precio con IVA estimado (+15%)
                 'last_date'   => $r['last_date'],
+                'locked'      => (bool) ($r['group_locked'] ?? false),
             ];
         }, $st->fetchAll());
 

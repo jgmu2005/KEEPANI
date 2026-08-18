@@ -32,6 +32,20 @@
   .center{max-width:400px;margin:60px auto;text-align:center}
   a{color:var(--brand-dk)}
   .hidden{display:none}
+  /* Navegación por secciones */
+  .admin-nav{display:flex;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:6;background:#f1f5f9;padding:12px 0;margin-bottom:6px}
+  .admin-nav button{background:#fff;border:1px solid var(--line);color:var(--ink);font-weight:700;font-size:.82rem;padding:7px 13px;border-radius:999px;cursor:pointer}
+  .admin-nav button:hover{border-color:var(--brand)}
+  .admin-nav button.active{background:var(--brand);border-color:var(--brand);color:#fff}
+  .admin-home{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-top:22px}
+  .admin-tile{display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;cursor:pointer;text-align:left;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .admin-tile:hover{border-color:var(--brand);transform:translateY(-1px)}
+  .admin-tile .ic{font-size:1.7rem}
+  .admin-tile .tl{font-weight:800;font-size:.95rem;color:var(--ink)}
+  .admin-tile .sub{font-size:.78rem;color:var(--muted);font-weight:400}
+  .ng-row{display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--line)}
+  .ng-info{flex:1;min-width:0;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ng-row button{cursor:pointer;border:0;border-radius:8px;font-weight:700;font-size:.8rem;padding:6px 11px;flex:none}
 </style>
 </head>
 <body>
@@ -52,6 +66,9 @@
 
   <!-- Panel (admin) -->
   <div id="adminView" class="hidden">
+    <nav id="adminNav" class="admin-nav"></nav>
+    <div id="adminHome" class="admin-home"></div>
+
     <div class="card">
       <h2>📊 Estadísticas</h2>
       <div id="statsBox"><div style="color:var(--muted)">Cargando…</div></div>
@@ -200,6 +217,17 @@
         <button id="cmpMore" style="background:#e2e8f0;color:#0f172a">Ver más</button>
       </div>
     </div>
+
+    <div class="card">
+      <h2>➕ Crear agrupación</h2>
+      <p style="color:var(--muted);font-size:.88rem;margin-top:-4px">Armá un comparativo desde cero: buscá productos, seleccioná 2 o más y creá el grupo. Ideal para unir lo que el matcher no juntó. Quedan marcados como <b>manuales</b> (el cron no los toca).</p>
+      <input id="ngQ" type="search" placeholder="Buscar productos por nombre… (mín. 2 letras)" autocomplete="off" style="max-width:340px">
+      <div id="ngResults" style="margin-top:6px"></div>
+      <h3 style="margin:16px 0 8px;font-size:.9rem">Selección (<span id="ngCount">0</span>)</h3>
+      <div id="ngSelected"><div style="color:var(--muted);font-size:.85rem">Nada seleccionado todavía.</div></div>
+      <div style="margin-top:14px"><button id="ngCreate" disabled style="background:#16a34a">Crear comparativo →</button></div>
+      <div id="ngMsg" class="msg"></div>
+    </div>
   </div>
 </div>
 
@@ -220,11 +248,101 @@ async function init(){
   try{ me = await api('auth/me.php'); }catch(e){ me = {user:null}; }
   if(me.user && me.user.is_admin){
     $('loginView').classList.add('hidden'); $('adminView').classList.remove('hidden');
-    loadStats(); loadSettings(); loadUsers(); loadDonations(); loadMatches(); loadMkStores(); loadComparatives();
+    buildAdminNav();
+    loadStats(); loadSettings(); loadUsers(); loadDonations(); loadMatches(); loadMkStores(); loadComparatives(); setupNewGroup();
   } else {
     $('adminView').classList.add('hidden'); $('loginView').classList.remove('hidden');
     if(me.user){ $('loginError').textContent = 'Esa cuenta no es administrador.'; $('loginError').style.display='block'; }
   }
+}
+
+// ---- Navegación por secciones (vista inicial + botones) ----
+const AD_SECTIONS = [
+  {id:'stats',        icon:'📊', label:'Estadísticas', sub:'Métricas del sitio',           match:['Estadísticas']},
+  {id:'config',       icon:'⚙️', label:'Configuración', sub:'Ajustes, SEO, correo',         match:['Ajustes del sitio','SEO / Google','Correo (SMTP']},
+  {id:'donations',    icon:'☕', label:'Donaciones',    sub:'Ko-fi y aportes recibidos',    match:['Ko-fi']},
+  {id:'users',        icon:'👥', label:'Usuarios',      sub:'Cuentas registradas',          match:['Usuarios']},
+  {id:'marketplace',  icon:'🏪', label:'Marketplace',   sub:'Tiendas Treinta',              match:['Marketplace']},
+  {id:'matches',      icon:'🔗', label:'Comparaciones', sub:'Revisar matches del cron',     match:['Revisión de comparaciones']},
+  {id:'comparatives', icon:'⚖️', label:'Comparativos',  sub:'Grupos activos + diferencias', match:['Comparativos funcionales']},
+  {id:'newgroup',     icon:'➕', label:'Crear agrupación', sub:'Comparativo manual nuevo',  match:['Crear agrupación']},
+];
+function adSectionOf(text){
+  for(const s of AD_SECTIONS){ if(s.match.some(m => text.includes(m))) return s.id; }
+  return null;
+}
+function buildAdminNav(){
+  const view = $('adminView');
+  // Etiquetar cada card con su sección (según el texto del h2).
+  view.querySelectorAll(':scope > .card').forEach(c => {
+    const h2 = c.querySelector('h2');
+    const sec = adSectionOf(h2 ? h2.textContent : '');
+    if(sec){ c.dataset.sec = sec; c.classList.add('adsec'); }
+  });
+  $('adminNav').innerHTML = '<button data-go="home">🏠 Inicio</button>' +
+    AD_SECTIONS.map(s => `<button data-go="${s.id}">${s.icon} ${esc(s.label)}</button>`).join('');
+  $('adminHome').innerHTML = AD_SECTIONS.map(s =>
+    `<button class="admin-tile" data-go="${s.id}"><span class="ic">${s.icon}</span><span class="tl">${esc(s.label)}</span><span class="sub">${esc(s.sub)}</span></button>`).join('');
+  view.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if(b){ showView(b.dataset.go); } });
+  showView((location.hash || '').replace('#','') || 'home');
+}
+function showView(name){
+  const view = $('adminView');
+  const home = !name || name === 'home';
+  $('adminHome').style.display = home ? '' : 'none';
+  view.querySelectorAll('.adsec').forEach(c => { c.style.display = (!home && c.dataset.sec === name) ? '' : 'none'; });
+  $('adminNav').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.go === (home ? 'home' : name)));
+  if(home){ if(location.hash) history.replaceState(null,'',location.pathname); }
+  else { location.hash = name; }
+  window.scrollTo(0,0);
+}
+
+// ---- Crear agrupación (comparativo manual) ----
+function setupNewGroup(){
+  const sel = new Map(); // id -> {title, store}
+  const box = $('ngResults'), selBox = $('ngSelected'), msg = $('ngMsg'), createBtn = $('ngCreate');
+  const cM = v => v==null ? '—' : 'C$'+Number(v).toLocaleString('en-US',{maximumFractionDigits:0});
+  function renderSel(){
+    $('ngCount').textContent = sel.size;
+    createBtn.disabled = sel.size < 2;
+    selBox.innerHTML = sel.size ? [...sel.entries()].map(([id,it]) =>
+      `<div class="ng-row"><div class="ng-info"><b>${esc(it.store)}</b> · ${esc(it.title)}</div><button class="ng-del" data-id="${id}" style="background:#fee2e2;color:#b91c1c">Quitar ✕</button></div>`).join('')
+      : '<div style="color:var(--muted);font-size:.85rem">Nada seleccionado todavía.</div>';
+  }
+  let t;
+  $('ngQ').addEventListener('input', () => {
+    clearTimeout(t);
+    const q = $('ngQ').value.trim();
+    if(q.length < 2){ box.innerHTML=''; return; }
+    t = setTimeout(async () => {
+      box.innerHTML = '<div style="color:var(--muted);font-size:.85rem">Buscando…</div>';
+      let j; try{ j = await api('admin/group_edit.php?action=search&q=' + encodeURIComponent(q)); }catch(e){ box.innerHTML=''; return; }
+      const its = (j.items||[]).filter(it => !sel.has(it.id));
+      box.innerHTML = its.length ? its.map(it => {
+        const tag = it.in_group ? ` · <span style="color:#b45309;font-weight:700">ya en otro comparativo (${it.group_members})</span>` : '';
+        return `<div class="ng-row"><div class="ng-info"><b>${esc(it.store)}</b> · ${esc(it.title)} · ${cM(it.price)}${tag}</div><button class="ng-add" data-id="${it.id}" data-title="${esc(it.title)}" data-store="${esc(it.store)}" style="background:#dcfce7;color:#166534">Agregar +</button></div>`;
+      }).join('') : '<div style="color:var(--muted);font-size:.85rem">Sin resultados.</div>';
+    }, 300);
+  });
+  box.addEventListener('click', e => {
+    const b = e.target.closest('.ng-add'); if(!b) return;
+    sel.set(Number(b.dataset.id), {title:b.dataset.title, store:b.dataset.store});
+    b.closest('.ng-row').remove(); renderSel();
+  });
+  selBox.addEventListener('click', e => {
+    const b = e.target.closest('.ng-del'); if(!b) return;
+    sel.delete(Number(b.dataset.id)); renderSel();
+  });
+  createBtn.addEventListener('click', async () => {
+    if(sel.size < 2) return;
+    createBtn.disabled = true; msg.className='msg'; msg.textContent='';
+    let j; try{
+      const r = await fetch(`${API}/admin/group_edit.php`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'create', products:[...sel.keys()]})});
+      const txt = await r.text(); try{ j = JSON.parse(txt); }catch(_){ j = {ok:false, error:'HTTP '+r.status+': '+txt.slice(0,200)}; }
+    }catch(err){ j = {ok:false, error:'Red: '+err.message}; }
+    if(j.ok){ window.open(j.url, '_blank'); msg.className='msg ok'; msg.textContent='✅ Comparativo creado. Se abrió en otra pestaña.'; sel.clear(); renderSel(); $('ngQ').value=''; box.innerHTML=''; loadComparatives && loadComparatives(true); }
+    else { msg.className='msg err'; msg.textContent = j.error || 'Error'; createBtn.disabled = false; }
+  });
 }
 
 // Estadísticas

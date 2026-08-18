@@ -38,6 +38,16 @@ function groupIdBySlug(PDO $db, string $slug): ?int
     return $id !== false ? (int) $id : null;
 }
 
+function slugify(string $s): string
+{
+    $s = mb_strtolower($s, 'UTF-8');
+    $s = strtr($s, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','à'=>'a','è'=>'e','ñ'=>'n','ü'=>'u','ç'=>'c']);
+    $s = preg_replace('/[^a-z0-9]+/', '-', $s);
+    $s = trim((string) $s, '-');
+    $s = substr((string) $s, 0, 60);
+    return $s !== '' ? $s : 'comparativo';
+}
+
 /** Recalcula member_count / store_count de un grupo (solo activos). */
 function recount(PDO $db, int $gid): void
 {
@@ -97,8 +107,43 @@ $body = json_decode(file_get_contents('php://input') ?: '', true);
 if (!is_array($body)) { $body = $_POST; }
 
 $action = (string) ($body['action'] ?? '');
-$slug   = trim((string) ($body['group'] ?? ''));
-$pid    = (int) ($body['product'] ?? 0);
+
+// CREAR un comparativo nuevo desde cero (no necesita grupo previo).
+if ($action === 'create') {
+    $ids = array_values(array_unique(array_filter(
+        array_map('intval', (array) ($body['products'] ?? [])),
+        static fn($v) => $v > 0
+    )));
+    if (count($ids) < 2) {
+        out(400, ['ok' => false, 'error' => 'Elegí al menos 2 productos para comparar.']);
+    }
+    $in = implode(',', $ids); // ints saneados
+    // Representante: título más largo (más descriptivo), primera imagen/marca.
+    $rep = $db->query("SELECT title, brand, image_url FROM products
+                        WHERE id IN ($in) ORDER BY CHAR_LENGTH(title) DESC LIMIT 1")->fetch();
+    $title = $rep['title'] ?: 'Comparativo manual';
+    $mk    = 'manual:' . bin2hex(random_bytes(8));
+    $slug  = slugify($title) . '-' . substr(sha1($mk), 0, 6);
+
+    $db->prepare(
+        'INSERT INTO product_groups (match_key, slug, canonical_title, brand, image_url, member_count, store_count, method)
+         VALUES (?, ?, ?, ?, ?, 0, 0, ?)'
+    )->execute([$mk, $slug, $title, $rep['brand'] ?: null, $rep['image_url'] ?: null, 'manual']);
+    $newGid = (int) $db->lastInsertId();
+
+    // Grupos viejos de esos productos (para recontar tras moverlos).
+    $oldGids = $db->query("SELECT DISTINCT group_id FROM products WHERE id IN ($in) AND group_id IS NOT NULL")
+                  ->fetchAll(PDO::FETCH_COLUMN);
+
+    $db->exec("UPDATE products SET group_id = $newGid, group_locked = 1 WHERE id IN ($in)");
+    foreach ($oldGids as $og) { recount($db, (int) $og); }
+    recount($db, $newGid);
+
+    out(200, ['ok' => true, 'slug' => $slug, 'url' => 'producto.php?slug=' . rawurlencode($slug)]);
+}
+
+$slug = trim((string) ($body['group'] ?? ''));
+$pid  = (int) ($body['product'] ?? 0);
 
 $gid = $slug !== '' ? groupIdBySlug($db, $slug) : null;
 if ($gid === null) { out(404, ['ok' => false, 'error' => 'Comparativo no encontrado']); }
@@ -133,6 +178,13 @@ if ($action === 'remove') {
     $upd->execute([$pid, $gid]);
     recount($db, $gid);
     out(200, ['ok' => true, 'removed' => $upd->rowCount()]);
+}
+
+if ($action === 'unlock') {
+    // Devolver el producto al modo AUTOMÁTICO: se quita el candado para que los
+    // crons de agrupación vuelvan a manejarlo (lo reagrupan por SKU/EAN/modelo).
+    $db->prepare('UPDATE products SET group_locked = 0 WHERE id = ?')->execute([$pid]);
+    out(200, ['ok' => true, 'unlocked' => 1]);
 }
 
 out(400, ['ok' => false, 'error' => 'Acción inválida']);

@@ -211,6 +211,8 @@ if ($priced) {
   .admin-edit button{cursor:pointer;border:0;border-radius:8px;font-weight:700;font-size:.8rem;padding:6px 12px;flex:none}
   .ae-remove{background:#fee2e2;color:#b91c1c}
   .ae-add{background:#dcfce7;color:#166534}
+  .ae-unlock{background:#e0e7ff;color:#3730a3}
+  .ae-lock{font-size:.66rem;font-weight:800;color:#3730a3;background:#e0e7ff;padding:2px 7px;border-radius:999px;margin-left:6px;white-space:nowrap}
   .admin-edit input[type=search]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:.9rem;background:var(--card);color:inherit}
   #aeResults{margin-top:4px}
   .ae-msg{margin-top:10px;font-size:.85rem;color:#b91c1c}
@@ -337,7 +339,8 @@ if ($priced) {
       <?php foreach ($offers as $o): ?>
         <div class="ae-row">
           <?php if (!empty($o['image_url'])): ?><img src="<?= $h($o['image_url']) ?>" alt=""><?php endif; ?>
-          <div class="ae-info"><b><?= $h($o['store_name']) ?></b> · <?= $h($o['title']) ?></div>
+          <div class="ae-info"><b><?= $h($o['store_name']) ?></b> · <?= $h($o['title']) ?><?php if (!empty($o['locked'])): ?> <span class="ae-lock">🔒 manual</span><?php endif; ?></div>
+          <?php if (!empty($o['locked'])): ?><button class="ae-unlock" data-id="<?= (int) $o['id'] ?>" title="Volver al modo automático (el matcher vuelve a manejarlo)">🔓 Auto</button><?php endif; ?>
           <button class="ae-remove" data-id="<?= (int) $o['id'] ?>">Quitar ✕</button>
         </div>
       <?php endforeach; ?>
@@ -385,12 +388,16 @@ if ($priced) {
       return j;
     }catch(err){ return {ok:false, error:'Error de red: '+err.message}; }
   }
-  // Quitar
+  // Quitar / Desbloquear
   root.addEventListener('click', async function(e){
-    var btn = e.target.closest('.ae-remove'); if(!btn) return;
-    if(!confirm('¿Quitar este producto del comparativo?')) return;
+    var rm = e.target.closest('.ae-remove');
+    var un = e.target.closest('.ae-unlock');
+    if(!rm && !un) return;
+    var btn = rm || un;
+    if(rm && !confirm('¿Quitar este producto del comparativo?')) return;
+    if(un && !confirm('¿Devolver este producto al modo automático? El matcher volverá a agruparlo solo en la próxima corrida.')) return;
     btn.disabled = true; msg.textContent = '';
-    var j = await post({action:'remove', group:slug, product:Number(btn.dataset.id)});
+    var j = await post({action: rm ? 'remove' : 'unlock', group:slug, product:Number(btn.dataset.id)});
     if(j.ok){ location.reload(); } else { msg.textContent = j.error || 'Error'; btn.disabled = false; }
   });
   // Buscar
