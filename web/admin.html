@@ -190,6 +190,10 @@
       <p style="color:var(--muted);font-size:.88rem;margin-top:-4px">Con precio disponible en 2+ tiendas ahora, ordenados por <b>mayor diferencia de precio entre tiendas</b>. Clic en “Ver →” para abrir el comparativo.</p>
       <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0">
         <input id="cmpQ" type="search" placeholder="Buscar por título…" style="max-width:280px">
+        <select id="cmpSort" style="max-width:210px">
+          <option value="diff">Orden: mayor diferencia</option>
+          <option value="new">Orden: más nuevos</option>
+        </select>
       </div>
       <div id="cmpBox"><div style="color:var(--muted)">Cargando…</div></div>
       <div style="text-align:center;margin-top:12px;display:none" id="cmpMoreWrap">
@@ -386,7 +390,8 @@ async function loadComparatives(reset = true){
   const box = $('cmpBox');
   if(reset){ CMP.offset = 0; box.innerHTML = '<div style="color:var(--muted)">Cargando…</div>'; }
   const q = encodeURIComponent($('cmpQ').value.trim());
-  let j; try{ j = await api(`admin/comparatives.php?limit=50&offset=${CMP.offset}&q=${q}`); }
+  const sort = $('cmpSort').value;
+  let j; try{ j = await api(`admin/comparatives.php?limit=50&offset=${CMP.offset}&q=${q}&sort=${sort}`); }
   catch(e){ box.innerHTML = '<div style="color:var(--muted)">Error al cargar.</div>'; CMP.busy = false; return; }
   if(!j.ok){ box.innerHTML = '<div style="color:var(--muted)">No disponible.</div>'; CMP.busy = false; return; }
   CMP.total = j.total || 0;
@@ -397,7 +402,7 @@ async function loadComparatives(reset = true){
       ${it.image ? `<img src="${esc(it.image)}" style="width:44px;height:44px;object-fit:contain;background:#f8fafc;border-radius:6px;flex:none">` : '<div style="width:44px;height:44px;background:#f1f5f9;border-radius:6px;flex:none"></div>'}
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.title)}</div>
-        <div style="color:var(--muted);font-size:.78rem">${it.stores} tiendas · ${cM(it.min)} → ${cM(it.max)}${it.brand ? ' · ' + esc(it.brand) : ''}</div>
+        <div style="color:var(--muted);font-size:.78rem">${it.stores} tiendas · ${cM(it.min)} → ${cM(it.max)}${it.brand ? ' · ' + esc(it.brand) : ''}${it.created ? ' · 🆕 ' + esc(String(it.created).slice(0,10)) : ''}</div>
       </div>
       ${it.diff_pct != null ? `<span title="Diferencia entre la tienda más cara y la más barata" style="flex:none;background:${it.diff_pct>=30?'#fee2e2':'#f1f5f9'};color:${it.diff_pct>=30?'#b91c1c':'#334155'};font-weight:800;font-size:.8rem;padding:4px 9px;border-radius:999px">+${it.diff_pct}%</span>` : ''}
       <a href="${esc(it.url)}" target="_blank" rel="noopener" style="flex:none;background:#2563eb;color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.83rem">Ver →</a>
@@ -410,6 +415,7 @@ async function loadComparatives(reset = true){
 }
 let cmpTimer;
 $('cmpQ').addEventListener('input', () => { clearTimeout(cmpTimer); cmpTimer = setTimeout(() => loadComparatives(true), 300); });
+$('cmpSort').addEventListener('change', () => loadComparatives(true));
 $('cmpMore').addEventListener('click', () => loadComparatives(false));
 $('matchesBox').addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-d]'); if(!btn) return;

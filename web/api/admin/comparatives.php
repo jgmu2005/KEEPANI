@@ -23,11 +23,16 @@ $q      = trim((string) ($_GET['q'] ?? ''));
 $limit  = min(200, max(1, (int) ($_GET['limit']  ?? 50)));
 $offset = max(0, (int) ($_GET['offset'] ?? 0));
 
-$where  = 'g.store_count >= 2';
+$sort   = ($_GET['sort'] ?? 'diff') === 'new' ? 'new' : 'diff';
+
+// La búsqueda va en el HAVING (no en el WHERE) para no descartar miembros que no
+// coinciden y así conservar el conteo de tiendas y el rango de precios del grupo.
+$having = 'COUNT(DISTINCT p.store_id) >= 2';
 $params = [];
 if ($q !== '') {
-    $where          .= ' AND g.canonical_title LIKE :q';
-    $params[':q']    = '%' . $q . '%';
+    $having        .= ' AND (g.canonical_title LIKE :qc OR SUM(p.title LIKE :qm) > 0)';
+    $params[':qc']  = '%' . $q . '%';
+    $params[':qm']  = '%' . $q . '%';
 }
 
 // Sólo tiendas EN STOCK (las agotadas traen precio-centinela) y con ≥2 tiendas reales.
@@ -35,22 +40,28 @@ $base = 'FROM product_groups g
           JOIN products p ON p.group_id = g.id AND p.is_active = 1
           JOIN price_history ph ON ph.id = (
                 SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
-         WHERE ' . $where . ' AND ph.in_stock = 1 AND ph.price_final IS NOT NULL
+         WHERE g.store_count >= 2 AND ph.in_stock = 1 AND ph.price_final IS NOT NULL
          GROUP BY g.id
-         HAVING COUNT(DISTINCT p.store_id) >= 2';
+         HAVING ' . $having;
+
+$order = $sort === 'new'
+    ? 'g.created_at DESC, g.id DESC'
+    : '(MAX(ph.price_final) - MIN(ph.price_final)) / NULLIF(MIN(ph.price_final), 0) DESC, store_count DESC';
 
 $cnt = $db->prepare('SELECT COUNT(*) FROM (SELECT g.id ' . $base . ') t');
 $cnt->execute($params);
 $total = (int) $cnt->fetchColumn();
 
-$sql = 'SELECT g.slug, g.canonical_title AS title, g.brand, g.image_url,
+$sql = 'SELECT g.slug,
+               COALESCE(NULLIF(g.canonical_title, \'\'), MAX(p.title)) AS title,
+               COALESCE(NULLIF(g.brand, \'\'), MAX(p.brand))          AS brand,
+               COALESCE(NULLIF(g.image_url, \'\'), MAX(p.image_url))   AS image_url,
                COUNT(DISTINCT p.store_id) AS store_count,
                COUNT(p.id) AS members,
                MIN(ph.price_final) AS min_price, MAX(ph.price_final) AS max_price,
-               MAX(ph.currency) AS currency
+               MAX(ph.currency) AS currency, g.created_at
           ' . $base . '
-         ORDER BY (MAX(ph.price_final) - MIN(ph.price_final)) / NULLIF(MIN(ph.price_final), 0) DESC,
-                  store_count DESC
+         ORDER BY ' . $order . '
          LIMIT ' . $limit . ' OFFSET ' . $offset;
 $st = $db->prepare($sql);
 $st->execute($params);
@@ -70,6 +81,7 @@ $items = array_map(static function (array $r): array {
         'diff'     => ($min !== null && $max !== null) ? $max - $min : null,
         'diff_pct' => ($min !== null && $min > 0 && $max !== null) ? (int) round((($max - $min) / $min) * 100) : null,
         'currency' => $r['currency'] ?? 'NIO',
+        'created'  => $r['created_at'] ?? null,
         'url'      => 'producto.php?slug=' . rawurlencode((string) $r['slug']),
     ];
 }, $st->fetchAll());
