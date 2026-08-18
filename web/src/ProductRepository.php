@@ -283,15 +283,47 @@ final class ProductRepository
 
         $last = end($history) ?: null;
 
+        $min = $prices ? min($prices) : null;
+        $max = $prices ? max($prices) : null;
+
+        // "Máximo histórico" ROBUSTO: descarta picos exagerados (lecturas del precio
+        // regular u otros errores puntuales) usando la mediana como referencia — el
+        // mismo criterio que el "habitual". Un pico aislado NO mueve la mediana, así
+        // que se excluye; un aumento SOSTENIDO sí la mueve, y entonces SÍ cuenta como
+        // máximo real. Se conserva el crudo en max_raw por si se necesita.
+        $maxReal = $max;
+        if (count($prices) >= self::ROBUST_MIN_POINTS) {
+            $median = self::medianOf($prices);
+            if ($median > 0) {
+                $normal = array_filter($prices, static fn($p) => $p <= $median * self::ROBUST_MAX_FACTOR);
+                if ($normal) {
+                    $maxReal = max($normal);
+                }
+            }
+        }
+
         return [
             'current'   => $last['price_final'] ?? null,
-            'min'       => $prices ? min($prices) : null,
-            'max'       => $prices ? max($prices) : null,
+            'min'       => $min,
+            'max'       => $maxReal,
+            'max_raw'   => $max,
             'in_stock'  => $last['in_stock'] ?? false,
             'currency'  => $last['currency'] ?? 'NIO',
             'points'    => count($history),
             'last_date' => $last['date'] ?? null,
         ];
+    }
+
+    /** Umbral de puntos y factor (× mediana) para el máximo robusto. */
+    private const ROBUST_MIN_POINTS = 5;
+    private const ROBUST_MAX_FACTOR = 1.4;
+
+    private static function medianOf(array $a): float
+    {
+        sort($a);
+        $n = count($a);
+        $m = intdiv($n, 2);
+        return $n % 2 ? (float) $a[$m] : ((float) $a[$m - 1] + (float) $a[$m]) / 2;
     }
 
     /** Tiendas activas (para el dropdown de filtro). */
