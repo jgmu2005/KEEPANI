@@ -187,7 +187,7 @@
 
     <div class="card">
       <h2>⚖️ Comparativos funcionales <span id="cmpCount" style="color:var(--muted);font-weight:400;font-size:.85rem"></span></h2>
-      <p style="color:var(--muted);font-size:.88rem;margin-top:-4px">Productos comparados en 2 o más tiendas. Clic en “Ver →” para abrir el comparativo público.</p>
+      <p style="color:var(--muted);font-size:.88rem;margin-top:-4px">Con precio disponible en 2+ tiendas ahora, ordenados por <b>mayor diferencia de precio entre tiendas</b>. Clic en “Ver →” para abrir el comparativo.</p>
       <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0">
         <input id="cmpQ" type="search" placeholder="Buscar por título…" style="max-width:280px">
       </div>
@@ -391,13 +391,15 @@ async function loadComparatives(reset = true){
   if(!j.ok){ box.innerHTML = '<div style="color:var(--muted)">No disponible.</div>'; CMP.busy = false; return; }
   CMP.total = j.total || 0;
   $('cmpCount').textContent = CMP.total ? `(${CMP.total})` : '';
+  const cM = v => v==null ? '—' : 'C$'+Number(v).toLocaleString('en-US',{maximumFractionDigits:0});
   const rows = (j.items||[]).map(it => `
     <div style="display:flex;align-items:center;gap:12px;padding:8px 4px;border-bottom:1px solid #eef1f5">
       ${it.image ? `<img src="${esc(it.image)}" style="width:44px;height:44px;object-fit:contain;background:#f8fafc;border-radius:6px;flex:none">` : '<div style="width:44px;height:44px;background:#f1f5f9;border-radius:6px;flex:none"></div>'}
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.title)}</div>
-        <div style="color:var(--muted);font-size:.78rem">${it.stores} tiendas · ${it.members} productos${it.brand ? ' · ' + esc(it.brand) : ''}</div>
+        <div style="color:var(--muted);font-size:.78rem">${it.stores} tiendas · ${cM(it.min)} → ${cM(it.max)}${it.brand ? ' · ' + esc(it.brand) : ''}</div>
       </div>
+      ${it.diff_pct != null ? `<span title="Diferencia entre la tienda más cara y la más barata" style="flex:none;background:${it.diff_pct>=30?'#fee2e2':'#f1f5f9'};color:${it.diff_pct>=30?'#b91c1c':'#334155'};font-weight:800;font-size:.8rem;padding:4px 9px;border-radius:999px">+${it.diff_pct}%</span>` : ''}
       <a href="${esc(it.url)}" target="_blank" rel="noopener" style="flex:none;background:#2563eb;color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.83rem">Ver →</a>
     </div>`).join('');
   if(reset) box.innerHTML = rows || '<div style="color:var(--muted)">Sin comparativos todavía.</div>';
