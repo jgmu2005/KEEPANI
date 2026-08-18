@@ -259,6 +259,18 @@
   #extBanner .eb-check{display:flex;align-items:center;justify-content:center;gap:7px;font-size:.8rem;color:var(--muted);margin-top:12px;cursor:pointer}
   .ext-btn{display:inline-block;margin-top:10px;background:var(--brand);color:#fff;font-weight:700;font-size:.86rem;padding:8px 14px;border-radius:8px;text-decoration:none}
   .ext-btn:hover{background:var(--brand-dk)}
+  /* FAB flotante de WhatsApp (abajo-derecha; el banner de extensión va centrado) */
+  #waFab{position:fixed;right:18px;bottom:18px;z-index:40;display:flex;flex-direction:column;align-items:flex-end;gap:12px}
+  #waBtn{width:58px;height:58px;border-radius:50%;background:#25D366;border:0;box-shadow:0 6px 20px rgba(37,211,102,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s}
+  #waBtn:hover{transform:scale(1.07)}
+  #waBtn svg{width:32px;height:32px;fill:#fff}
+  #waCard{display:none;max-width:272px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 34px rgba(15,23,42,.24);padding:16px 16px 14px;position:relative}
+  #waCard.open{display:block;animation:waPop .18s ease}
+  @keyframes waPop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  #waCard .wa-title{font-weight:800;font-size:.98rem;margin:0 18px 6px 0}
+  #waCard .wa-text{font-size:.85rem;color:var(--muted);line-height:1.45;margin:0 0 12px}
+  #waCard .wa-join{display:block;text-align:center;background:#25D366;color:#fff;font-weight:800;padding:10px;border-radius:9px;text-decoration:none}
+  #waCard .wa-x{position:absolute;top:6px;right:9px;background:none;border:0;font-size:1.25rem;line-height:1;color:var(--muted);cursor:pointer}
   .topnav a.nav-ext{background:rgba(255,255,255,.12)}
   footer{background:#0f172a;color:#94a3b8;padding:26px 0;text-align:center;font-size:.86rem}
   footer .links{margin-top:8px}
@@ -469,6 +481,27 @@
     </div>
   </div>
 </footer>
+
+<!-- Botón flotante: canal de WhatsApp -->
+<div id="waFab">
+  <div id="waCard">
+    <button class="wa-x" id="waCardX" aria-label="Cerrar">×</button>
+    <div class="wa-title">🟢 Ofertas reales en tu WhatsApp</div>
+    <div class="wa-text">Unite a nuestro canal y enterate de las <b>bajadas de precio y ofertas de verdad</b> (sin descuentos falsos) antes que nadie.</div>
+    <a class="wa-join" href="https://whatsapp.com/channel/0029Vb8rtBl35fLzbo8lsb2b" target="_blank" rel="noopener">Unirme al canal →</a>
+  </div>
+  <button id="waBtn" aria-label="Abrir canal de WhatsApp" title="Canal de ofertas en WhatsApp">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.15-1.7-.84-2-.94-.26-.1-.46-.15-.65.15-.19.29-.74.94-.9 1.13-.17.19-.33.22-.62.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.64-2.04-.17-.29-.02-.45.13-.6.13-.13.29-.33.44-.5.15-.17.19-.29.29-.48.1-.19.05-.36-.02-.5-.08-.15-.65-1.57-.9-2.15-.24-.57-.48-.49-.65-.5l-.56-.01c-.19 0-.5.07-.77.36-.26.29-1 .98-1 2.38s1.03 2.76 1.17 2.95c.15.19 2.03 3.1 4.92 4.35.69.3 1.22.47 1.64.6.69.22 1.32.19 1.81.12.55-.08 1.7-.7 1.94-1.36.24-.67.24-1.24.17-1.36-.07-.12-.26-.19-.56-.34zM12 2C6.48 2 2 6.48 2 12c0 1.77.46 3.44 1.28 4.89L2 22l5.25-1.38A9.94 9.94 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2z"/></svg>
+  </button>
+</div>
+<script>
+(function(){
+  var btn=document.getElementById('waBtn'), card=document.getElementById('waCard'), x=document.getElementById('waCardX');
+  if(!btn) return;
+  btn.addEventListener('click', function(){ card.classList.toggle('open'); });
+  x.addEventListener('click', function(){ card.classList.remove('open'); });
+})();
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>

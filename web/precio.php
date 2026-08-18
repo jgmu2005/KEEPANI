@@ -256,6 +256,7 @@ $ldBreadcrumb = [
 
   <footer class="site-foot">
     <p>Precios referenciales tomados de <?= $h($p['store_name']) ?>. Verificá el precio final antes de comprar.</p>
+    <p style="margin:12px 0"><a href="https://whatsapp.com/channel/0029Vb8rtBl35fLzbo8lsb2b" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;padding:9px 18px;border-radius:999px;text-decoration:none;font-weight:700">🟢 Seguinos en WhatsApp — ofertas reales del día</a></p>
     <p><a href="https://chromewebstore.google.com/detail/ojo-al-precio/moeikollgpcleldjkjogmeeeoglmncac" target="_blank" rel="noopener">🧩 Extensión de Chrome</a> · <a href="<?= $h($base) ?>/index.html">Inicio</a> · <a href="<?= $h($base) ?>/ayuda.html">Ayuda</a> · <a href="<?= $h($base) ?>/terminos.html">Términos y privacidad</a> · <?= $h($siteName) ?> 🇳🇮</p>
   </footer>
 </div>
