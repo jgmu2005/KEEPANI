@@ -32,4 +32,7 @@
 
     # Marketplace de tiendas locales (Treinta), aislado del tracker.
     RewriteRule ^marketplace$ marketplace.php [L,QSA]
+
+    # Ofertas del día (motor de contenido para el canal de WhatsApp).
+    RewriteRule ^hoy$ hoy.php [L,QSA]
 </IfModule>

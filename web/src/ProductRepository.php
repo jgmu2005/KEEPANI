@@ -782,6 +782,118 @@ final class ProductRepository
         return $out;
     }
 
+    /** Las 4 marcas Unicomer (mismo dueño, precio distinto entre sus tiendas). */
+    private const UNICOMER = ['tropigas', 'gallo', 'radioshack', 'lacuracao'];
+
+    /**
+     * Mayores diferencias de precio entre tiendas para el MISMO producto, para la
+     * página "precios que no tienen sentido". Solo matches CONFIABLES (exacto por
+     * SKU/EAN o manual, nunca el difuso) y rango acotado, para no mostrar productos
+     * distintos como iguales en una página pública. Marca las de "misma cadena".
+     */
+    public function biggestGaps(int $limit = 8): array
+    {
+        $sql = "SELECT g.slug, g.canonical_title AS title, g.image_url,
+                       MIN(ph.price_final) AS min_price, MAX(ph.price_final) AS max_price,
+                       COUNT(DISTINCT p.store_id) AS store_count
+                  FROM product_groups g
+                  JOIN products p ON p.group_id = g.id AND p.is_active = 1
+                  JOIN price_history ph ON ph.id = (
+                        SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
+                 WHERE g.store_count >= 2 AND g.method IN ('uni','ean','manual')
+                   AND ph.in_stock = 1 AND ph.price_final IS NOT NULL AND ph.price_final < 1000000
+                 GROUP BY g.id
+                HAVING COUNT(DISTINCT p.store_id) >= 2 AND MIN(ph.price_final) > 0
+                   AND (MAX(ph.price_final) - MIN(ph.price_final)) / MIN(ph.price_final) BETWEEN 0.15 AND 3.0
+                 ORDER BY (MAX(ph.price_final) - MIN(ph.price_final)) / MIN(ph.price_final) DESC
+                 LIMIT " . (int) max(1, min($limit, 30));
+
+        $groups = $this->db->query($sql)->fetchAll();
+
+        // Oferta más barata y más cara (con tienda) por grupo.
+        $off = $this->db->prepare(
+            'SELECT s.slug AS store, s.name AS store_name, ph.price_final, ph.currency
+               FROM products p
+               JOIN stores s ON s.id = p.store_id
+               JOIN price_history ph ON ph.id = (
+                     SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
+              WHERE p.group_id = ? AND p.is_active = 1 AND ph.in_stock = 1 AND ph.price_final IS NOT NULL
+              ORDER BY ph.price_final ASC'
+        );
+        $gidStmt = $this->db->prepare('SELECT id FROM product_groups WHERE slug = ?');
+
+        $out = [];
+        foreach ($groups as $g) {
+            $gidStmt->execute([$g['slug']]);
+            $gid = (int) $gidStmt->fetchColumn();
+            $off->execute([$gid]);
+            $offers = $off->fetchAll();
+            if (count($offers) < 2) { continue; }
+            $cheap = $offers[0];
+            $pricy = $offers[count($offers) - 1];
+            $lo = (float) $cheap['price_final']; $hi = (float) $pricy['price_final'];
+            $sameChain = in_array($cheap['store'], self::UNICOMER, true)
+                      && in_array($pricy['store'], self::UNICOMER, true);
+            $out[] = [
+                'slug'        => $g['slug'],
+                'title'       => $g['title'] ?: '(producto)',
+                'image_url'   => $g['image_url'],
+                'cheap_store' => $cheap['store_name'],
+                'cheap_price' => $lo,
+                'pricy_store' => $pricy['store_name'],
+                'pricy_price' => $hi,
+                'currency'    => $cheap['currency'] ?? 'NIO',
+                'diff_pct'    => $lo > 0 ? (int) round(($hi - $lo) / $lo * 100) : null,
+                'save'        => $hi - $lo,
+                'stores'      => (int) $g['store_count'],
+                'same_chain'  => $sameChain,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Productos en (o casi en) su precio MÁS BAJO registrado, que además bajaron
+     * de un pico — "mínimos históricos". Excluye centinela y exige historia mínima.
+     */
+    public function historicLows(int $limit = 12): array
+    {
+        $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
+                       s.name AS store_name, s.slug AS store,
+                       cur.price_final AS price_now, cur.currency,
+                       agg.min_price, agg.max_price
+                  FROM products p
+                  JOIN stores s ON s.id = p.store_id
+                  JOIN price_history cur ON cur.id = (
+                        SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
+                  JOIN (SELECT product_id, MIN(price_final) AS min_price, MAX(price_final) AS max_price, COUNT(*) AS n
+                          FROM price_history
+                         WHERE in_stock = 1 AND price_final IS NOT NULL AND price_final < 1000000
+                           AND captured_date >= DATE_SUB(CURDATE(), INTERVAL 120 DAY)
+                         GROUP BY product_id) agg ON agg.product_id = p.id
+                 WHERE cur.in_stock = 1 AND cur.price_final IS NOT NULL AND cur.price_final < 1000000
+                   AND agg.n >= 5
+                   AND cur.price_final <= agg.min_price * 1.001
+                   AND agg.max_price > agg.min_price * 1.03
+                 ORDER BY (agg.max_price - agg.min_price) / agg.min_price DESC
+                 LIMIT ' . (int) max(1, min($limit, 40));
+
+        return array_map(static function (array $r): array {
+            $now = (float) $r['price_now']; $max = (float) $r['max_price'];
+            return [
+                'id'         => (int) $r['id'],
+                'title'      => $r['title'],
+                'image_url'  => $r['image_url'],
+                'url'        => $r['url'],
+                'store_name' => $r['store_name'],
+                'price_now'  => $now,
+                'price_peak' => $max,
+                'currency'   => $r['currency'] ?? 'NIO',
+                'off_peak_pct' => $max > 0 ? (int) round(($max - $now) / $max * 100) : null,
+            ];
+        }, $this->db->query($sql)->fetchAll());
+    }
+
     private static function mapChange(array $r): array
     {
         $now  = (float) $r['price_now'];
