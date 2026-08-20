@@ -106,9 +106,15 @@ foreach ($data as $p) {
     }
     if ($name === '') { $name = 'Comtech ' . $code; }
 
+    // Sólo las imágenes del tenant COMTECH son públicas en S3. Algunos productos
+    // referencian el storage de OTRO tenant (ej. LBRRRCL) que responde 403: para
+    // esos dejamos la imagen en null (placeholder limpio, no imagen rota).
     $img = null;
-    if (!empty($p['ResourceLink'])) {
-        $img = IMG_BASE . ltrim((string) $p['ResourceLink'], '/');
+    $rl  = (string) ($p['ResourceLink'] ?? '');
+    if ($rl !== '') {
+        if (strpos($rl, '/COMTECH/') !== false) {
+            $img = IMG_BASE . ltrim($rl, '/');
+        }
     } elseif (!empty($p['ImageFileName'])) {
         $img = IMG_BASE . 'online.storage/COMTECH/Products/' . $p['ImageFileName'] . '.webp';
     }
