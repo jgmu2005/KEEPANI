@@ -3,7 +3,7 @@
 Tracker de precios estilo Keepa para e-commerce de Nicaragua.
 Historial de precios, alertas de bajada y comparador entre tiendas.
 
-> **Hosting actual:** subdirectorio temporal `https://agrotecnicaragua.com/ojoalprecio`
+> **Hosting actual:** subdirectorio temporal `ojoalprecio.online`
 > mientras se compra el dominio propio. El código no asume el subpath (rutas
 > relativas), así que migrar = mover la carpeta y actualizar la URL del cron.
 
@@ -43,7 +43,7 @@ Sube el **contenido de `web/`** dentro de `public_html/ojoalprecio/`.
 
 ### 4. Probar la ingesta (sin correr el scraper)
 ```powershell
-Invoke-RestMethod -Uri "https://agrotecnicaragua.com/ojoalprecio/api/ingest.php" `
+Invoke-RestMethod -Uri "ojoalprecio.online/api/ingest.php" `
   -Method Post -ContentType "application/json" `
   -Headers @{ "X-Api-Key" = "TU_CLAVE" } `
   -InFile "web/samples/sample_batch.json"
@@ -57,7 +57,7 @@ cron-job.org solo lo dispara por HTTP.
 
 ### Probar el runner manualmente
 ```powershell
-Invoke-RestMethod -Uri "https://agrotecnicaragua.com/ojoalprecio/cron/run.php" `
+Invoke-RestMethod -Uri "ojoalprecio.online/cron/run.php" `
   -Method Get -Headers @{ "X-Api-Key" = "TU_CLAVE" }
 ```
 Espera algo como `{ ok:true, scanned:3, updated:3, fetch_failed:0 }`.
@@ -65,7 +65,7 @@ Si `fetch_failed` = total, FatCow bloquea el cURL saliente → pasamos el scrape
 GitHub Actions (plan B).
 
 ### Configurar el job en cron-job.org
-- **URL:** `https://agrotecnicaragua.com/ojoalprecio/cron/run.php`
+- **URL:** `ojoalprecio.online/cron/run.php`
 - **Método:** GET
 - **Headers:** `X-Api-Key: TU_CLAVE`
 - **Schedule:** diario (p.ej. 06:00 hora Managua)
