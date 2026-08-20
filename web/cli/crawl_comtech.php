@@ -99,12 +99,16 @@ foreach ($data as $p) {
     $price = isset($p['Price']) ? (float) $p['Price'] : null;
     if ($price === null || $price <= 0) { $noPrice++; continue; }
 
-    // Nombre: suele venir vacío → "Marca + Modelo" (como Copasa).
+    // Nombre: ProductName viene SIEMPRE vacío en comtech. El mejor texto descriptivo
+    // es ImageAlternativeText (~73% lo trae, ej. "AFEITADORA ELECTRICA PARA DAMA
+    // MULTILASER"); es clave para el clasificador de categorías y para el display.
+    // Si no, "Marca + Modelo", y de último "Comtech {code}".
     $name = trim((string) ($p['ProductName'] ?? ''));
+    if ($name === '') { $name = trim((string) ($p['ImageAlternativeText'] ?? '')); }
     if ($name === '') {
         $name = trim(((string) ($p['Brand'] ?? '')) . ' ' . ((string) ($p['Model'] ?? '')));
     }
-    if ($name === '') { $name = 'Comtech ' . $code; }
+    if ($name === '' || $name === '.') { $name = 'Comtech ' . $code; }
 
     // Sólo las imágenes del tenant COMTECH son públicas en S3. Algunos productos
     // referencian el storage de OTRO tenant (ej. LBRRRCL) que responde 403: para
@@ -124,7 +128,7 @@ foreach ($data as $p) {
         sku:         $code,
         url:         BASE . '/product/' . rawurlencode($code),
         title:       $name,
-        brand:       !empty($p['Brand']) ? (string) $p['Brand'] : null,
+        brand:       (!empty($p['Brand']) && $p['Brand'] !== '.') ? (string) $p['Brand'] : null,
         imageUrl:    $img,
         priceNative: $price,
         currency:    CURRENCY,
