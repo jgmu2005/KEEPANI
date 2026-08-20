@@ -66,6 +66,7 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
 <meta property="og:url" content="<?= $h($pageUrl) ?>">
 <meta name="twitter:card" content="summary_large_image">
 <?= Seo::head($settings, true) ?>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
   :root{--brand:#0ea5e9;--brand-dk:#0369a1;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--ok:#16a34a;--bad:#dc2626;--card:#fff}
   *{box-sizing:border-box}
@@ -98,6 +99,7 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
   .save{color:var(--muted);font-size:.82rem}
   .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
   .copy{cursor:pointer;border:0;background:#25d366;color:#fff;font-weight:800;font-size:.82rem;padding:8px 13px;border-radius:9px}
+  .img{cursor:pointer;border:0;background:#7c3aed;color:#fff;font-weight:800;font-size:.82rem;padding:8px 13px;border-radius:9px}
   .view{background:var(--brand);color:#fff;font-weight:700;font-size:.82rem;padding:8px 13px;border-radius:9px}
   .empty{color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:16px;text-align:center}
   .foot{margin-top:36px;padding-top:20px;border-top:1px solid var(--line);text-align:center;color:var(--muted);font-size:.84rem}
@@ -133,6 +135,7 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
       <span class="drop-badge"><?= (float) $d['delta_pct'] ?>%</span>
       <div class="actions">
         <button class="copy" data-wa="<?= $h($waDrop($d)) ?>">📋 Copiar</button>
+        <button class="img" data-imgsrc="img.php?id=<?= (int) $d['id'] ?>" data-title="<?= $h($d['title']) ?>" data-price="Ahora <?= $h($money((float) $d['price_now'])) ?>" data-note="antes <?= $h($money((float) $d['price_prev'])) ?> · <?= $h($d['store_name']) ?>" data-tag="<?= (float) $d['delta_pct'] ?>%">🖼️ Imagen</button>
         <a class="view" href="precio.php?id=<?= (int) $d['id'] ?>">Ver</a>
       </div>
     </div>
@@ -154,6 +157,7 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
       </div>
       <div class="actions">
         <button class="copy" data-wa="<?= $h($waGap($g)) ?>">📋 Copiar</button>
+        <button class="img" data-imgsrc="img.php?group=<?= $h(rawurlencode($g['slug'])) ?>" data-title="<?= $h($g['title']) ?>" data-price="<?= $h($money((float) $g['cheap_price'])) ?> en <?= $h($g['cheap_store']) ?>" data-note="vs <?= $h($money((float) $g['pricy_price'])) ?> en <?= $h($g['pricy_store']) ?> — mismo producto" data-tag="<?= $g['same_chain'] ? 'Misma empresa · Unicomer' : (int) $g['diff_pct'] . '% de diferencia' ?>">🖼️ Imagen</button>
         <a class="view" href="producto.php?slug=<?= $h(rawurlencode($g['slug'])) ?>">Comparar</a>
       </div>
     </div>
@@ -173,6 +177,7 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
       </div>
       <div class="actions">
         <button class="copy" data-wa="<?= $h($waLow($l)) ?>">📋 Copiar</button>
+        <button class="img" data-imgsrc="img.php?id=<?= (int) $l['id'] ?>" data-title="<?= $h($l['title']) ?>" data-price="<?= $h($money((float) $l['price_now'])) ?>" data-note="su precio más bajo · pico <?= $h($money((float) $l['price_peak'])) ?>" data-tag="<?= (int) $l['off_peak_pct'] ?>% bajo su pico">🖼️ Imagen</button>
         <a class="view" href="precio.php?id=<?= (int) $l['id'] ?>">Ver</a>
       </div>
     </div>
@@ -184,7 +189,26 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
   </div>
 </div>
 
+<!-- Plantilla oculta para generar la imagen compartible (html2canvas) -->
+<div id="cardTpl" style="display:none;position:fixed;left:-9999px;top:0;width:600px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;overflow:hidden">
+  <div style="padding:22px 26px 4px;display:flex;align-items:center;justify-content:space-between">
+    <div style="font-weight:900;font-size:22px">🔎 Ojo al Precio</div>
+    <div style="font-size:13px;color:#7dd3fc;font-weight:700">ofertas reales · Nicaragua</div>
+  </div>
+  <div style="background:#fff;margin:14px 26px 0;border-radius:16px;padding:18px;text-align:center">
+    <img class="ct-img" src="" alt="" style="max-width:100%;height:250px;object-fit:contain">
+  </div>
+  <div style="padding:18px 26px 6px">
+    <div class="ct-tag" style="display:none;background:#fecaca;color:#7f1d1d;font-weight:900;font-size:16px;padding:6px 14px;border-radius:999px;margin-bottom:12px"></div>
+    <div class="ct-title" style="font-weight:800;font-size:23px;line-height:1.25;margin-bottom:12px"></div>
+    <div class="ct-price" style="font-weight:900;font-size:36px;color:#4ade80;line-height:1.1"></div>
+    <div class="ct-note" style="font-size:17px;color:#cbd5e1;margin-top:6px"></div>
+  </div>
+  <div style="padding:16px 26px 22px;font-size:15px;color:#94a3b8;border-top:1px solid #334155;margin-top:14px;font-weight:600">📲 ojoalprecio.online/hoy · unite al canal de WhatsApp</div>
+</div>
+
 <script>
+// Copiar para WhatsApp
 document.addEventListener('click', function(e){
   var b = e.target.closest('[data-wa]'); if(!b) return;
   var msg = b.getAttribute('data-wa');
@@ -192,6 +216,31 @@ document.addEventListener('click', function(e){
     var prev = b.textContent; b.textContent = '✅ ¡Copiado!';
     setTimeout(function(){ b.textContent = prev; }, 1600);
   }).catch(function(){ b.textContent = '⚠️ Copiá manual'; });
+});
+
+// Generar imagen compartible (html2canvas + proxy same-origin img.php)
+async function makeCard(ds){
+  var t = document.getElementById('cardTpl');
+  t.querySelector('.ct-title').textContent = ds.title || '';
+  t.querySelector('.ct-price').textContent = ds.price || '';
+  t.querySelector('.ct-note').textContent  = ds.note || '';
+  var tag = t.querySelector('.ct-tag');
+  tag.textContent = ds.tag || ''; tag.style.display = ds.tag ? 'inline-block' : 'none';
+  var im = t.querySelector('.ct-img'); im.src = ds.imgsrc || '';
+  await new Promise(function(res){ if(!ds.imgsrc || im.complete){ res(); } else { im.onload = res; im.onerror = res; } });
+  t.style.display = 'block';
+  var canvas = await html2canvas(t, {scale: 2, backgroundColor: null, logging: false, useCORS: true});
+  t.style.display = 'none';
+  var a = document.createElement('a');
+  a.download = 'ojoalprecio-oferta.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+document.addEventListener('click', function(e){
+  var b = e.target.closest('.img'); if(!b) return;
+  var prev = b.textContent; b.textContent = '⏳';
+  makeCard(b.dataset).then(function(){ b.textContent = prev; })
+    .catch(function(){ b.textContent = '⚠️'; setTimeout(function(){ b.textContent = prev; }, 1500); });
 });
 </script>
 </body>
