@@ -19,6 +19,8 @@ header('Content-Type: application/json; charset=utf-8');
 $db = Db::conn();
 Auth::requireAdmin($db);
 
+try {
+
 $q      = trim((string) ($_GET['q'] ?? ''));
 $limit  = min(200, max(1, (int) ($_GET['limit']  ?? 50)));
 $offset = max(0, (int) ($_GET['offset'] ?? 0));
@@ -52,10 +54,10 @@ $cnt = $db->prepare('SELECT COUNT(*) FROM (SELECT g.id ' . $base . ') t');
 $cnt->execute($params);
 $total = (int) $cnt->fetchColumn();
 
-$sql = 'SELECT g.slug,
-               COALESCE(NULLIF(g.canonical_title, \'\'), MAX(p.title)) AS title,
-               COALESCE(NULLIF(g.brand, \'\'), MAX(p.brand))          AS brand,
-               COALESCE(NULLIF(g.image_url, \'\'), MAX(p.image_url))   AS image_url,
+// Sólo columnas del grupo (rápido). NO usar MAX(p.title/brand/image_url) acá:
+// agregar MAX sobre columnas de texto con GROUP BY genera tablas temporales enormes
+// y hace reventar la query con catálogo grande. El respaldo va aparte, abajo.
+$sql = 'SELECT g.slug, g.canonical_title AS title, g.brand, g.image_url,
                COUNT(DISTINCT p.store_id) AS store_count,
                COUNT(p.id) AS members,
                MIN(ph.price_final) AS min_price, MAX(ph.price_final) AS max_price,
@@ -65,6 +67,34 @@ $sql = 'SELECT g.slug,
          LIMIT ' . $limit . ' OFFSET ' . $offset;
 $st = $db->prepare($sql);
 $st->execute($params);
+$rows = $st->fetchAll();
+
+// Respaldo de título/marca/imagen desde un producto miembro, SÓLO para los grupos
+// de esta página que no tienen datos propios (consulta chica y acotada).
+$need = [];
+foreach ($rows as $r) {
+    if (($r['title'] ?? '') === '' || ($r['image_url'] ?? '') === '') { $need[] = $r['slug']; }
+}
+if ($need) {
+    $in = implode(',', array_fill(0, count($need), '?'));
+    $fb = $db->prepare(
+        "SELECT g.slug, MAX(p.title) AS t, MAX(p.brand) AS b, MAX(p.image_url) AS img
+           FROM product_groups g JOIN products p ON p.group_id = g.id AND p.is_active = 1
+          WHERE g.slug IN ($in) GROUP BY g.id"
+    );
+    $fb->execute($need);
+    $map = [];
+    foreach ($fb->fetchAll() as $f) { $map[$f['slug']] = $f; }
+    foreach ($rows as &$r) {
+        $m = $map[$r['slug']] ?? null;
+        if ($m) {
+            if (($r['title'] ?? '') === '')     { $r['title']     = $m['t']; }
+            if (($r['brand'] ?? '') === '')     { $r['brand']     = $m['b']; }
+            if (($r['image_url'] ?? '') === '') { $r['image_url'] = $m['img']; }
+        }
+    }
+    unset($r);
+}
 
 $items = array_map(static function (array $r): array {
     $min = $r['min_price'] !== null ? (float) $r['min_price'] : null;
@@ -84,7 +114,7 @@ $items = array_map(static function (array $r): array {
         'created'  => $r['created_at'] ?? null,
         'url'      => 'producto.php?slug=' . rawurlencode((string) $r['slug']),
     ];
-}, $st->fetchAll());
+}, $rows);
 
 echo json_encode([
     'ok'     => true,
@@ -93,3 +123,8 @@ echo json_encode([
     'offset' => $offset,
     'items'  => $items,
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+
+} catch (\Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Error: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+}
