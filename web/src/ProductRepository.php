@@ -212,8 +212,9 @@ final class ProductRepository
             'vtex'    => (preg_match('~-(\d{6,})(?:/p)?/?(?:[?#].*)?$~', $url, $m) ? $m[1] : null),
             // OG: Copasa (.../Product/Detail/{sku}), Gallo (.../slug-{id}) o Unicomer (.../slug-{id}/p)
             'og_meta' => (
-                preg_match('~/Product/Detail/([^/?#]+)~i', $url, $m) ? rawurldecode($m[1])
-                    : (preg_match('~-(\d+)(?:/p)?/?(?:[?#].*)?$~', $url, $m2) ? $m2[1] : null)
+                preg_match('~/Product/Detail/([^/?#]+)~i', $url, $m) ? rawurldecode($m[1])          // Copasa
+                    : (preg_match('~/product/([^/?#]+)~', $url, $m3) ? rawurldecode($m3[1])          // Comtech: /product/{code}
+                    : (preg_match('~-(\d+)(?:/p)?/?(?:[?#].*)?$~', $url, $m2) ? $m2[1] : null))       // Gallo/Unicomer: slug-{id}
             ),
             // PriceSmart: .../es-ni/producto/{slug}-{pid}/{pid}-{ean} → el pid es el
             // número al inicio del último segmento (antes del guion, si lo hay).

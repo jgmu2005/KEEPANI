@@ -1,0 +1,28 @@
+name: Crawl Comtech (Online40)
+
+# Baja/refresca el catálogo completo de Comtech vía su Search API (una llamada).
+# Cada corrida agrega un punto de precio por producto.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 8 * * *'   # diario ~08:15 UTC
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: Crawl Comtech
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/crawl_comtech.php
