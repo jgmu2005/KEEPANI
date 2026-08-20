@@ -1,0 +1,28 @@
+name: Crawl Tech Store (app.js)
+
+# Baja el catálogo embebido en app.js de Tech Store Nicaragua (SPA estática).
+# Catálogo chico y de nicho; cada corrida agrega un punto de precio por producto.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 8 * * *'   # diario ~08:20 UTC
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: Crawl Tech Store
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/crawl_techstore.php
