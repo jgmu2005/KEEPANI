@@ -220,6 +220,8 @@ final class ProductRepository
             'bloomreach' => (preg_match('~/(\d+)(?:-\w+)?/?(?:[?#].*)?$~', $url, $m) ? $m[1] : null),
             // Shopify: .../products/{handle}[?variant=...] → el handle es el sku.
             'shopify' => (preg_match('~/products/([^/?#]+)~', $url, $m) ? rawurldecode($m[1]) : null),
+            // WooCommerce: .../product/{slug} o .../producto/{slug} → el slug es el sku.
+            'woocommerce' => (preg_match('~/(?:product|producto)/([^/?#]+)~', $url, $m) ? rawurldecode($m[1]) : null),
             default   => null,
         };
 

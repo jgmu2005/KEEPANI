@@ -1,0 +1,33 @@
+name: Crawl WooCommerce (E-Tech, PC System)
+
+# Baja/refresca el catálogo de tiendas WooCommerce vía el Store API (paginado).
+# Cada corrida agrega un punto de precio por producto.
+on:
+  workflow_dispatch:
+    inputs:
+      store:
+        description: 'Tienda (etech, pcsystemni o all)'
+        required: true
+        default: 'all'
+  schedule:
+    - cron: '45 8 * * *'   # diario ~08:45 UTC
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: Crawl WooCommerce
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/crawl_woocommerce.php "${{ github.event.inputs.store || 'all' }}"

@@ -1,0 +1,62 @@
+<?php
+declare(strict_types=1);
+
+namespace OjoAlPrecio\Web\Fetch;
+
+/**
+ * Convierte UN producto del WooCommerce Store API
+ * (/wp-json/wc/store/v1/products) en NormalizedProduct.
+ *
+ * Trackeamos por el `slug` (lo que va en la URL /product/{slug}). Los precios
+ * vienen en "unidades menores": price / 10^currency_minor_unit (ej. 75210 → 752.10).
+ * El campo `brands` (plugin WooCommerce Brands) da la marca cuando existe.
+ */
+final class WooMapper
+{
+    public static function map(
+        array $p,
+        string $slug,
+        string $currency,
+        bool $taxIncluded,
+        float $taxRate
+    ): ?NormalizedProduct {
+        $handle = (string) ($p['slug'] ?? '');
+        $prices = $p['prices'] ?? null;
+        if ($handle === '' || !is_array($prices)) {
+            return null;
+        }
+
+        $minor = isset($prices['currency_minor_unit']) ? (int) $prices['currency_minor_unit'] : 2;
+        $div   = 10 ** max(0, $minor);
+        $toNum = static fn($v) => ($v === null || $v === '') ? null : (float) $v / $div;
+
+        $price = $toNum($prices['price'] ?? null);
+        if ($price === null || $price <= 0) {
+            return null; // sin precio no hay nada que trackear
+        }
+        $regular   = $toNum($prices['regular_price'] ?? null);
+        $listPrice = ($regular !== null && $regular > $price) ? $regular : null;
+
+        $brand = null;
+        if (!empty($p['brands']) && is_array($p['brands']) && !empty($p['brands'][0]['name'])) {
+            $brand = (string) $p['brands'][0]['name'];
+        }
+
+        $image = !empty($p['images'][0]['src']) ? (string) $p['images'][0]['src'] : null;
+
+        return new NormalizedProduct(
+            storeSlug:   $slug,
+            sku:         $handle, // el slug es el identificador de la URL
+            url:         !empty($p['permalink']) ? (string) $p['permalink'] : '',
+            title:       isset($p['name']) ? (string) $p['name'] : null,
+            brand:       $brand,
+            imageUrl:    $image,
+            priceNative: $price,
+            currency:    $currency,
+            inStock:     !empty($p['is_in_stock']),
+            taxIncluded: $taxIncluded,
+            taxRate:     $taxRate,
+            listPrice:   $listPrice,
+        );
+    }
+}
