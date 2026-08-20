@@ -218,6 +218,8 @@ final class ProductRepository
             // PriceSmart: .../es-ni/producto/{slug}-{pid}/{pid}-{ean} → el pid es el
             // número al inicio del último segmento (antes del guion, si lo hay).
             'bloomreach' => (preg_match('~/(\d+)(?:-\w+)?/?(?:[?#].*)?$~', $url, $m) ? $m[1] : null),
+            // Shopify: .../products/{handle}[?variant=...] → el handle es el sku.
+            'shopify' => (preg_match('~/products/([^/?#]+)~', $url, $m) ? rawurldecode($m[1]) : null),
             default   => null,
         };
 
