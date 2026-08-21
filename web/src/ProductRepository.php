@@ -235,7 +235,7 @@ final class ProductRepository
     public function product(int $id): ?array
     {
         $st = $this->db->prepare(
-            'SELECT p.id, p.external_sku AS sku, p.title, p.brand, p.image_url, p.url,
+            'SELECT p.id, p.external_sku AS sku, p.title, p.brand, p.seller, p.image_url, p.url,
                     s.slug AS store, s.name AS store_name, s.currency, s.tax_included,
                     g.slug AS group_slug, g.store_count AS group_stores
                FROM products p
@@ -577,7 +577,7 @@ final class ProductRepository
         }
 
         $st = $this->db->prepare(
-            'SELECT p.id, p.title, p.brand, p.image_url, p.url, p.group_locked,
+            'SELECT p.id, p.title, p.brand, p.image_url, p.url, p.group_locked, p.seller,
                     s.slug AS store, s.name AS store_name, s.tax_included,
                     ph.price_final, ph.list_price, ph.currency, ph.in_stock, ph.captured_date AS last_date
                FROM products p
@@ -604,6 +604,7 @@ final class ProductRepository
                 'tax_added'   => !(bool) $r['tax_included'], // precio con IVA estimado (+15%)
                 'last_date'   => $r['last_date'],
                 'locked'      => (bool) ($r['group_locked'] ?? false),
+                'seller'      => $r['seller'] ?? null,
             ];
         }, $st->fetchAll());
 

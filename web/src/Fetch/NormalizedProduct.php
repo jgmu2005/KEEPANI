@@ -33,6 +33,8 @@ final class NormalizedProduct
         public ?string $ean = null,
         /** @var string[] refIds de TODOS los SKUs (VTEX): tallas/colores del mismo producto. */
         public array   $refIds = [],
+        /** Vendedor en marketplaces (ej. Tizo): el comercio que vende el producto. */
+        public ?string $seller = null,
     ) {
         if ($this->capturedAt === '') {
             $this->capturedAt = gmdate('c');
@@ -85,6 +87,7 @@ final class NormalizedProduct
             'category_id'  => $this->categoryId,
             'ean'          => $this->ean,
             'ref_ids'      => $this->refIds,
+            'seller'       => $this->seller,
         ];
     }
 }

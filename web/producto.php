@@ -219,6 +219,7 @@ if ($priced) {
   .usd{color:var(--muted);font-size:.72rem}
   .cheap{background:#f0fdf4}
   .tag{display:inline-block;font-size:.64rem;font-weight:800;color:#065f46;background:#d1fae5;padding:2px 7px;border-radius:999px;margin-left:6px}
+  .seller{color:var(--muted);font-size:.72rem}
   .st{font-size:.78rem;font-weight:600}
   .st.in{color:var(--ok)} .st.out{color:var(--bad)}
   .go{background:var(--brand);color:#fff;padding:8px 13px;border-radius:8px;font-weight:700;white-space:nowrap}
@@ -299,7 +300,7 @@ if ($priced) {
         $hasDisc = $o['list_price'] !== null && $o['price_final'] !== null && $o['list_price'] > $o['price_final'];
     ?>
       <tr class="<?= $isCheap ? 'cheap' : '' ?>">
-        <td><b><?= $h($o['store_name']) ?></b><?= $isCheap ? '<span class="tag">💚 más barato</span>' : '' ?></td>
+        <td><b><?= $h($o['store_name']) ?></b><?= $isCheap ? '<span class="tag">💚 más barato</span>' : '' ?><?php if (!empty($o['seller'])): ?><br><small class="seller">🏬 vendido por <?= $h($o['seller']) ?></small><?php endif; ?></td>
         <td class="price"><?= $fmt($o['price_final'], $o['currency']) ?><?php if ($hasDisc): ?><span class="old"><?= $fmt($o['list_price'], $o['currency']) ?></span><?php endif; ?><?php if (!empty($o['tax_added'])): ?><small class="taxest">IVA estimado incluido</small><?php endif; ?></td>
         <td class="usd c-usd"><?= $h($usd($o['price_final'])) ?></td>
         <td><span class="st in">● En stock</span></td>

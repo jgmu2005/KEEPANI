@@ -72,6 +72,9 @@ final class TizoMapper
             taxIncluded: $taxIncluded,
             taxRate:     $taxRate,
             listPrice:   $listPrice,
+            // Vendedor del marketplace: 'store' (catálogo) o 'storeName' (detalle).
+            seller:      !empty($p['storeName']) ? (string) $p['storeName']
+                          : (!empty($p['store']) ? (string) $p['store'] : null),
         );
     }
 }

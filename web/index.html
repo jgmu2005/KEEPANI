@@ -961,7 +961,7 @@ async function openDetail(params, endpoint='history.php'){
     <div class="head">
       ${p.image_url ? `<img src="${p.image_url}" alt="">` : ''}
       <div>
-        <span class="badge">${p.store_name || p.store}</span>
+        <span class="badge">${p.store_name || p.store}</span>${p.seller ? ` <span class="note" style="font-size:.78rem">🏬 vendido por ${escapeHtml(p.seller)}</span>` : ''}
         <h3>${escapeHtml(p.title || p.sku)}</h3>
         ${p.brand ? `<div class="note">${escapeHtml(p.brand)}</div>` : ''}
       </div>
