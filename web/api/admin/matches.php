@@ -39,35 +39,39 @@ if ($category !== '') {
     $params[':cata'] = $category;
     $params[':catb'] = $category;
 }
-// "En stock" = último precio con in_stock=1 en AMBOS productos.
+
+// Subconsulta de "último precio/stock" por producto. Es CARA, así que solo se usa
+// cuando hace falta: al ocultar agotados (filtro), y en la fase 2 para los pocos
+// de la página. NO se usa para ordenar (eso obligaba a calcularla para TODOS).
+$priceJoins = 'LEFT JOIN price_history pha ON pha.id = (SELECT id FROM price_history WHERE product_id = a.id ORDER BY captured_at DESC LIMIT 1)
+               LEFT JOIN price_history phb ON phb.id = (SELECT id FROM price_history WHERE product_id = b.id ORDER BY captured_at DESC LIMIT 1)';
 $bothIn = '(COALESCE(pha.in_stock,0) = 1 AND COALESCE(phb.in_stock,0) = 1)';
-if ($hideOos) {
-    $where[] = $bothIn;
-}
-$whereSql = implode(' AND ', $where);
+$order  = $sort === 'recent' ? 'mr.created_at DESC, mr.id DESC' : 'mr.score DESC, mr.id ASC';
 
-// Los agotados al final; luego el orden elegido.
-$order = $sort === 'recent'
-    ? "$bothIn DESC, mr.created_at DESC, mr.id DESC"
-    : "$bothIn DESC, mr.score DESC, mr.id ASC";
+// --- FASE 1: IDs de la página, sin subconsultas de precio (rápido) ---
+$idJoins = 'JOIN products a ON a.id = mr.product_a_id JOIN products b ON b.id = mr.product_b_id';
+$idWhere = implode(' AND ', $where);
+if ($hideOos) { $idJoins .= "\n" . $priceJoins; $idWhere .= " AND $bothIn"; }
+$idSt = $db->prepare("SELECT mr.id FROM match_review mr $idJoins WHERE $idWhere ORDER BY $order LIMIT $limit OFFSET $offset");
+$idSt->execute($params);
+$ids = $idSt->fetchAll(\PDO::FETCH_COLUMN);
 
-$sql = "SELECT mr.id, mr.score, mr.img_distance, mr.jaccard, mr.method, mr.created_at,
-               a.title AS a_title, a.image_url AS a_img, a.url AS a_url,
-               sa.name AS a_store, pha.price_final AS a_price, COALESCE(pha.in_stock,0) AS a_stock,
-               b.title AS b_title, b.image_url AS b_img, b.url AS b_url,
-               sb.name AS b_store, phb.price_final AS b_price, COALESCE(phb.in_stock,0) AS b_stock
-          FROM match_review mr
-          JOIN products a ON a.id = mr.product_a_id  JOIN stores sa ON sa.id = a.store_id
-          JOIN products b ON b.id = mr.product_b_id  JOIN stores sb ON sb.id = b.store_id
-          LEFT JOIN price_history pha ON pha.id = (SELECT id FROM price_history WHERE product_id = a.id ORDER BY captured_at DESC LIMIT 1)
-          LEFT JOIN price_history phb ON phb.id = (SELECT id FROM price_history WHERE product_id = b.id ORDER BY captured_at DESC LIMIT 1)
-         WHERE $whereSql
-         ORDER BY $order
-         LIMIT $limit OFFSET $offset";
-$st = $db->prepare($sql);
-$st->execute($params);
-
-$items = array_map(static function (array $r): array {
+// --- FASE 2: datos completos + precios SOLO para esos IDs ---
+$items = [];
+if ($ids) {
+    $in  = implode(',', array_map('intval', $ids));
+    $sql = "SELECT mr.id, mr.score, mr.img_distance, mr.jaccard, mr.method, mr.created_at,
+                   a.title AS a_title, a.image_url AS a_img, a.url AS a_url,
+                   sa.name AS a_store, pha.price_final AS a_price, COALESCE(pha.in_stock,0) AS a_stock,
+                   b.title AS b_title, b.image_url AS b_img, b.url AS b_url,
+                   sb.name AS b_store, phb.price_final AS b_price, COALESCE(phb.in_stock,0) AS b_stock
+              FROM match_review mr
+              JOIN products a ON a.id = mr.product_a_id  JOIN stores sa ON sa.id = a.store_id
+              JOIN products b ON b.id = mr.product_b_id  JOIN stores sb ON sb.id = b.store_id
+              $priceJoins
+             WHERE mr.id IN ($in)
+             ORDER BY $order";
+    $items = array_map(static function (array $r): array {
     return [
         'id'      => (int) $r['id'],
         'score'   => (int) $r['score'],
@@ -76,24 +80,23 @@ $items = array_map(static function (array $r): array {
         'method'  => $r['method'],
         'a' => ['title' => $r['a_title'], 'img' => $r['a_img'], 'url' => $r['a_url'], 'store' => $r['a_store'], 'price' => $r['a_price'] !== null ? (float) $r['a_price'] : null, 'in_stock' => (bool) $r['a_stock']],
         'b' => ['title' => $r['b_title'], 'img' => $r['b_img'], 'url' => $r['b_url'], 'store' => $r['b_store'], 'price' => $r['b_price'] !== null ? (float) $r['b_price'] : null, 'in_stock' => (bool) $r['b_stock']],
-    ];
-}, $st->fetchAll());
+        ];
+    }, $db->query($sql)->fetchAll());
+}
 
-// Total con los MISMOS filtros (para saber si hay "Ver más").
-$cntSql = "SELECT COUNT(*)
-             FROM match_review mr
-             JOIN products a ON a.id = mr.product_a_id
-             JOIN products b ON b.id = mr.product_b_id
-             LEFT JOIN price_history pha ON pha.id = (SELECT id FROM price_history WHERE product_id = a.id ORDER BY captured_at DESC LIMIT 1)
-             LEFT JOIN price_history phb ON phb.id = (SELECT id FROM price_history WHERE product_id = b.id ORDER BY captured_at DESC LIMIT 1)
-            WHERE $whereSql";
-$cnt = $db->prepare($cntSql);
+// Total con los MISMOS filtros. Sin subconsultas de precio salvo que se oculten
+// agotados (ahí sí hacen falta para filtrar).
+$cntJoins = 'JOIN products a ON a.id = mr.product_a_id JOIN products b ON b.id = mr.product_b_id';
+$cntWhere = implode(' AND ', $where);
+if ($hideOos) { $cntJoins .= "\n" . $priceJoins; $cntWhere .= " AND $bothIn"; }
+$cnt = $db->prepare("SELECT COUNT(*) FROM match_review mr $cntJoins WHERE $cntWhere");
 $cnt->execute($params);
 $total = (int) $cnt->fetchColumn();
 
-// Categorías presentes en los pares pendientes (para el filtro).
+// Categorías presentes en los pares pendientes (para el filtro). Solo en la
+// primera página: el cliente las cachea y no hace falta recalcularlas al paginar.
 $categories = [];
-if ($hasCat) {
+if ($hasCat && $offset === 0) {
     $catRows = $db->query(
         "SELECT p.cat_key AS k, COUNT(*) AS n FROM (
             SELECT product_a_id AS pid FROM match_review WHERE status='pending'
