@@ -44,6 +44,14 @@ final class WooMapper
 
         $image = !empty($p['images'][0]['src']) ? (string) $p['images'][0]['src'] : null;
 
+        // Si el SKU de WooCommerce es un código de barras (EAN/UPC, 12-14 dígitos),
+        // lo guardamos como EAN para el matcheo EXACTO cross-store (ej. fitshop).
+        $ean    = null;
+        $wooSku = trim((string) ($p['sku'] ?? ''));
+        if ($wooSku !== '' && preg_match('/^\d{12,14}$/', $wooSku)) {
+            $ean = $wooSku;
+        }
+
         return new NormalizedProduct(
             storeSlug:   $slug,
             sku:         $handle, // el slug es el identificador de la URL
@@ -57,6 +65,7 @@ final class WooMapper
             taxIncluded: $taxIncluded,
             taxRate:     $taxRate,
             listPrice:   $listPrice,
+            ean:         $ean,
         );
     }
 }

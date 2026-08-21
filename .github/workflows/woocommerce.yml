@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       store:
-        description: 'Tienda (etech, pcsystemni o all)'
+        description: 'Tienda (etech, pcsystemni, fitshop o all)'
         required: true
         default: 'all'
   schedule:
