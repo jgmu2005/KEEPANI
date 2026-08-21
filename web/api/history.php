@@ -42,13 +42,24 @@ try {
     }
 
     // Cuenta la vista (web = tarjeta, ext = extensión). No debe romper la respuesta.
-    try {
-        $src = ($_GET['src'] ?? '') === 'ext' ? 'ext' : 'web';
-        Db::conn()->prepare(
-            'INSERT INTO product_hits (product_id, source, day, hits) VALUES (?, ?, CURDATE(), 1)
-             ON DUPLICATE KEY UPDATE hits = hits + 1'
-        )->execute([$id, $src]);
-    } catch (\Throwable $e) { /* tracking best-effort */ }
+    // NO cuenta bots/crawlers ni fetchers de preview (Googlebot renderiza el SPA y
+    // dispara esto al seguir los links index.html?p=ID desde las páginas SEO, lo que
+    // inflaba las "impresiones"). Igual se devuelven los datos, para no afectar el SEO.
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    $isBot = $ua === '' || preg_match(
+        '~bot|crawl|spider|slurp|bingpreview|facebookexternal|embedly|preview|whatsapp|telegram|' .
+        'headless|python-requests|scrapy|curl|wget|go-http|okhttp|java/|semrush|ahrefs|mj12|dotbot|petalbot~i',
+        $ua
+    );
+    if (!$isBot) {
+        try {
+            $src = ($_GET['src'] ?? '') === 'ext' ? 'ext' : 'web';
+            Db::conn()->prepare(
+                'INSERT INTO product_hits (product_id, source, day, hits) VALUES (?, ?, CURDATE(), 1)
+                 ON DUPLICATE KEY UPDATE hits = hits + 1'
+            )->execute([$id, $src]);
+        } catch (\Throwable $e) { /* tracking best-effort */ }
+    }
 
     $product = $repo->product($id);
     $history = $repo->history($id);
