@@ -112,10 +112,20 @@ function probe(array $domains, string $path, string $platform): array
     return $hits;
 }
 
+/** Normaliza una línea a un host limpio (tolera URLs completas, www, rutas, #comentarios). */
+function normHost(string $s): ?string
+{
+    $s = trim($s);
+    if ($s === '' || $s[0] === '#') { return null; }
+    $h = preg_match('~^https?://~i', $s) ? (string) parse_url($s, PHP_URL_HOST) : (string) preg_split('~[/\s]~', $s)[0];
+    $h = preg_replace('/^www\./', '', strtolower($h));
+    return ($h && strpos($h, '.') !== false && strpos($h, ' ') === false) ? $h : null;
+}
+
 // --- Origen de dominios ---
 $file = $argv[1] ?? null;
 if ($file !== null && is_file($file)) {
-    $domains = array_values(array_unique(array_filter(array_map('trim', file($file, FILE_IGNORE_NEW_LINES)))));
+    $domains = array_values(array_unique(array_filter(array_map('normHost', file($file, FILE_IGNORE_NEW_LINES)))));
     err('Dominios del archivo: ' . count($domains));
 } else {
     err('Bajando dominios de crt.sh…');
