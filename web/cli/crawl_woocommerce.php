@@ -21,7 +21,8 @@ use OjoAlPrecio\Web\Fetch\WooMapper;
 const STORES = [
     'etech'      => ['base_url' => 'https://etech.com.ni',   'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'pcsystemni' => ['base_url' => 'https://pcsystemni.com', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
-    'fitshop'    => ['base_url' => 'https://fitshop.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    // Nota: fitshop es WooCommerce pero su Cloudflare BLOQUEA las IPs de GitHub
+    // Actions (403). Se crawlea desde el server (FatCow) con web/cron/crawl_woo_server.php.
 ];
 const PAGE      = 100; // máximo del Store API
 const MAX_PAGES = 120; // tope de seguridad
