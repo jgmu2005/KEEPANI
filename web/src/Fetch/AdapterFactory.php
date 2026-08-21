@@ -35,6 +35,10 @@ final class AdapterFactory
                 http: $http, slug: $slug, baseUrl: $baseUrl,
                 currency: $currency, taxIncluded: $taxIncluded, taxRate: $taxRate,
             ),
+            'tizo' => new TizoAdapter(
+                http: $http, slug: $slug, baseUrl: $baseUrl,
+                currency: $currency, taxIncluded: $taxIncluded, taxRate: $taxRate,
+            ),
             'woocommerce' => new WooAdapter(
                 http: $http, slug: $slug, baseUrl: $baseUrl,
                 currency: $currency, taxIncluded: $taxIncluded, taxRate: $taxRate,

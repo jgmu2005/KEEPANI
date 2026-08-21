@@ -223,6 +223,8 @@ final class ProductRepository
             'shopify' => (preg_match('~/products/([^/?#]+)~', $url, $m) ? rawurldecode($m[1]) : null),
             // WooCommerce: .../product/{slug} o .../producto/{slug} → el slug es el sku.
             'woocommerce' => (preg_match('~/(?:product|producto)/([^/?#]+)~', $url, $m) ? rawurldecode($m[1]) : null),
+            // Tizo: .../home/product/{productId}/option/{opt} → el id es el sku.
+            'tizo' => (preg_match('~/home/product/(\d+)~', $url, $m) ? $m[1] : null),
             default   => null,
         };
 

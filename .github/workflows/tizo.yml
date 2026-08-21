@@ -1,0 +1,28 @@
+name: Crawl Tizo (soytizo.com)
+
+# Baja el catálogo de Tizo vía su API (api.tizo.app) con token de invitado.
+# Recorre categorías → catálogos → productos. Cada corrida agrega un punto de precio.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '50 8 * * *'   # diario ~08:50 UTC
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: Crawl Tizo
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/crawl_tizo.php
