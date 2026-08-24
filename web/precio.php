@@ -125,12 +125,14 @@ if ($image)      { $ld['image'] = $image; }
 if ($p['brand']) { $ld['brand'] = ['@type' => 'Brand', 'name' => $p['brand']]; }
 if ($current !== null) {
     $ld['offers'] = [
-        '@type'         => 'Offer',
-        'price'         => $current,
-        'priceCurrency' => $cur === 'USD' ? 'USD' : 'NIO',
-        'availability'  => $inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-        'url'           => $p['url'],
-        'seller'        => ['@type' => 'Organization', 'name' => $p['store_name']],
+        '@type'          => 'Offer',
+        'price'          => $current,
+        'priceCurrency'  => $cur === 'USD' ? 'USD' : 'NIO',
+        'availability'   => $inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        'itemCondition'  => 'https://schema.org/NewCondition',
+        'priceValidUntil' => date('Y-m-d', strtotime('+2 days')), // precios se refrescan a diario
+        'url'            => $p['url'],
+        'seller'         => ['@type' => 'Organization', 'name' => $p['store_name']],
     ];
 }
 $ldBreadcrumb = [

@@ -145,12 +145,14 @@ if ($priced) {
         'lowPrice'      => $low,
         'highPrice'     => $high,
         'offerCount'    => count($priced),
+        'priceValidUntil' => date('Y-m-d', strtotime('+2 days')), // precios se refrescan a diario
         'offers'        => array_map(static function ($o) use ($cur) {
             return [
                 '@type'         => 'Offer',
                 'price'         => $o['price_final'],
                 'priceCurrency' => $cur === 'USD' ? 'USD' : 'NIO',
                 'availability'  => $o['in_stock'] ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                'itemCondition' => 'https://schema.org/NewCondition',
                 'url'           => $o['url'],
                 'seller'        => ['@type' => 'Organization', 'name' => $o['store_name']],
             ];
