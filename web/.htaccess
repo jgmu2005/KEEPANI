@@ -18,6 +18,18 @@
 # la vista de celulares. Se usa sin barra final (así lo genera history.pushState).
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # ── DOMINIO CANÓNICO: 301 a https://ojoalprecio.online (sin www) ──
+    # Sin esto, Google indexa 4 variantes (http/https × www/no-www) como duplicados.
+    # 1) www → sin www (siempre a https).
+    RewriteCond %{HTTP_HOST} ^www\.ojoalprecio\.online$ [NC]
+    RewriteRule ^ https://ojoalprecio.online%{REQUEST_URI} [L,R=301]
+    # 2) http → https (con guarda X-Forwarded-Proto para no hacer loop si el SSL
+    #    lo termina un proxy y Apache ve la request como http).
+    RewriteCond %{HTTPS} off
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteRule ^ https://ojoalprecio.online%{REQUEST_URI} [L,R=301]
+
     RewriteRule ^compara-telefonos$ index.html [L]
 
     # URL amigable y con keywords por producto: /precio/{id}/{slug-opcional}

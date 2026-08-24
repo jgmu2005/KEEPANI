@@ -14,8 +14,14 @@ final class Verification
     /** URL base de la app (funciona en cualquier dominio: raíz o subdirectorio). */
     public static function baseUrl(): string
     {
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        // Producción: FORZAR el dominio canónico (https, sin www). Si no, cada
+        // variante (http / www) arma su propia URL canónica y Google las trata
+        // como duplicados. En dev/otros entornos se deriva del request.
+        if (str_contains($host, 'ojoalprecio.online')) {
+            return 'https://ojoalprecio.online';
+        }
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
         // Raíz de la app desde SCRIPT_NAME:
         //  1) quita el tramo de endpoint (/api|cron|cli/...) → sirve para esos scripts;
         //  2) quita el archivo .php de las páginas top-level (producto.php, precio.php…),
