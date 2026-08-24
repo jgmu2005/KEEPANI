@@ -73,13 +73,11 @@ if ($method === 'GET') {
     $excludeId = $excludeSlug !== '' ? groupIdBySlug($db, $excludeSlug) : null;
 
     $sql = 'SELECT p.id, p.title, p.image_url, s.name AS store_name,
-                   ph.price_final, ph.currency,
+                   p.last_price AS price_final, p.last_currency AS currency,
                    g.slug AS group_slug, g.canonical_title AS group_title, g.member_count AS group_members
               FROM products p
               JOIN stores s ON s.id = p.store_id
          LEFT JOIN product_groups g ON g.id = p.group_id
-         LEFT JOIN price_history ph ON ph.id = (
-                   SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
              WHERE p.is_active = 1 AND p.title LIKE :q'
              . ($excludeId ? ' AND (p.group_id IS NULL OR p.group_id <> :ex)' : '')
              . ' ORDER BY p.title LIMIT 25';

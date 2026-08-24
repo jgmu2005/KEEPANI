@@ -52,10 +52,8 @@ if ($method === 'GET') {
         $place = implode(',', array_fill(0, count($brands), '?'));
         $ps = $db->prepare(
             "SELECT p.id, p.brand_norm, p.store_id, p.model_norm, p.img_dhash, p.group_id,
-                    ph.price_final AS price
+                    p.last_price AS price
                FROM products p
-               LEFT JOIN price_history ph ON ph.id = (
-                    SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
               WHERE p.is_active = 1 AND p.model_norm IS NOT NULL AND p.brand_norm IN ($place)"
         );
         $ps->execute($brands);

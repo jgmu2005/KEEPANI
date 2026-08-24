@@ -37,18 +37,18 @@ if ($q !== '') {
     $params[':qm']  = '%' . $q . '%';
 }
 
-// Sólo tiendas EN STOCK (las agotadas traen precio-centinela) y con ≥2 tiendas reales.
+// Sólo tiendas EN STOCK y con ≥2 tiendas reales. Precio/stock actual denormalizado
+// en products.last_* (ya saneado): sin subconsulta a price_history por producto.
 $base = 'FROM product_groups g
           JOIN products p ON p.group_id = g.id AND p.is_active = 1
-          JOIN price_history ph ON ph.id = (
-                SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
-         WHERE g.store_count >= 2 AND ph.in_stock = 1 AND ph.price_final IS NOT NULL
+         WHERE g.store_count >= 2 AND p.last_in_stock = 1
+           AND p.last_price IS NOT NULL AND p.last_price < 1000000
          GROUP BY g.id
          HAVING ' . $having;
 
 $order = $sort === 'new'
     ? 'g.created_at DESC, g.id DESC'
-    : '(MAX(ph.price_final) - MIN(ph.price_final)) / NULLIF(MIN(ph.price_final), 0) DESC, store_count DESC';
+    : '(MAX(p.last_price) - MIN(p.last_price)) / NULLIF(MIN(p.last_price), 0) DESC, store_count DESC';
 
 $cnt = $db->prepare('SELECT COUNT(*) FROM (SELECT g.id ' . $base . ') t');
 $cnt->execute($params);
@@ -60,8 +60,8 @@ $total = (int) $cnt->fetchColumn();
 $sql = 'SELECT g.slug, g.canonical_title AS title, g.brand, g.image_url,
                COUNT(DISTINCT p.store_id) AS store_count,
                COUNT(p.id) AS members,
-               MIN(ph.price_final) AS min_price, MAX(ph.price_final) AS max_price,
-               MAX(ph.currency) AS currency, g.created_at
+               MIN(p.last_price) AS min_price, MAX(p.last_price) AS max_price,
+               MAX(p.last_currency) AS currency, g.created_at
           ' . $base . '
          ORDER BY ' . $order . '
          LIMIT ' . $limit . ' OFFSET ' . $offset;

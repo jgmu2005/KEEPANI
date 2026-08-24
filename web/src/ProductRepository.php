@@ -352,9 +352,7 @@ final class ProductRepository
         $rows = $this->db->query(
             'SELECT p.cat_key AS k, COUNT(*) AS n
                FROM products p
-               JOIN price_history ph ON ph.id = (
-                    SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
-              WHERE p.is_active = 1 AND p.cat_key IS NOT NULL AND ph.in_stock = 1
+              WHERE p.is_active = 1 AND p.cat_key IS NOT NULL AND p.last_in_stock = 1
               GROUP BY p.cat_key'
         )->fetchAll(\PDO::FETCH_KEY_PAIR);
 
@@ -382,9 +380,7 @@ final class ProductRepository
                 SUM(p.tv_inches >= 56)              AS xl,
                 SUM(p.tv_inches IS NULL)            AS na
               FROM products p
-              JOIN price_history ph ON ph.id = (
-                    SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
-             WHERE p.is_active = 1 AND p.cat_key = 'tv' AND ph.in_stock = 1"
+             WHERE p.is_active = 1 AND p.cat_key = 'tv' AND p.last_in_stock = 1"
         )->fetch() ?: [];
 
         $labels = [
@@ -442,15 +438,15 @@ final class ProductRepository
             $params[':store'] = $f['store'];
         }
         if (isset($f['min']) && $f['min'] !== '' && $f['min'] !== null) {
-            $where[] = 'ph.price_final >= :min';
+            $where[] = 'p.last_price >= :min';
             $params[':min'] = (float) $f['min'];
         }
         if (isset($f['max']) && $f['max'] !== '' && $f['max'] !== null) {
-            $where[] = 'ph.price_final <= :max';
+            $where[] = 'p.last_price <= :max';
             $params[':max'] = (float) $f['max'];
         }
         if (!empty($f['in_stock'])) {
-            $where[] = 'ph.in_stock = 1';
+            $where[] = 'p.last_in_stock = 1';
         }
         if (!empty($f['category'])) {
             $where[] = 'p.category_external_id = :cat';
@@ -476,9 +472,9 @@ final class ProductRepository
         // Orden: lista blanca (nunca interpolar entrada del usuario).
         $sortMap = [
             'name'       => 'p.title ASC',
-            'price_asc'  => 'ph.price_final ASC',
-            'price_desc' => 'ph.price_final DESC',
-            'discount'   => 'ph.discount_pct DESC',
+            'price_asc'  => 'p.last_price ASC',
+            'price_desc' => 'p.last_price DESC',
+            'discount'   => '((p.last_list - p.last_price) / NULLIF(p.last_list, 0)) DESC',
         ];
         $orderSql = $sortMap[$f['sort'] ?? 'name'] ?? $sortMap['name'];
 
@@ -489,9 +485,6 @@ final class ProductRepository
         $base = 'FROM products p
                  JOIN stores s ON s.id = p.store_id
                  LEFT JOIN product_groups pg ON pg.id = p.group_id
-                 LEFT JOIN price_history ph ON ph.id = (
-                     SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1
-                 )
                  WHERE ' . $whereSql;
 
         $countStmt = $this->db->prepare('SELECT COUNT(*) ' . $base);
@@ -500,8 +493,8 @@ final class ProductRepository
 
         $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
                        s.slug AS store, s.name AS store_name, s.tax_included,
-                       ph.price_final, ph.list_price, ph.discount_pct,
-                       ph.currency, ph.in_stock, ph.captured_date AS last_date,
+                       p.last_price AS price_final, p.last_list AS list_price,
+                       p.last_currency AS currency, p.last_in_stock AS in_stock, p.last_date AS last_date,
                        pg.slug AS group_slug, pg.store_count AS group_stores
                 ' . $base . '
                 ORDER BY ' . $orderSql . '
@@ -520,7 +513,10 @@ final class ProductRepository
                 'store_name'   => $r['store_name'],
                 'price_final'  => $r['price_final'] !== null ? (float) $r['price_final'] : null,
                 'list_price'   => $r['list_price'] !== null ? (float) $r['list_price'] : null,
-                'discount_pct' => $r['discount_pct'] !== null ? (float) $r['discount_pct'] : null,
+                // Descuento derivado de lista vs precio (ya no guardamos discount_pct denormalizado).
+                'discount_pct' => ($r['list_price'] !== null && $r['price_final'] !== null
+                                   && (float) $r['list_price'] > (float) $r['price_final'])
+                                  ? round((1 - (float) $r['price_final'] / (float) $r['list_price']) * 100, 1) : null,
                 'currency'     => $r['currency'] ?? 'NIO',
                 'in_stock'     => (bool) $r['in_stock'],
                 'tax_added'    => !(bool) $r['tax_included'],
@@ -579,13 +575,12 @@ final class ProductRepository
         $st = $this->db->prepare(
             'SELECT p.id, p.title, p.brand, p.image_url, p.url, p.group_locked, p.seller,
                     s.slug AS store, s.name AS store_name, s.tax_included,
-                    ph.price_final, ph.list_price, ph.currency, ph.in_stock, ph.captured_date AS last_date
+                    p.last_price AS price_final, p.last_list AS list_price,
+                    p.last_currency AS currency, p.last_in_stock AS in_stock, p.last_date
                FROM products p
                JOIN stores s ON s.id = p.store_id
-               LEFT JOIN price_history ph ON ph.id = (
-                    SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
               WHERE p.group_id = ? AND p.is_active = 1
-              ORDER BY (ph.price_final IS NULL), ph.price_final ASC'
+              ORDER BY (p.last_price IS NULL), p.last_price ASC'
         );
         $st->execute([(int) $g['id']]);
 
@@ -639,14 +634,13 @@ final class ProductRepository
             $params[':method'] = $method;
         }
 
-        // Sólo cuentan las ofertas EN STOCK: las agotadas traen precio-centinela
-        // (ej. Siman marca C$10,000,000) que inflaba el máximo y el % de ahorro.
-        // Se recalcula el # de tiendas con stock y se exige que sigan siendo ≥2.
+        // Sólo cuentan las ofertas EN STOCK. Precio/stock ACTUAL denormalizado en
+        // products.last_* (Fase B): ya no hace falta buscar la última fila en
+        // price_history por cada producto. last_price viene saneado (centinela → null).
         $base = 'FROM product_groups g
                   JOIN products p ON p.group_id = g.id AND p.is_active = 1
-                  JOIN price_history ph ON ph.id = (
-                        SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
-                 WHERE ' . $where . ' AND ph.in_stock = 1 AND ph.price_final IS NOT NULL
+                 WHERE ' . $where . ' AND p.last_in_stock = 1
+                   AND p.last_price IS NOT NULL AND p.last_price < 1000000
                  GROUP BY g.id
                  HAVING COUNT(DISTINCT p.store_id) >= 2';
 
@@ -657,12 +651,12 @@ final class ProductRepository
         // Orden: por diferencia de precio % entre tiendas (default) o por # de tiendas.
         $order = $sort === 'stores'
             ? 'store_count DESC, g.updated_at DESC'
-            : '(MAX(ph.price_final) - MIN(ph.price_final)) / NULLIF(MIN(ph.price_final), 0) DESC, store_count DESC';
+            : '(MAX(p.last_price) - MIN(p.last_price)) / NULLIF(MIN(p.last_price), 0) DESC, store_count DESC';
 
         $sql = 'SELECT g.slug, g.canonical_title AS title, g.brand, g.image_url,
                        COUNT(DISTINCT p.store_id) AS store_count,
-                       MIN(ph.price_final) AS min_price, MAX(ph.price_final) AS max_price,
-                       MAX(ph.currency) AS currency
+                       MIN(p.last_price) AS min_price, MAX(p.last_price) AS max_price,
+                       MAX(p.last_currency) AS currency
                   ' . $base . '
                  ORDER BY ' . $order . '
                  LIMIT ' . $limit . ' OFFSET ' . $offset;
@@ -804,42 +798,38 @@ final class ProductRepository
         $pool = $recent ? min($limit * 6, 80) : $limit;
 
         $sql = "SELECT g.slug, g.canonical_title AS title, g.image_url,
-                       MIN(ph.price_final) AS min_price, MAX(ph.price_final) AS max_price,
+                       MIN(p.last_price) AS min_price, MAX(p.last_price) AS max_price,
                        COUNT(DISTINCT p.store_id) AS store_count
                   FROM product_groups g
                   JOIN products p ON p.group_id = g.id AND p.is_active = 1
-                  JOIN price_history ph ON ph.id = (
-                        SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
                  WHERE g.store_count >= 2 AND g.method IN ('uni','ean','manual')
-                   AND ph.in_stock = 1 AND ph.price_final IS NOT NULL AND ph.price_final < 1000000
+                   AND p.last_in_stock = 1 AND p.last_price IS NOT NULL AND p.last_price < 1000000
                  GROUP BY g.id
-                HAVING COUNT(DISTINCT p.store_id) >= 2 AND MIN(ph.price_final) > 0
-                   AND (MAX(ph.price_final) - MIN(ph.price_final)) / MIN(ph.price_final) BETWEEN 0.15 AND 3.0
-                 ORDER BY (MAX(ph.price_final) - MIN(ph.price_final)) / MIN(ph.price_final) DESC
+                HAVING COUNT(DISTINCT p.store_id) >= 2 AND MIN(p.last_price) > 0
+                   AND (MAX(p.last_price) - MIN(p.last_price)) / MIN(p.last_price) BETWEEN 0.15 AND 3.0
+                 ORDER BY (MAX(p.last_price) - MIN(p.last_price)) / MIN(p.last_price) DESC
                  LIMIT " . $pool;
 
         $groups = $this->db->query($sql)->fetchAll();
 
         // Última fecha de CAMBIO de precio del grupo (máx entre sus miembros). Sólo
-        // en 'recent', para reordenar el pool por novedad.
+        // en 'recent'. El precio actual sale de p.last_price; el historial de cambio,
+        // de price_history (que sí necesita la tabla).
         $lc = $this->db->prepare(
             'SELECT MAX((SELECT MAX(ph2.captured_date) FROM price_history ph2
-                          WHERE ph2.product_id = p.id AND ph2.price_final <> cur.price_final
+                          WHERE ph2.product_id = p.id AND ph2.price_final <> p.last_price
                             AND ph2.price_final < 1000000))
                FROM products p
-               JOIN price_history cur ON cur.id = (SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
               WHERE p.group_id = ? AND p.is_active = 1'
         );
 
         // Oferta más barata y más cara (con tienda) por grupo.
         $off = $this->db->prepare(
-            'SELECT s.slug AS store, s.name AS store_name, ph.price_final, ph.currency
+            'SELECT s.slug AS store, s.name AS store_name, p.last_price AS price_final, p.last_currency AS currency
                FROM products p
                JOIN stores s ON s.id = p.store_id
-               JOIN price_history ph ON ph.id = (
-                     SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
-              WHERE p.group_id = ? AND p.is_active = 1 AND ph.in_stock = 1 AND ph.price_final IS NOT NULL
-              ORDER BY ph.price_final ASC'
+              WHERE p.group_id = ? AND p.is_active = 1 AND p.last_in_stock = 1 AND p.last_price IS NOT NULL
+              ORDER BY p.last_price ASC'
         );
         $gidStmt = $this->db->prepare('SELECT id FROM product_groups WHERE slug = ?');
 
@@ -892,27 +882,26 @@ final class ProductRepository
         // mayor caída desde el pico. La subconsulta de cambio sólo se agrega en 'recent'.
         $lastChangeCol = $recent
             ? ", (SELECT MAX(ph2.captured_date) FROM price_history ph2
-                    WHERE ph2.product_id = p.id AND ph2.price_final <> cur.price_final
+                    WHERE ph2.product_id = p.id AND ph2.price_final <> p.last_price
                       AND ph2.price_final < 1000000) AS last_change"
             : '';
         $order = $recent ? 'last_change DESC' : '(agg.max_price - agg.min_price) / agg.min_price DESC';
 
+        // Precio ACTUAL de p.last_*; el mín/máx HISTÓRICO sí sale de price_history (agg).
         $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
                        s.name AS store_name, s.slug AS store,
-                       cur.price_final AS price_now, cur.currency,
+                       p.last_price AS price_now, p.last_currency AS currency,
                        agg.min_price, agg.max_price' . $lastChangeCol . '
                   FROM products p
                   JOIN stores s ON s.id = p.store_id
-                  JOIN price_history cur ON cur.id = (
-                        SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
                   JOIN (SELECT product_id, MIN(price_final) AS min_price, MAX(price_final) AS max_price, COUNT(*) AS n
                           FROM price_history
                          WHERE in_stock = 1 AND price_final IS NOT NULL AND price_final < 1000000
                            AND captured_date >= DATE_SUB(CURDATE(), INTERVAL 120 DAY)
                          GROUP BY product_id) agg ON agg.product_id = p.id
-                 WHERE cur.in_stock = 1 AND cur.price_final IS NOT NULL AND cur.price_final < 1000000
+                 WHERE p.last_in_stock = 1 AND p.last_price IS NOT NULL AND p.last_price < 1000000
                    AND agg.n >= 5
-                   AND cur.price_final <= agg.min_price * 1.001
+                   AND p.last_price <= agg.min_price * 1.001
                    AND agg.max_price > agg.min_price * 1.03
                  ORDER BY ' . $order . '
                  LIMIT ' . (int) max(1, min($limit, 40));
