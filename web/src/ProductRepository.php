@@ -795,8 +795,14 @@ final class ProductRepository
      * SKU/EAN o manual, nunca el difuso) y rango acotado, para no mostrar productos
      * distintos como iguales en una página pública. Marca las de "misma cadena".
      */
-    public function biggestGaps(int $limit = 8): array
+    public function biggestGaps(int $limit = 8, string $sort = 'diff'): array
     {
+        $limit  = (int) max(1, min($limit, 30));
+        $recent = $sort === 'recent';
+        // En 'recent' traemos un pool más grande (por diferencia) y lo reordenamos
+        // por última actualización de precio; así rota el contenido día a día.
+        $pool = $recent ? min($limit * 6, 80) : $limit;
+
         $sql = "SELECT g.slug, g.canonical_title AS title, g.image_url,
                        MIN(ph.price_final) AS min_price, MAX(ph.price_final) AS max_price,
                        COUNT(DISTINCT p.store_id) AS store_count
@@ -810,9 +816,20 @@ final class ProductRepository
                 HAVING COUNT(DISTINCT p.store_id) >= 2 AND MIN(ph.price_final) > 0
                    AND (MAX(ph.price_final) - MIN(ph.price_final)) / MIN(ph.price_final) BETWEEN 0.15 AND 3.0
                  ORDER BY (MAX(ph.price_final) - MIN(ph.price_final)) / MIN(ph.price_final) DESC
-                 LIMIT " . (int) max(1, min($limit, 30));
+                 LIMIT " . $pool;
 
         $groups = $this->db->query($sql)->fetchAll();
+
+        // Última fecha de CAMBIO de precio del grupo (máx entre sus miembros). Sólo
+        // en 'recent', para reordenar el pool por novedad.
+        $lc = $this->db->prepare(
+            'SELECT MAX((SELECT MAX(ph2.captured_date) FROM price_history ph2
+                          WHERE ph2.product_id = p.id AND ph2.price_final <> cur.price_final
+                            AND ph2.price_final < 1000000))
+               FROM products p
+               JOIN price_history cur ON cur.id = (SELECT id FROM price_history WHERE product_id = p.id ORDER BY captured_at DESC LIMIT 1)
+              WHERE p.group_id = ? AND p.is_active = 1'
+        );
 
         // Oferta más barata y más cara (con tienda) por grupo.
         $off = $this->db->prepare(
@@ -838,6 +855,8 @@ final class ProductRepository
             $lo = (float) $cheap['price_final']; $hi = (float) $pricy['price_final'];
             $sameChain = in_array($cheap['store'], self::UNICOMER, true)
                       && in_array($pricy['store'], self::UNICOMER, true);
+            $lastChange = null;
+            if ($recent) { $lc->execute([$gid]); $lastChange = $lc->fetchColumn() ?: null; }
             $out[] = [
                 'slug'        => $g['slug'],
                 'title'       => $g['title'] ?: '(producto)',
@@ -851,7 +870,13 @@ final class ProductRepository
                 'save'        => $hi - $lo,
                 'stores'      => (int) $g['store_count'],
                 'same_chain'  => $sameChain,
+                'last_change' => $lastChange,
             ];
+        }
+        if ($recent) {
+            // Los sin historial de cambio (null) al final; el resto por fecha desc.
+            usort($out, static fn($a, $b) => strcmp((string) $b['last_change'], (string) $a['last_change']));
+            $out = array_slice($out, 0, $limit);
         }
         return $out;
     }
@@ -860,12 +885,22 @@ final class ProductRepository
      * Productos en (o casi en) su precio MÁS BAJO registrado, que además bajaron
      * de un pico — "mínimos históricos". Excluye centinela y exige historia mínima.
      */
-    public function historicLows(int $limit = 12): array
+    public function historicLows(int $limit = 12, string $sort = 'drop'): array
     {
+        $recent = $sort === 'recent';
+        // 'recent' = por fecha del último cambio de precio (novedad); si no, por
+        // mayor caída desde el pico. La subconsulta de cambio sólo se agrega en 'recent'.
+        $lastChangeCol = $recent
+            ? ", (SELECT MAX(ph2.captured_date) FROM price_history ph2
+                    WHERE ph2.product_id = p.id AND ph2.price_final <> cur.price_final
+                      AND ph2.price_final < 1000000) AS last_change"
+            : '';
+        $order = $recent ? 'last_change DESC' : '(agg.max_price - agg.min_price) / agg.min_price DESC';
+
         $sql = 'SELECT p.id, p.title, p.brand, p.image_url, p.url,
                        s.name AS store_name, s.slug AS store,
                        cur.price_final AS price_now, cur.currency,
-                       agg.min_price, agg.max_price
+                       agg.min_price, agg.max_price' . $lastChangeCol . '
                   FROM products p
                   JOIN stores s ON s.id = p.store_id
                   JOIN price_history cur ON cur.id = (
@@ -879,7 +914,7 @@ final class ProductRepository
                    AND agg.n >= 5
                    AND cur.price_final <= agg.min_price * 1.001
                    AND agg.max_price > agg.min_price * 1.03
-                 ORDER BY (agg.max_price - agg.min_price) / agg.min_price DESC
+                 ORDER BY ' . $order . '
                  LIMIT ' . (int) max(1, min($limit, 40));
 
         return array_map(static function (array $r): array {
@@ -894,6 +929,7 @@ final class ProductRepository
                 'price_peak' => $max,
                 'currency'   => $r['currency'] ?? 'NIO',
                 'off_peak_pct' => $max > 0 ? (int) round(($max - $now) / $max * 100) : null,
+                'last_change'  => $r['last_change'] ?? null,
             ];
         }, $this->db->query($sql)->fetchAll());
     }

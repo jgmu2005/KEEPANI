@@ -26,9 +26,21 @@ const WA_CHANNEL = 'https://whatsapp.com/channel/0029Vb8rtBl35fLzbo8lsb2b';
 $db   = Db::conn();
 $repo = new ProductRepository($db);
 
+// Orden de las secciones 2 y 3: 'recientes' (por último cambio de precio) o el
+// default. Así el contenido rota día a día aunque los gaps/mínimos no cambien seguido.
+$gapsSort = ($_GET['gaps'] ?? '') === 'recent' ? 'recent' : 'diff';
+$lowsSort = ($_GET['lows'] ?? '') === 'recent' ? 'recent' : 'drop';
+
 $drops = $repo->changesList('drop', 15);
-$gaps  = $repo->biggestGaps(10);
-$lows  = $repo->historicLows(15);
+$gaps  = $repo->biggestGaps(10, $gapsSort);
+$lows  = $repo->historicLows(15, $lowsSort);
+
+/** Link a esta misma página cambiando un parámetro de orden (conserva el otro). */
+$toggleUrl = static function (string $which, string $val) use ($gapsSort, $lowsSort): string {
+    $g = $which === 'gaps' ? $val : $gapsSort;
+    $l = $which === 'lows' ? $val : $lowsSort;
+    return 'hoy.php?gaps=' . $g . '&lows=' . $l . '#' . $which;
+};
 
 $settings = Settings::all($db);
 $siteName = $settings['site_name'] ?? 'Ojo al Precio';
@@ -84,6 +96,9 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
   .wa-join{margin-left:auto;background:#25d366;color:#fff;font-weight:800;padding:10px 16px;border-radius:9px;white-space:nowrap}
   h2{font-size:1.15rem;margin:28px 0 4px}
   .sub{color:var(--muted);font-size:.88rem;margin:0 0 12px}
+  .toggle{display:flex;gap:6px;margin:0 0 14px}
+  .toggle a{font-size:.8rem;font-weight:700;color:var(--muted);background:var(--card);border:1px solid var(--line);padding:5px 12px;border-radius:999px;text-decoration:none}
+  .toggle a.on{background:var(--brand);border-color:var(--brand);color:#fff}
   .card{display:flex;gap:14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;flex-wrap:wrap}
   .card img{width:64px;height:64px;object-fit:contain;background:#f8fafc;border-radius:9px;flex:none}
   .card .info{flex:1;min-width:200px}
@@ -142,8 +157,12 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
   <?php endforeach; endif; ?>
 
   <!-- 2) PRECIOS QUE NO TIENEN SENTIDO -->
-  <h2>🤨 Precios que no tienen sentido</h2>
+  <h2 id="gaps">🤨 Precios que no tienen sentido</h2>
   <p class="sub">El mismo producto, precio muy distinto según la tienda. A veces… de la misma empresa.</p>
+  <div class="toggle">
+    <a href="<?= $h($toggleUrl('gaps', 'diff')) ?>"<?= $gapsSort === 'diff' ? ' class="on"' : '' ?>>Mayor diferencia</a>
+    <a href="<?= $h($toggleUrl('gaps', 'recent')) ?>"<?= $gapsSort === 'recent' ? ' class="on"' : '' ?>>🆕 Recientes</a>
+  </div>
   <?php if (!$gaps): ?>
     <div class="empty">Sin diferencias grandes ahora mismo.</div>
   <?php else: foreach ($gaps as $g): ?>
@@ -164,8 +183,12 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
   <?php endforeach; endif; ?>
 
   <!-- 3) MÍNIMOS HISTÓRICOS -->
-  <h2>📉 En su precio más bajo</h2>
+  <h2 id="lows">📉 En su precio más bajo</h2>
   <p class="sub">Productos que hoy están en el precio más bajo que les hemos registrado.</p>
+  <div class="toggle">
+    <a href="<?= $h($toggleUrl('lows', 'drop')) ?>"<?= $lowsSort === 'drop' ? ' class="on"' : '' ?>>Mayor caída</a>
+    <a href="<?= $h($toggleUrl('lows', 'recent')) ?>"<?= $lowsSort === 'recent' ? ' class="on"' : '' ?>>🆕 Recientes</a>
+  </div>
   <?php if (!$lows): ?>
     <div class="empty">Sin mínimos históricos destacados por ahora.</div>
   <?php else: foreach ($lows as $l): ?>
