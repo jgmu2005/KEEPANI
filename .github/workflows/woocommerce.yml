@@ -1,4 +1,4 @@
-name: Crawl WooCommerce (E-Tech, PC System, GCM, Casa de las Lámparas, Fogel, TelcMax)
+name: Crawl WooCommerce (E-Tech, PC System, GCM, Casa de las Lámparas, Fogel)
 
 # Baja/refresca el catálogo de tiendas WooCommerce vía el Store API (paginado).
 # Cada corrida agrega un punto de precio por producto.

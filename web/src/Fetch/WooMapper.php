@@ -13,6 +13,26 @@ namespace OjoAlPrecio\Web\Fetch;
  */
 final class WooMapper
 {
+    /**
+     * Identificador de URL del producto (lo que trackeamos). Usa el campo `slug`;
+     * si la tienda no lo popula (p.ej. gcm), lo deriva del último segmento del
+     * `permalink` (…/productos/{slug}/). Así el SKU coincide con parseUrl().
+     */
+    public static function handle(array $p): string
+    {
+        $slug = trim((string) ($p['slug'] ?? ''));
+        if ($slug !== '') {
+            return $slug;
+        }
+        $path = (string) parse_url((string) ($p['permalink'] ?? ''), PHP_URL_PATH);
+        $seg  = trim($path, '/');
+        if ($seg === '') {
+            return '';
+        }
+        $parts = explode('/', $seg);
+        return rawurldecode((string) end($parts));
+    }
+
     public static function map(
         array $p,
         string $slug,
@@ -20,7 +40,7 @@ final class WooMapper
         bool $taxIncluded,
         float $taxRate
     ): ?NormalizedProduct {
-        $handle = (string) ($p['slug'] ?? '');
+        $handle = self::handle($p);
         $prices = $p['prices'] ?? null;
         if ($handle === '' || !is_array($prices)) {
             return null;
@@ -56,7 +76,7 @@ final class WooMapper
             storeSlug:   $slug,
             sku:         $handle, // el slug es el identificador de la URL
             url:         !empty($p['permalink']) ? (string) $p['permalink'] : '',
-            title:       isset($p['name']) ? (string) $p['name'] : null,
+            title:       isset($p['name']) ? html_entity_decode((string) $p['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
             brand:       $brand,
             imageUrl:    $image,
             priceNative: $price,

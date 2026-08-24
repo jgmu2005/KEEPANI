@@ -24,10 +24,9 @@ const STORES = [
     'gcm'              => ['base_url' => 'https://gcm.com.ni',              'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'casadelaslamparas' => ['base_url' => 'https://casadelaslamparas.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'fogel'             => ['base_url' => 'https://fogel.com.ni',            'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
-    'telcmax'           => ['base_url' => 'https://telcmax.com',             'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
-    // Nota: fitshop y fetesa son WooCommerce pero su Cloudflare BLOQUEA las IPs de
-    // GitHub Actions (403). Se crawlean desde el server (FatCow) con
-    // web/cron/crawl_woo_server.php?store=fitshop  y  ?store=fetesa.
+    // Nota: fitshop, fetesa y telcmax son WooCommerce pero su WAF/Cloudflare
+    // BLOQUEA las IPs de GitHub Actions (403). Se crawlean desde el server
+    // (FatCow) con web/cron/crawl_woo_server.php?store=fitshop|fetesa|telcmax.
 ];
 const PAGE      = 100; // máximo del Store API
 const MAX_PAGES = 120; // tope de seguridad
@@ -98,7 +97,7 @@ foreach ($targets as $slug) {
 
         $recs = [];
         foreach ($products as $p) {
-            $handle = (string) ($p['slug'] ?? '');
+            $handle = WooMapper::handle($p);
             if ($handle === '' || isset($seen[$handle])) { continue; }
             $seen[$handle] = true;
             $rec = WooMapper::map($p, $slug, $cfg['currency'], $cfg['tax_included'], $cfg['tax_rate']);

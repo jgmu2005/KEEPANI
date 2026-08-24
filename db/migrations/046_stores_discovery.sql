@@ -6,14 +6,14 @@
 --    gcm ............... electrodomésticos / celulares (hcdn)
 --    casadelaslamparas . iluminación / lámparas (nginx)
 --    fogel ............. aires acondicionados, refrigeradoras (nginx)
---    telcmax ........... telefonía / tecnología (LiteSpeed)
+--    telcmax ........... telefonía / tecnología (WAF → crawl server-side)
 --    fetesa ............ ferretería / hogar (Cloudflare → crawl server-side)
 --    cubitt ............ wearables / accesorios tech (Shopify)
 --
---  Las 4 WooCommerce sin Cloudflare las crawlea GitHub Actions
+--  gcm/casadelaslamparas/fogel (WooCommerce sin WAF) los crawlea GitHub Actions
 --  (crawl_woocommerce.php all); cubitt vía crawl_shopify.php all.
---  fetesa está detrás de Cloudflare (bloquea IPs de Actions con 403), así que
---  se crawlea desde FatCow con cron/crawl_woo_server.php?store=fetesa.
+--  fetesa y telcmax bloquean las IPs de Actions con 403, así que se crawlean
+--  desde FatCow con cron/crawl_woo_server.php?store=fetesa  y  ?store=telcmax.
 --  Ejecutar una vez en phpMyAdmin/Adminer.
 -- ============================================================================
 
