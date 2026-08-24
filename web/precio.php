@@ -84,6 +84,20 @@ if ($deal) {
     elseif ($deal['verdict'] === 'fake') { $dealBadge = ['t' => '⚠️ Descuento poco fiable', 'c' => '#9a3412', 'b' => '#ffedd5']; }
 }
 
+// Frase "answer-shaped": un resumen factual que las AI (y Google) pueden citar
+// textual — responde "¿cuál es el precio más bajo?" y "¿es buen momento de comprar?".
+$verdictTxt = 'Está cerca de su precio habitual.';
+if ($deal) {
+    if ($deal['verdict'] === 'low')       { $verdictTxt = 'Hoy está en su precio más bajo registrado, así que es buen momento para comprar.'; }
+    elseif ($deal['verdict'] === 'fake')  { $verdictTxt = 'La tienda anuncia un descuento, pero no está más barato de lo habitual.'; }
+    elseif (isset($deal['typical']))      { $verdictTxt = 'Su precio habitual ronda ' . $fmt((float) $deal['typical']) . '.'; }
+}
+$answer = $current !== null
+    ? ('El precio más bajo registrado de ' . $title . ' en Nicaragua es ' . $fmt($minP)
+        . ($maxP !== null && $maxP > $minP ? ', y el más alto ' . $fmt($maxP) : '') . '. '
+        . 'Precio actual: ' . $fmt($current) . ' en ' . $p['store_name'] . '. ' . $verdictTxt)
+    : '';
+
 // URL canónica bonita.
 $slug     = $slugify($title);
 $prettyRel = '/precio/' . $id . ($slug !== '' ? '/' . $slug : '');
@@ -194,6 +208,7 @@ $ldBreadcrumb = [
   .chart{width:100%;height:auto;display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px}
   .nodata{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;text-align:center;color:var(--muted)}
   .cmp{display:block;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-top:16px;font-weight:700;color:var(--brand-dk)}
+  .answer{background:#f0f9ff;border:1px solid #bae6fd;border-left:4px solid var(--brand);border-radius:10px;padding:14px 16px;margin:18px 0 0;font-size:.95rem;line-height:1.55;color:var(--ink)}
   .taxnote{margin-top:12px;font-size:.8rem;color:var(--muted);background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
   .site{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff}
   .site .in{max-width:820px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -237,6 +252,8 @@ $ldBreadcrumb = [
       </div>
     </div>
   </div>
+
+  <?php if ($answer !== ''): ?><p class="answer"><?= $h($answer) ?></p><?php endif; ?>
 
   <?php if (!empty($p['group_slug']) && ($p['group_stores'] ?? 0) >= 2): ?>
     <a class="cmp" href="<?= $h($base) ?>/producto.php?slug=<?= $h(rawurlencode((string) $p['group_slug'])) ?>">⚖️ Este producto está en <?= (int) $p['group_stores'] ?> tiendas — comparalas y ahorrá →</a>

@@ -124,6 +124,17 @@ $desc = 'Compará el precio de "' . $title . '" en ' . $storeCount . ' tienda'
       . ($low !== null ? ', desde ' . $fmt($low, $cur) . '.' : '.') . $savingTxt
       . ' Historial y ofertas en ' . $siteName . '.';
 
+// Frase "answer-shaped": resumen factual citable por AI y Google ("¿dónde está
+// más barato X en Nicaragua?").
+$priciest = $priced ? $priced[count($priced) - 1] : null;
+$diffPct  = ($low !== null && $high !== null && $low > 0 && $high > $low) ? (int) round(($high - $low) / $low * 100) : 0;
+$answer = ($low !== null && $cheapest)
+    ? ('En Nicaragua, ' . $title . ' se consigue desde ' . $fmt($low, $cur) . ' en ' . $cheapest['store_name']
+        . ($diffPct > 0 && $priciest ? ' y hasta ' . $fmt($high, $cur) . ' en ' . $priciest['store_name'] . ' — una diferencia del ' . $diffPct . '%' : '')
+        . '. El precio más bajo es ' . $fmt($low, $cur) . ' en ' . $cheapest['store_name'] . '.'
+        . ($sameChain ? ' Varias de estas tiendas son de la misma empresa (Unicomer): el mismo producto a distinto precio según la tienda.' : ''))
+    : '';
+
 // WhatsApp
 $waText = '💰 ' . $title . ($low !== null ? ' — desde ' . $fmt($low, $cur) : '')
         . ' en ' . $storeCount . ' tiendas. Compará acá: ' . $pageUrl;
@@ -222,6 +233,7 @@ if ($priced) {
   .cheap{background:#f0fdf4}
   .tag{display:inline-block;font-size:.64rem;font-weight:800;color:#065f46;background:#d1fae5;padding:2px 7px;border-radius:999px;margin-left:6px}
   .seller{color:var(--muted);font-size:.72rem}
+  .answer{background:#f0f9ff;border:1px solid #bae6fd;border-left:4px solid var(--brand);border-radius:10px;padding:14px 16px;margin:0 0 18px;font-size:.95rem;line-height:1.55;color:var(--ink)}
   .st{font-size:.78rem;font-weight:600}
   .st.in{color:var(--ok)} .st.out{color:var(--bad)}
   .go{background:var(--brand);color:#fff;padding:8px 13px;border-radius:8px;font-weight:700;white-space:nowrap}
@@ -285,6 +297,8 @@ if ($priced) {
       </div>
     </div>
   </div>
+
+  <?php if ($answer !== ''): ?><p class="answer"><?= $h($answer) ?></p><?php endif; ?>
 
   <h2>Comparación de precios</h2>
   <?php if ($sameChain): ?>
