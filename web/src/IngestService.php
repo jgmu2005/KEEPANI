@@ -211,6 +211,22 @@ final class IngestService
             ':stock' => !empty($it['in_stock']) ? 1 : 0,
         ]);
 
+        // Denormalización (Fase A): mantené el precio/stock ACTUAL en el producto,
+        // para que los listados no tengan que recalcular el "último precio" desde
+        // price_history. Solo se pisa si esta captura es igual o más nueva. Los
+        // valores ya vienen saneados (centinela → null). Best-effort: si las columnas
+        // aún no están migradas, el error 1054 no aborta la transacción.
+        try {
+            $this->db->prepare(
+                'UPDATE products
+                    SET last_price = ?, last_list = ?, last_in_stock = ?, last_currency = ?, last_date = ?
+                  WHERE id = ? AND (last_date IS NULL OR last_date <= ?)'
+            )->execute([
+                $pfin, $lp, !empty($it['in_stock']) ? 1 : 0, $it['currency'] ?? 'NIO', $capturedDate,
+                $productId, $capturedDate,
+            ]);
+        } catch (\Throwable $e) { /* columnas aún no migradas */ }
+
         // rowCount()==1 => INSERT nuevo; ==2 => UPDATE por ON DUPLICATE KEY.
         return $stmt->rowCount() === 1;
     }
