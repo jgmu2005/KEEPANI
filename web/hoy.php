@@ -227,7 +227,10 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
     <div class="ct-price" style="font-weight:900;font-size:36px;color:#4ade80;line-height:1.1"></div>
     <div class="ct-note" style="font-size:17px;color:#cbd5e1;margin-top:6px"></div>
   </div>
-  <div style="padding:16px 26px 22px;font-size:15px;color:#94a3b8;border-top:1px solid #334155;margin-top:14px;font-weight:600">📲 ojoalprecio.online/hoy · unite al canal de WhatsApp</div>
+  <div style="padding:18px 26px 24px;margin-top:16px;border-top:1px solid #334155">
+    <div style="background:linear-gradient(90deg,#f97316,#fb923c);color:#fff;font-weight:900;font-size:27px;text-align:center;padding:15px;border-radius:12px;letter-spacing:.3px;box-shadow:0 4px 18px rgba(249,115,22,.45)">OjoAlPrecio.online</div>
+    <div style="text-align:center;font-size:14px;color:#94a3b8;margin-top:12px;font-weight:600">📲 Unite al canal de WhatsApp · ofertas reales del día</div>
+  </div>
 </div>
 
 <script>
