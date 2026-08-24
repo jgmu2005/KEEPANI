@@ -20,6 +20,7 @@ use OjoAlPrecio\Web\Fetch\ShopifyMapper;
 
 const STORES = [
     'simpletechnic' => ['base_url' => 'https://simpletechnic.com', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    'cubitt'        => ['base_url' => 'https://cubitt.com.ni',      'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
 ];
 const PAGE      = 250;
 const MAX_PAGES = 80; // tope de seguridad (250*80 = 20.000 productos)

@@ -47,7 +47,7 @@ try {
         // No está rastreado: intentar leerlo en vivo y agregarlo.
         $loc = $repo->locate($store, $sku, $url);
         if (!$loc) {
-            out(404, ['ok' => false, 'error' => 'No pudimos leer ese enlace. Pegá el link de un PRODUCTO (no de una búsqueda o categoría). Tiendas soportadas: Siman, Sinsa, Walmart, PriceSmart, La Curacao, RadioShack, Tropigas, El Gallo y Copasa.']);
+            out(404, ['ok' => false, 'error' => 'No pudimos leer ese enlace. Pegá el link de un PRODUCTO (no de una búsqueda o categoría). Rastreamos más de 20 tiendas de Nicaragua; ver la lista en ojoalprecio.online/ayuda.html#tiendas']);
         }
         $storeRow = $repo->storeBySlug($loc['slug']);
         if (!$storeRow) {

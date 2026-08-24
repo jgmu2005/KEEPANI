@@ -19,10 +19,15 @@ use OjoAlPrecio\Web\Fetch\Http;
 use OjoAlPrecio\Web\Fetch\WooMapper;
 
 const STORES = [
-    'etech'      => ['base_url' => 'https://etech.com.ni',   'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
-    'pcsystemni' => ['base_url' => 'https://pcsystemni.com', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
-    // Nota: fitshop es WooCommerce pero su Cloudflare BLOQUEA las IPs de GitHub
-    // Actions (403). Se crawlea desde el server (FatCow) con web/cron/crawl_woo_server.php.
+    'etech'             => ['base_url' => 'https://etech.com.ni',            'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    'pcsystemni'        => ['base_url' => 'https://pcsystemni.com',          'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    'gcm'              => ['base_url' => 'https://gcm.com.ni',              'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    'casadelaslamparas' => ['base_url' => 'https://casadelaslamparas.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    'fogel'             => ['base_url' => 'https://fogel.com.ni',            'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    'telcmax'           => ['base_url' => 'https://telcmax.com',             'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    // Nota: fitshop y fetesa son WooCommerce pero su Cloudflare BLOQUEA las IPs de
+    // GitHub Actions (403). Se crawlean desde el server (FatCow) con
+    // web/cron/crawl_woo_server.php?store=fitshop  y  ?store=fetesa.
 ];
 const PAGE      = 100; // máximo del Store API
 const MAX_PAGES = 120; // tope de seguridad

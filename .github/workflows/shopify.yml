@@ -1,4 +1,4 @@
-name: Crawl Shopify (Simple Technic)
+name: Crawl Shopify (Simple Technic, Cubitt)
 
 # Baja/refresca el catálogo de tiendas Shopify vía /products.json (paginado).
 # Cada corrida agrega un punto de precio por producto.

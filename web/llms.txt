@@ -2,7 +2,7 @@
 
 > Rastreador y comparador de precios de tiendas en Nicaragua. Muestra el historial de precios de cada producto, compara el mismo producto entre tiendas, y distingue las ofertas reales de los descuentos falsos.
 
-Ojo al Precio (https://ojoalprecio.online) monitorea a diario los precios de las principales tiendas de Nicaragua —Siman, Sinsa, Walmart, PriceSmart, La Curacao, RadioShack, Tropigas, El Gallo, Copasa, Simple Technic, E-Tech, PC System, Comtech, Tech Store, Tizo y FitShop, entre otras— más un marketplace de comercios locales.
+Ojo al Precio (https://ojoalprecio.online) monitorea a diario los precios de más de 20 tiendas de Nicaragua —Siman, Sinsa, Walmart, PriceSmart, La Curacao, RadioShack, Tropigas, El Gallo, Copasa, Casa de las Lámparas, Fogel, Fetesa, Simple Technic, E-Tech, PC System, Comtech, Tech Store, TelcMax, GCM, Cubitt, Tizo y FitShop, entre otras— más un marketplace de comercios locales.
 
 Para cada producto guarda: el historial de precios, el precio más bajo y más alto registrado, la disponibilidad, y un veredicto sobre si es buen momento para comprar (si está por debajo de su precio habitual) o si un "descuento" anunciado no es real.
 
