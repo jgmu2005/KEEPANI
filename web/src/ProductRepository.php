@@ -430,8 +430,13 @@ final class ProductRepository
         $params = [];
 
         if (!empty($f['q'])) {
-            $where[] = 'p.title LIKE :q';
-            $params[':q'] = '%' . $f['q'] . '%';
+            // Palabras sueltas, cualquier orden: "cubitt audifono" matchea
+            // "Audífono Cubitt …". Todas las palabras deben aparecer en el título.
+            [$qCond, $qParams] = SearchQuery::like((string) $f['q'], ['p.title']);
+            if ($qCond !== '') {
+                $where[] = $qCond;
+                $params += $qParams;
+            }
         }
         if (!empty($f['store'])) {
             $where[] = 's.slug = :store';

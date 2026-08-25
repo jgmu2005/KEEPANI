@@ -13,6 +13,7 @@ require dirname(__DIR__, 2) . '/bootstrap.php';
 
 use OjoAlPrecio\Web\Db;
 use OjoAlPrecio\Web\Auth;
+use OjoAlPrecio\Web\SearchQuery;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -31,10 +32,12 @@ $sort   = ($_GET['sort'] ?? 'diff') === 'new' ? 'new' : 'diff';
 // coinciden y así conservar el conteo de tiendas y el rango de precios del grupo.
 $having = 'COUNT(DISTINCT p.store_id) >= 2';
 $params = [];
-if ($q !== '') {
-    $having        .= ' AND (g.canonical_title LIKE :qc OR SUM(p.title LIKE :qm) > 0)';
-    $params[':qc']  = '%' . $q . '%';
-    $params[':qm']  = '%' . $q . '%';
+// Palabras sueltas en cualquier orden: cada palabra debe aparecer en el título del
+// grupo O en el de algún miembro. "cubitt audifono" matchea aunque estén separadas.
+foreach (SearchQuery::words($q) as $i => $w) {
+    $having         .= " AND (g.canonical_title LIKE :qc$i OR SUM(p.title LIKE :qm$i) > 0)";
+    $params[":qc$i"] = '%' . $w . '%';
+    $params[":qm$i"] = '%' . $w . '%';
 }
 
 // Sólo tiendas EN STOCK y con ≥2 tiendas reales. Precio/stock actual denormalizado

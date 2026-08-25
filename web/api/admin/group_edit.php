@@ -17,6 +17,7 @@ require dirname(__DIR__, 2) . '/bootstrap.php';
 
 use OjoAlPrecio\Web\Db;
 use OjoAlPrecio\Web\Auth;
+use OjoAlPrecio\Web\SearchQuery;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -72,16 +73,20 @@ if ($method === 'GET') {
     }
     $excludeId = $excludeSlug !== '' ? groupIdBySlug($db, $excludeSlug) : null;
 
+    // Palabras sueltas en cualquier orden: "cubitt audifono" matchea "Audífono Cubitt…".
+    [$qCond, $qParams] = SearchQuery::like($q, ['p.title']);
+    if ($qCond === '') { out(200, ['ok' => true, 'items' => []]); }
+
     $sql = 'SELECT p.id, p.title, p.image_url, s.name AS store_name,
                    p.last_price AS price_final, p.last_currency AS currency,
                    g.slug AS group_slug, g.canonical_title AS group_title, g.member_count AS group_members
               FROM products p
               JOIN stores s ON s.id = p.store_id
          LEFT JOIN product_groups g ON g.id = p.group_id
-             WHERE p.is_active = 1 AND p.title LIKE :q'
+             WHERE p.is_active = 1 AND ' . $qCond
              . ($excludeId ? ' AND (p.group_id IS NULL OR p.group_id <> :ex)' : '')
              . ' ORDER BY p.title LIMIT 25';
-    $params = [':q' => '%' . $q . '%'];
+    $params = $qParams;
     if ($excludeId) { $params[':ex'] = $excludeId; }
     $st = $db->prepare($sql);
     $st->execute($params);
