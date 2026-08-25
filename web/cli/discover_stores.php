@@ -9,13 +9,14 @@ declare(strict_types=1);
  *   - Shopify:      GET /products.json?limit=1                     (200 + {products:[...]})
  * Devuelve un TSV:  dominio <tab> plataforma <tab> productos
  *
- * Origen de dominios:
- *   - Sin argumento: los baja de crt.sh (Certificate Transparency) con varios
- *     patrones (.com.ni, .ni, *nicaragua*, *nic.com, *ni.com).
- *   - Con argumento: un archivo de texto con un dominio por línea (ej. salido de
- *     Google dorks o un directorio). Útil si crt.sh está caído.
+ * Origen de dominios (por orden de preferencia):
+ *   - Sin argumento: los baja de COMMON CRAWL (índice de la web). Consulta todas
+ *     las URLs bajo el TLD .ni y las deduplica a host. Es la fuente por defecto
+ *     porque crt.sh suele estar caído (502). Si Common Crawl no responde, cae a crt.sh.
+ *   - Argumento 'crt': fuerza crt.sh (Certificate Transparency).
+ *   - Argumento = archivo: un dominio por línea (ej. de un directorio). Útil offline.
  *
- * Uso:  php web/cli/discover_stores.php [dominios.txt]
+ * Uso:  php web/cli/discover_stores.php [dominios.txt|crt]
  */
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
@@ -64,6 +65,40 @@ function crtDomains(): array
             if (!$ok) { sleep(3 * ($i + 1)); }
         }
         if (!$ok) { err("  crt.sh $q -> falló (crt.sh caído?)"); }
+    }
+    return array_keys($set);
+}
+
+/**
+ * Dominios .ni candidatos desde el índice de Common Crawl. Detecta el índice más
+ * reciente (collinfo.json) y pide todas las URLs bajo el TLD .ni, deduplicadas a
+ * host. Excluye gobierno/educación/militar. Es la fuente por defecto (crt.sh cae seguido).
+ */
+function commonCrawlDomains(int $limit = 15000): array
+{
+    // 1) Índice más reciente: collinfo.json los lista del más nuevo al más viejo.
+    $cdxApi = 'https://index.commoncrawl.org/CC-MAIN-2026-34-index'; // fallback
+    $info = httpGet('https://index.commoncrawl.org/collinfo.json', 60);
+    if ($info !== null) {
+        $j = json_decode($info, true);
+        if (is_array($j) && isset($j[0]['cdx-api'])) { $cdxApi = (string) $j[0]['cdx-api']; }
+    }
+    err('  índice Common Crawl: ' . $cdxApi);
+
+    // 2) Todas las URLs bajo *.ni; nos quedamos con el host.
+    $body = httpGet($cdxApi . '?url=*.ni&output=json&fl=url&limit=' . $limit, 150);
+    if ($body === null) { err('  Common Crawl no respondió.'); return []; }
+
+    $set = [];
+    foreach (explode("\n", $body) as $line) {
+        $line = trim($line);
+        if ($line === '') { continue; }
+        $row  = json_decode($line, true);
+        $u    = is_array($row) ? (string) ($row['url'] ?? '') : '';
+        $host = preg_replace('/^www\./', '', strtolower((string) parse_url($u, PHP_URL_HOST)));
+        if ($host === '' || !str_ends_with($host, '.ni')) { continue; }
+        if (preg_match('/\.(gob|gov|edu|mil)\.ni$/', $host)) { continue; } // no gobierno/edu
+        $set[$host] = true;
     }
     return array_keys($set);
 }
@@ -123,13 +158,18 @@ function normHost(string $s): ?string
 }
 
 // --- Origen de dominios ---
-$file = $argv[1] ?? null;
-if ($file !== null && is_file($file)) {
-    $domains = array_values(array_unique(array_filter(array_map('normHost', file($file, FILE_IGNORE_NEW_LINES)))));
+$arg = $argv[1] ?? null;
+if ($arg !== null && $arg !== 'crt' && is_file($arg)) {
+    $domains = array_values(array_unique(array_filter(array_map('normHost', file($arg, FILE_IGNORE_NEW_LINES)))));
     err('Dominios del archivo: ' . count($domains));
-} else {
+} elseif ($arg === 'crt') {
     err('Bajando dominios de crt.sh…');
     $domains = crtDomains();
+    err('Dominios candidatos: ' . count($domains));
+} else {
+    err('Bajando dominios de Common Crawl…');
+    $domains = commonCrawlDomains();
+    if (!$domains) { err('Common Crawl vacío; probando crt.sh…'); $domains = crtDomains(); }
     err('Dominios candidatos: ' . count($domains));
 }
 if (!$domains) { err('Sin dominios que probar.'); exit(1); }
