@@ -40,13 +40,19 @@ if ($expected === '' || !is_string($sent) || !hash_equals($expected, $sent)) {
     out(401, ['ok' => false, 'error' => 'No autorizado']);
 }
 
-// Productos de marcas de celular (isPhone() filtra TVs/refris en PHP).
+// Candidatos a celular: marca conocida en brand_norm, O una marca/submarca en el
+// TÍTULO (para tiendas que NO exponen marca, ej. telcmax → brand_norm NULL).
+// isPhone()/signature() filtran con precisión en PHP (TVs, accesorios, etc.).
 $rows = $db->query(
     "SELECT id, store_id, brand, brand_norm, model_norm, title, image_url
        FROM products
       WHERE is_active = 1 AND model_norm IS NOT NULL AND group_locked = 0
-        AND brand_norm IN ('apple','samsung','xiaomi','honor','huawei','motorola',
-                           'tecno','infinix','oppo','realme','zte','nokia','itel','alcatel','google')"
+        AND (
+             brand_norm IN ('apple','samsung','xiaomi','honor','huawei','motorola',
+                            'tecno','infinix','oppo','realme','zte','nokia','itel','alcatel','google')
+             OR CONCAT(' ', model_norm, ' ') REGEXP
+                ' (apple|samsung|xiaomi|honor|huawei|motorola|tecno|infinix|oppo|realme|zte|nokia|itel|alcatel|google|iphone|galaxy|redmi|poco|moto|pixel|magic|reno|narzo|camon|spark|pova|mate|nova) '
+        )"
 )->fetchAll();
 
 $clusters = []; // firma => [filas]
