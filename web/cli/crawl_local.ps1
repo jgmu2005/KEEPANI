@@ -1,5 +1,5 @@
 # ============================================================================
-#  Crawl LOCAL — tiendas que bloquean IPs de datacenter (telcmax) y solo se
+#  Crawl LOCAL — tiendas que bloquean IPs de datacenter (telcmax, tizo) y solo se
 #  pueden bajar desde una IP RESIDENCIAL (tu casa). Pensado para correr al
 #  encender la PC / iniciar sesion (Task Scheduler, ver instrucciones abajo).
 #
@@ -42,4 +42,15 @@ foreach ($s in $stores) {
         Log "ERROR en '$s': $($_.Exception.Message)"
     }
 }
+
+# --- 4) Crawlers con script PROPIO (no WooCommerce) que tambien bloquean datacenter ---
+#     Tizo (api.tizo.app): tiene su propio crawler; se llama sin argumentos.
+Log "crawl 'tizo' ..."
+try {
+    $out = & php web/cli/crawl_tizo.php 2>&1 | Out-String
+    Log $out.Trim()
+} catch {
+    Log "ERROR en 'tizo': $($_.Exception.Message)"
+}
+
 Log "listo."

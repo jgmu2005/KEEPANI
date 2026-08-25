@@ -2,10 +2,15 @@ name: Crawl Tizo (soytizo.com)
 
 # Baja el catálogo de Tizo vía su API (api.tizo.app) con token de invitado.
 # Recorre categorías → catálogos → productos. Cada corrida agrega un punto de precio.
+#
+# NOTA: Tizo BLOQUEA las IPs de datacenter (GitHub Actions) → desde acá ingesta 0
+# productos aunque el run salga "verde". Se crawlea desde la PC local (residencial)
+# con web/cli/crawl_local.ps1. El schedule queda DESACTIVADO; se deja solo el
+# disparo manual (workflow_dispatch) por si algún día desbloquean.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '50 8 * * *'   # diario ~08:50 UTC
+  # schedule:
+  #   - cron: '50 8 * * *'   # diario ~08:50 UTC (desactivado: Tizo bloquea datacenter)
 
 jobs:
   crawl:
