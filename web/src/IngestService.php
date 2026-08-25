@@ -117,6 +117,7 @@ final class IngestService
                         url = COALESCE(?, url),
                         category_external_id = COALESCE(?, category_external_id),
                         seller = COALESCE(?, seller),
+                        is_active = 1,
                         last_seen_at = ?
                   WHERE id = ?'
             );
