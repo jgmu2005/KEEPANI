@@ -104,7 +104,7 @@ $items = array_map(static function (array $r): array {
     $max = $r['max_price'] !== null ? (float) $r['max_price'] : null;
     return [
         'slug'     => $r['slug'],
-        'title'    => $r['title'] ?: '(sin título)',
+        'title'    => \OjoAlPrecio\Web\Normalizer::cleanDisplayTitle($r['title']) ?: '(sin título)',
         'brand'    => $r['brand'],
         'image'    => $r['image_url'],
         'stores'   => (int) $r['store_count'],

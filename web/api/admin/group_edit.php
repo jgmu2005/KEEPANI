@@ -124,7 +124,7 @@ if ($action === 'create') {
     // Representante: título más largo (más descriptivo), primera imagen/marca.
     $rep = $db->query("SELECT title, brand, image_url FROM products
                         WHERE id IN ($in) ORDER BY CHAR_LENGTH(title) DESC LIMIT 1")->fetch();
-    $title = $rep['title'] ?: 'Comparativo manual';
+    $title = \OjoAlPrecio\Web\Normalizer::cleanDisplayTitle($rep['title']) ?: 'Comparativo manual';
     $mk    = 'manual:' . bin2hex(random_bytes(8));
     $slug  = slugify($title) . '-' . substr(sha1($mk), 0, 6);
 

@@ -86,7 +86,7 @@ foreach (['uni' => $UNI, 'ean' => $EAN] as $method => $sql) {
         $upsert->execute([
             ':mk'     => $mk,
             ':slug'   => $slug,
-            ':title'  => $c['title'] ?: null,
+            ':title'  => \OjoAlPrecio\Web\Normalizer::cleanDisplayTitle($c['title']) ?: null,
             ':brand'  => $c['brand'] ?: null,
             ':img'    => $c['image_url'] ?: null,
             ':n'      => (int) $c['n'],

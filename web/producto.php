@@ -83,7 +83,7 @@ if (!$priced) {
 $low     = $priced ? min(array_map(static fn($o) => $o['price_final'], $priced)) : null;
 $high    = $priced ? max(array_map(static fn($o) => $o['price_final'], $priced)) : null;
 $cur     = $priced[0]['currency'] ?? ($offers[0]['currency'] ?? 'NIO');
-$title   = $g['canonical_title'] ?: 'Producto';
+$title   = \OjoAlPrecio\Web\Normalizer::cleanDisplayTitle($g['canonical_title']) ?: 'Producto';
 $image   = $g['image_url'] ?: ($offers[0]['image_url'] ?? '');
 $cheapest = $priced[0] ?? null; // ya vienen ordenadas por precio asc
 $trackId  = (int) ($cheapest['id'] ?? ($offers[0]['id'] ?? 0)); // para deep-link a la ficha

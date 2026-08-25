@@ -128,7 +128,7 @@ foreach ($clusters as $sig => $items) {
 
     // Representante: título más largo (más descriptivo); primera imagen no vacía.
     usort($items, static fn(array $a, array $b): int => strlen((string) $b['title']) <=> strlen((string) $a['title']));
-    $title = (string) ($items[0]['title'] ?? 'Celular');
+    $title = \OjoAlPrecio\Web\Normalizer::cleanDisplayTitle($items[0]['title'] ?? 'Celular') ?: 'Celular';
     $brand = null; $img = null;
     foreach ($items as $p) { if ($brand === null && !empty($p['brand'])) { $brand = $p['brand']; } if ($img === null && !empty($p['image_url'])) { $img = $p['image_url']; } }
 

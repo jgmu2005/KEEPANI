@@ -40,6 +40,35 @@ final class Normalizer
         return $t === '' ? null : $t;
     }
 
+    /**
+     * Limpia el título para MOSTRAR: quita el sufijo de tienda que algunas cadenas
+     * pegan al final ("... | El Gallo más Gallo", "...|LaCuracao Nicaragua",
+     * "... | RadioShack Nicaragua"). Conserva mayúsculas/acentos y los separadores
+     * "|" de specs legítimas (p.ej. "256GB | 256GB"): sólo elimina segmentos finales
+     * que parezcan nombre de tienda.
+     */
+    public static function cleanDisplayTitle(?string $title): string
+    {
+        $title = trim((string) $title);
+        if ($title === '') {
+            return '';
+        }
+        $parts = preg_split('/\s*\|\s*/', $title) ?: [$title];
+        $storeHint = '/\b(nicaragua|el gallo|gallo mas gallo|la\s*curacao|lacuracao|'
+            . 'radioshack|walmart|pricesmart|siman|sinsa|tropigas|copasa|tizo|fitshop|'
+            . 'telcmax|comtech|tech\s*store|pc\s*system|simple\s*technic|e-?tech|fetesa|'
+            . 'fogel|casa de las lamparas|cubitt|gcm)\b/i';
+        while (count($parts) > 1) {
+            $last = self::deaccentLower((string) end($parts));
+            if (preg_match($storeHint, $last)) {
+                array_pop($parts);
+            } else {
+                break;
+            }
+        }
+        return trim(implode(' | ', $parts));
+    }
+
     private static function deaccentLower(string $s): string
     {
         $s = mb_strtolower($s, 'UTF-8');

@@ -671,7 +671,7 @@ final class ProductRepository
         $items = array_map(static function (array $r): array {
             return [
                 'slug'        => $r['slug'],
-                'title'       => $r['title'],
+                'title'       => Normalizer::cleanDisplayTitle($r['title']),
                 'brand'       => $r['brand'],
                 'image_url'   => $r['image_url'],
                 'store_count' => (int) $r['store_count'],
@@ -854,7 +854,7 @@ final class ProductRepository
             if ($recent) { $lc->execute([$gid]); $lastChange = $lc->fetchColumn() ?: null; }
             $out[] = [
                 'slug'        => $g['slug'],
-                'title'       => $g['title'] ?: '(producto)',
+                'title'       => Normalizer::cleanDisplayTitle($g['title']) ?: '(producto)',
                 'image_url'   => $g['image_url'],
                 'cheap_store' => $cheap['store_name'],
                 'cheap_price' => $lo,

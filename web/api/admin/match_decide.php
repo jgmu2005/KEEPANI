@@ -77,7 +77,7 @@ try {
         $db->prepare('UPDATE products SET group_id = ? WHERE id = ?')->execute([$gb, $aId]);
         $gid = $gb;
     } else {
-        $title = $pa['title'] ?: ($pb['title'] ?: 'Producto');
+        $title = \OjoAlPrecio\Web\Normalizer::cleanDisplayTitle($pa['title'] ?: ($pb['title'] ?: 'Producto')) ?: 'Producto';
         $mk    = 'fuzzy:' . $aId . '-' . $bId;
         $slug  = slugify($title) . '-' . substr(sha1($mk), 0, 6);
         $db->prepare(
