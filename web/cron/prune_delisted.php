@@ -39,6 +39,10 @@ $dry  = !empty($_GET['dry']);
 
 try {
 
+// FatCow limita MAX_JOIN_SIZE (SQL_BIG_SELECTS=0) y aborta el join products×derivada
+// con "1104 ... more than MAX_JOIN_SIZE rows". Lo habilitamos para esta sesión.
+$db->exec('SET SQL_BIG_SELECTS=1');
+
 // Desglose por tienda de lo que se marcaría (o marcó).
 $breakdown = $db->prepare(
     "SELECT s.name AS store, COUNT(*) AS n
