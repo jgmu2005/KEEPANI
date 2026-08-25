@@ -37,6 +37,8 @@ if ($expected === '' || !is_string($key) || !hash_equals($expected, $key)) {
 $days = max(1, min((int) ($_GET['days'] ?? 3), 60));
 $dry  = !empty($_GET['dry']);
 
+try {
+
 // Desglose por tienda de lo que se marcaría (o marcó).
 $breakdown = $db->prepare(
     "SELECT s.name AS store, COUNT(*) AS n
@@ -47,7 +49,7 @@ $breakdown = $db->prepare(
          ON f.store_id = p.store_id
       WHERE p.is_active = 1
         AND p.last_seen_at < (f.fresh - INTERVAL {$days} DAY)
-      GROUP BY s.id
+      GROUP BY s.id, s.name
       ORDER BY n DESC"
 );
 $breakdown->execute();
@@ -77,3 +79,7 @@ out(200, [
     'marked'    => $marked,     // cuántos se marcaron inactivos (0 en dry)
     'by_store'  => array_map(static fn($r) => ['store' => $r['store'], 'n' => (int) $r['n']], $rows),
 ]);
+
+} catch (\Throwable $e) {
+    out(500, ['ok' => false, 'error' => $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine()]);
+}
