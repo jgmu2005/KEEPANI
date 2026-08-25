@@ -14,6 +14,10 @@ use OjoAlPrecio\Web\Auth;
 
 header('Content-Type: application/json; charset=utf-8');
 
+function out(int $s, array $p): never { http_response_code($s); echo json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE); exit; }
+
+try {
+
 $db = Db::conn();
 Auth::requireAdmin($db);
 
@@ -91,9 +95,13 @@ usort($out, static function ($a, $b) {
     return $b['active'] <=> $a['active'];
 });
 
-echo json_encode([
+out(200, [
     'ok'          => true,
     'stale_hours' => $STALE_HOURS,
     'generated'   => date('Y-m-d H:i'),
     'stores'      => $out,
-], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+]);
+
+} catch (\Throwable $e) {
+    out(500, ['ok' => false, 'error' => $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine()]);
+}

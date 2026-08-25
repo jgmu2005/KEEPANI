@@ -356,7 +356,7 @@ function setupNewGroup(){
 async function loadStoresHealth(){
   const box = $('storesHealthBox');
   let j; try{ j = await api('admin/stores_health.php'); }catch(e){ box.innerHTML = '<div style="color:var(--muted)">Error al cargar.</div>'; return; }
-  if(!j.ok){ box.innerHTML = '<div style="color:var(--muted)">No disponible (¿falta la migración 047_product_deactivated_at?).</div>'; return; }
+  if(!j.ok){ box.innerHTML = '<div class="msg err">'+esc(j.error||'No disponible (¿falta la migración 047_product_deactivated_at?).')+'</div>'; return; }
   const num = n => n==null ? '—' : Number(n).toLocaleString('es-NI');
   const ago = h => h==null ? 'nunca' : (h < 1 ? 'recién' : (h < 24 ? h+'h' : Math.floor(h/24)+'d '+(h%24)+'h'));
   const stale = j.stores.filter(s => s.stale).length;
