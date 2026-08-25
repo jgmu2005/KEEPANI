@@ -50,6 +50,10 @@ final class PhoneModel
         'decor','adorno','microsd','memoria sd','tarjeta',
         'mando','gamepad','joystick','backbone','vidrio','templado','glass',
         'soporte','holder','tripode','anillo',' pad ','ipad','matepad',
+        // Electrodomésticos/herramientas cuyos MODELOS chocan con líneas de celular
+        // (ej. campana Drija "Galaxy", horno "Nova"): la palabra fuerte los colaba.
+        'campana','extractora','horno','hornilla','estufa','licuadora','batidora',
+        'sopladora','taladro','pistola','ducha','llave','gamer','nevera','freidora',
     ];
 
     /** Palabra-línea: un número suelto que la sigue es parte del modelo. */

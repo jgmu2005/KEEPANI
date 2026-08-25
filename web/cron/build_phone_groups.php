@@ -21,6 +21,15 @@ use OjoAlPrecio\Web\PhoneModel;
 header('Content-Type: application/json; charset=utf-8');
 @set_time_limit(0);
 
+// FatCow corre varios workers PHP, cada uno con su propio OPcache; un opcache_reset
+// sólo limpia el del request. Para que ESTA corrida siempre use el PhoneModel más
+// nuevo, invalidamos su bytecode acá (recompila desde el .php de disco).
+if (function_exists('opcache_invalidate')) {
+    foreach (['/src/PhoneModel.php', '/src/Normalizer.php'] as $f) {
+        @opcache_invalidate(dirname(__DIR__) . $f, true);
+    }
+}
+
 function out(int $s, array $p): never { http_response_code($s); echo json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit; }
 
 function slugify(string $s): string
