@@ -49,7 +49,7 @@ final class PhoneModel
         'adaptador','power bank','router','modem','scooter','xpad',
         'decor','adorno','microsd','memoria sd','tarjeta',
         'mando','gamepad','joystick','backbone','vidrio','templado','glass',
-        'soporte','holder','tripode','anillo',
+        'soporte','holder','tripode','anillo',' pad ','ipad','matepad',
     ];
 
     /** Palabra-línea: un número suelto que la sigue es parte del modelo. */
