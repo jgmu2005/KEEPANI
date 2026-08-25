@@ -33,10 +33,12 @@ final class PhoneModel
         'narzo' => 'realme', 'camon' => 'tecno', 'spark' => 'tecno', 'pova' => 'tecno',
         'mate' => 'huawei', 'nova' => 'huawei',
     ];
-    /** Pistas de que es un celular (no una TV/refri de la misma marca). */
-    private const HINTS = [
-        'iphone','galaxy','redmi','poco','moto','pixel','mate','nova','magic',
-        'reno','narzo','spark','camon','pova','celular','smartphone','telefono',
+    /** Palabras FUERTES e inequívocas de celular (línea de modelo o término explícito).
+     *  Las submarcas ambiguas (reno, nova, mate, magic…) NO van acá: "Reno Navideño
+     *  Decor" es marca 'oppo' por 'reno' pero NO es un celular. Se exige, además de
+     *  la marca, una palabra fuerte O una señal de contexto (ver isPhone). */
+    private const STRONG = [
+        'iphone','galaxy','redmi','poco','pixel','celular','smartphone','telefono',
     ];
     /** Palabras de OTROS productos de esas marcas → NO es celular. */
     private const NOT_PHONE = [
@@ -45,6 +47,7 @@ final class PhoneModel
         'cargador','funda','case','protector','refriger','lavadora','microonda',
         'cocina','aire ','monitor','impresora','mouse','teclado','cable',
         'adaptador','power bank','router','modem','scooter','xpad',
+        'decor','adorno','microsd','memoria sd','tarjeta',
     ];
 
     /** Palabra-línea: un número suelto que la sigue es parte del modelo. */
@@ -106,13 +109,14 @@ final class PhoneModel
         foreach (self::NOT_PHONE as $x) {
             if (str_contains($m, $x)) { return false; }
         }
-        // "dual sim" / "esim" es señal fuerte de celular aunque el título no traiga
-        // una submarca conocida (ej. "HONOR X5d DUAL SIM 4GB RAM 128GB").
-        if (str_contains($m, ' sim ') || str_contains($m, ' esim ')) { return true; }
-        foreach (self::HINTS as $h) {
-            if (str_contains($m, $h)) { return true; }
+        // Palabra fuerte/inequívoca de celular (iphone, galaxy, redmi…).
+        foreach (self::STRONG as $s) {
+            if (str_contains($m, $s)) { return true; }
         }
-        return false;
+        // O una señal de CONTEXTO de celular (specs de teléfono). Necesaria para las
+        // submarcas ambiguas: un celular real trae "dual sim", "ram", "5g", storage…
+        // — un adorno "Reno Navideño Decor" no trae ninguna → NO es celular.
+        return (bool) preg_match('/ (sim|esim|ram|rom|5g|4g|lte|almacenamiento) /', $m);
     }
 
     /** Firma "marca|modelo" o null si no es celular / no hay modelo. */
