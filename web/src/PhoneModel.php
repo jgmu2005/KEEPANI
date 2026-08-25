@@ -48,6 +48,8 @@ final class PhoneModel
         'cocina','aire ','monitor','impresora','mouse','teclado','cable',
         'adaptador','power bank','router','modem','scooter','xpad',
         'decor','adorno','microsd','memoria sd','tarjeta',
+        'mando','gamepad','joystick','backbone','vidrio','templado','glass',
+        'soporte','holder','tripode','anillo',
     ];
 
     /** Palabra-línea: un número suelto que la sigue es parte del modelo. */
