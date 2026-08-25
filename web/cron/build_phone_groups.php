@@ -93,6 +93,15 @@ if (!empty($_GET['debug'])) {
     ]);
 }
 
+// RESET: sacar de sus grupos 'model' (no bloqueados) a TODOS los productos, para
+// reconstruir desde cero en esta pasada. Así se limpian asignaciones viejas que ya
+// no son válidas (ej. un "Reno Navideño" que dejó de clasificar como celular queda
+// sin grupo y su grupo viejo se borra en la limpieza de vacíos del final).
+$db->exec("UPDATE products p
+             JOIN product_groups g ON g.id = p.group_id
+              SET p.group_id = NULL
+            WHERE g.method = 'model' AND p.group_locked = 0");
+
 $upsert = $db->prepare(
     'INSERT INTO product_groups (match_key, slug, canonical_title, brand, image_url, member_count, store_count, method)
      VALUES (:mk, :slug, :title, :brand, :img, :n, :stores, :method)
