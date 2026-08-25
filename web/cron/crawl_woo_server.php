@@ -8,10 +8,17 @@ declare(strict_types=1);
  * pasar la IP del server (ej. fitshop). Corre en FatCow, baja el WooCommerce Store
  * API e ingesta directo (sin POST a /api/ingest). Lo dispara cron-job.org.
  *
- * Acepta una o varias tiendas separadas por coma (catálogos chicos → un cron):
+ * Acepta una o varias tiendas separadas por coma:
  *   GET /cron/crawl_woo_server.php?store=fitshop
- *   GET /cron/crawl_woo_server.php?store=fitshop,fetesa,telcmax
+ *   GET /cron/crawl_woo_server.php?store=fetesa
  *   Header: X-Api-Key: <ingest_api_key>
+ *
+ * DISEÑADO PARA cron-job.org (que espera respuesta y falla si tarda): cada llamada
+ * procesa un TRAMO chico (~8 páginas / ≤14s) y responde rápido, guardando un CURSOR
+ * en la tabla `settings` (crawl_next_<slug>). El cron debe llamarse SEGUIDO (cada
+ * ~10 min): el cursor avanza solo hasta completar una pasada del catálogo; al
+ * terminar marca la fecha (crawl_done_<slug>) y las llamadas siguientes del día
+ * hacen no-op instantáneo. fetesa (~46 páginas) se completa en ~6 llamadas.
  */
 
 require dirname(__DIR__) . '/bootstrap.php';
@@ -48,11 +55,34 @@ $slugs = array_values(array_filter(array_map(
 )));
 if (!$slugs) { out(400, ['ok' => false, 'error' => 'Falta el parámetro store']); }
 
-$ingest  = new IngestService($db);
-$results  = [];
-$grand    = 0;
+$ingest = new IngestService($db);
+$results = [];
+$grand   = 0;
+
+// --- Cursor persistente en `settings` (KV). Escribimos directo (Settings::set
+//     filtra por whitelist). Cada tienda guarda su próxima página + la fecha en
+//     que completó la última pasada, para no re-crawlear todo el día. ---
+$KV_get = static function (string $k) use ($db): ?string {
+    $s = $db->prepare('SELECT v FROM settings WHERE k = ?'); $s->execute([$k]);
+    $v = $s->fetchColumn();
+    return $v === false ? null : (string) $v;
+};
+$KV_set = static function (string $k, string $v) use ($db): void {
+    $db->prepare('INSERT INTO settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)')->execute([$k, $v]);
+};
+
+// Cada request procesa un TRAMO chico y responde RÁPIDO (cron-job.org espera la
+// respuesta y falla si tarda). El cron llama seguido y el cursor avanza solo
+// hasta completar una pasada; después no-op hasta el día siguiente.
+$PAGES_PER_CALL = 8;    // máx páginas (×100 prod) por llamada
+$TIME_BUDGET    = 14;   // seg tope por request (bien bajo el corte del hosting)
+$today          = date('Y-m-d');
+$t0             = time();
 
 foreach ($slugs as $slug) {
+    $sent = 0; $pages = 0; $error = null; $done = false; $startPage = 1; $page = 1;
+    $nextKey = "crawl_next_$slug"; $doneKey = "crawl_done_$slug";
+  try {
     $st = $db->prepare("SELECT base_url, currency, tax_included, tax_rate FROM stores WHERE slug = ? AND platform = 'woocommerce' AND is_active = 1");
     $st->execute([$slug]);
     $store = $st->fetch();
@@ -60,30 +90,46 @@ foreach ($slugs as $slug) {
         $results[] = ['store' => $slug, 'ok' => false, 'error' => 'no encontrada'];
         continue;
     }
+
+    $startPage = max(1, (int) ($KV_get($nextKey) ?? '1'));
+    $page      = $startPage;
+
+    // ¿Ya completó una pasada HOY? (cursor en 1 + marca de hoy) → no-op rápido.
+    if ($startPage <= 1 && $KV_get($doneKey) === $today) {
+        $results[] = ['store' => $slug, 'ok' => true, 'skipped' => 'ya actualizada hoy'];
+        continue;
+    }
+
     $base        = rtrim((string) $store['base_url'], '/');
     $currency    = (string) ($store['currency'] ?? 'NIO');
     $taxIncluded = (bool) ($store['tax_included'] ?? 1);
     $taxRate     = (float) ($store['tax_rate'] ?? 0.15);
+    $seen        = [];
 
-    $seen = []; $sent = 0; $pages = 0; $error = null;
+    for ($n = 0; $n < $PAGES_PER_CALL; $n++, $page++) {
+        // Corte por tiempo (siempre tras ≥1 página → hay progreso).
+        if ($n > 0 && (time() - $t0) >= $TIME_BUDGET) { break; }
 
-    for ($page = 1; $page <= 200; $page++) {
         $ch = curl_init($base . '/wp-json/wc/store/v1/products?per_page=100&page=' . $page);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 5,
-            CURLOPT_CONNECTTIMEOUT => 12, CURLOPT_TIMEOUT => 40, CURLOPT_ENCODING => '',
-            CURLOPT_USERAGENT => UA, CURLOPT_HTTPHEADER => ['Accept: application/json'],
+            CURLOPT_CONNECTTIMEOUT => 10, CURLOPT_TIMEOUT => 25, CURLOPT_ENCODING => '',
+            CURLOPT_USERAGENT => UA,
+            CURLOPT_HTTPHEADER => ['Accept: application/json', 'Accept-Language: es-NI,es;q=0.9'],
+            // FatCow puede tener un CA bundle viejo → HTTP 0 por SSL.
+            CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0,
         ]);
         $body = curl_exec($ch);
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $cerr = curl_error($ch);
         curl_close($ch);
 
         if ($body === false || $code < 200 || $code >= 300) {
-            $error = "Fetch falló (HTTP $code) en página $page";
+            $error = "Fetch falló (HTTP $code) en página $page" . ($cerr !== '' ? " · curl: $cerr" : '');
             break;
         }
         $products = json_decode((string) $body, true);
-        if (!is_array($products) || count($products) === 0) { break; }
+        if (!is_array($products) || count($products) === 0) { $done = true; break; } // fin del catálogo
         $pages++;
 
         $batch = [];
@@ -94,18 +140,27 @@ foreach ($slugs as $slug) {
             $rec = WooMapper::map($p, $slug, $currency, $taxIncluded, $taxRate);
             if ($rec !== null) { $batch[] = $rec->toArray(); }
         }
-        if ($batch) {
-            $ingest->ingest($batch);
-            $sent += count($batch);
-        }
-        if (count($products) < 100) { break; }
-        usleep(300000);
+        if ($batch) { $ingest->ingest($batch); $sent += count($batch); }
+        if (count($products) < 100) { $done = true; break; } // última página real
+        usleep(200000);
     }
 
+    // Guardar cursor: si terminó la pasada → reinicia a 1 + marca hoy; si no,
+    // deja apuntando a la próxima página para la siguiente llamada del cron.
+    if ($error === null) {
+        if ($done) { $KV_set($nextKey, '1'); $KV_set($doneKey, $today); }
+        else       { $KV_set($nextKey, (string) $page); }
+    }
+  } catch (\Throwable $e) {
+        $error = 'excepción: ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine();
+  }
+
     $grand += $sent;
-    $results[] = $error === null
-        ? ['store' => $slug, 'ok' => true, 'pages' => $pages, 'sent' => $sent]
-        : ['store' => $slug, 'ok' => false, 'pages' => $pages, 'sent' => $sent, 'error' => $error];
+    $row = ['store' => $slug, 'ok' => $error === null, 'from' => $startPage, 'pages' => $pages, 'sent' => $sent];
+    if ($done)                       { $row['done'] = true; }
+    if (!$done && $error === null)   { $row['next_from'] = $page; }
+    if ($error !== null)             { $row['error'] = $error; }
+    $results[] = $row;
 }
 
 $allOk = !array_filter($results, static fn($r) => !$r['ok']);

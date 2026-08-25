@@ -31,9 +31,20 @@ $repo = new ProductRepository($db);
 $gapsSort = ($_GET['gaps'] ?? '') === 'recent' ? 'recent' : 'diff';
 $lowsSort = ($_GET['lows'] ?? '') === 'recent' ? 'recent' : 'drop';
 
-$drops = $repo->changesList('drop', 15);
-$gaps  = $repo->biggestGaps(10, $gapsSort);
-$lows  = $repo->historicLows(15, $lowsSort);
+$dropsAll = $repo->changesList('drop', 60);
+$drops    = array_slice($dropsAll, 0, 15);
+$gaps     = $repo->biggestGaps(10, $gapsSort);
+$lows     = $repo->historicLows(15, $lowsSort);
+
+// La MEJOR bajada de CADA tienda (1 por tienda). Sirve para promocionar tiendas
+// que no entran al top-15 por % (E-Tech, El Gallo, las nuevas…). Sale de la misma
+// query: deduplicamos por tienda conservando el orden por descuento.
+$perStore = []; $seenStore = [];
+foreach ($dropsAll as $d) {
+    if (($d['direction'] ?? '') !== 'down' || isset($seenStore[$d['store']])) { continue; }
+    $seenStore[$d['store']] = true;
+    $perStore[] = $d;
+}
 
 /** Link a esta misma página cambiando un parámetro de orden (conserva el otro). */
 $toggleUrl = static function (string $which, string $val) use ($gapsSort, $lowsSort): string {
@@ -146,6 +157,27 @@ $waLow = static fn(array $l) => "📉 {$l['title']}\n¡En su precio MÁS BAJO!: 
       <div class="info">
         <div class="tt"><a href="precio.php?id=<?= (int) $d['id'] ?>"><?= $h($d['title']) ?></a></div>
         <div><span class="price"><?= $money((float) $d['price_now']) ?></span><span class="old"><?= $money((float) $d['price_prev']) ?></span> · <?= $h($d['store_name']) ?></div>
+      </div>
+      <span class="drop-badge"><?= (float) $d['delta_pct'] ?>%</span>
+      <div class="actions">
+        <button class="copy" data-wa="<?= $h($waDrop($d)) ?>">📋 Copiar</button>
+        <button class="img" data-imgsrc="img.php?id=<?= (int) $d['id'] ?>" data-title="<?= $h($d['title']) ?>" data-price="Ahora <?= $h($money((float) $d['price_now'])) ?>" data-note="antes <?= $h($money((float) $d['price_prev'])) ?> · <?= $h($d['store_name']) ?>" data-tag="<?= (float) $d['delta_pct'] ?>%">🖼️ Imagen</button>
+        <a class="view" href="precio.php?id=<?= (int) $d['id'] ?>">Ver</a>
+      </div>
+    </div>
+  <?php endforeach; endif; ?>
+
+  <!-- 1b) MEJOR BAJADA POR TIENDA -->
+  <h2 id="portienda">🏪 La mejor bajada de cada tienda</h2>
+  <p class="sub">Una oferta destacada por tienda — así promocionás todas, no solo las del mayor descuento.</p>
+  <?php if (!$perStore): ?>
+    <div class="empty">Todavía no hay bajones por tienda. Volvé más tarde. 👀</div>
+  <?php else: foreach ($perStore as $d): ?>
+    <div class="card">
+      <?php if (!empty($d['image_url'])): ?><img src="<?= $h($d['image_url']) ?>" alt="" loading="lazy"><?php endif; ?>
+      <div class="info">
+        <div class="tt"><a href="precio.php?id=<?= (int) $d['id'] ?>"><?= $h($d['title']) ?></a></div>
+        <div><span class="price"><?= $money((float) $d['price_now']) ?></span><span class="old"><?= $money((float) $d['price_prev']) ?></span> · <b><?= $h($d['store_name']) ?></b></div>
       </div>
       <span class="drop-badge"><?= (float) $d['delta_pct'] ?>%</span>
       <div class="actions">

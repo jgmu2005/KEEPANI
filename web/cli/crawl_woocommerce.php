@@ -24,9 +24,14 @@ const STORES = [
     'gcm'              => ['base_url' => 'https://gcm.com.ni',              'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'casadelaslamparas' => ['base_url' => 'https://casadelaslamparas.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'fogel'             => ['base_url' => 'https://fogel.com.ni',            'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
-    // Nota: fitshop, fetesa y telcmax son WooCommerce pero su WAF/Cloudflare
-    // BLOQUEA las IPs de GitHub Actions (403). Se crawlean desde el server
-    // (FatCow) con web/cron/crawl_woo_server.php?store=fitshop|fetesa|telcmax.
+    // telcmax bloquea TODA IP de datacenter (Actions 403, FatCow timeout). Solo se
+    // puede crawlear desde una IP RESIDENCIAL → 'residential_only' lo saca de 'all'
+    // (Actions), pero se corre explícito desde tu máquina:
+    //   php web/cli/crawl_woocommerce.php telcmax
+    'telcmax'           => ['base_url' => 'https://telcmax.com', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15, 'residential_only' => true],
+    // Nota: fitshop y fetesa son WooCommerce con Cloudflare que BLOQUEA las IPs de
+    // GitHub Actions (403) pero deja pasar la del server → se crawlean desde FatCow
+    // con web/cron/crawl_woo_server.php?store=fitshop  y  ?store=fetesa.
 ];
 const PAGE      = 100; // máximo del Store API
 const MAX_PAGES = 120; // tope de seguridad
@@ -76,7 +81,11 @@ if ($ingestUrl === '' || $ingestKey === '') {
 }
 
 $which   = $argv[1] ?? 'all';
-$targets = $which === 'all' ? array_keys(STORES) : [$which];
+// 'all' (Actions) omite las tiendas residential_only (bloquean datacenter). Se
+// corren explícitas por nombre desde una IP residencial.
+$targets = $which === 'all'
+    ? array_keys(array_filter(STORES, static fn($c) => empty($c['residential_only'])))
+    : [$which];
 
 $http  = new Http();
 $grand = 0;
