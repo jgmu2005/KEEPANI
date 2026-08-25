@@ -118,6 +118,7 @@ final class IngestService
                         category_external_id = COALESCE(?, category_external_id),
                         seller = COALESCE(?, seller),
                         is_active = 1,
+                        deactivated_at = NULL,
                         last_seen_at = ?
                   WHERE id = ?'
             );

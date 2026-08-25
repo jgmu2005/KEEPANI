@@ -67,7 +67,7 @@ if (!$dry && $total > 0) {
            JOIN (SELECT store_id, MAX(last_seen_at) AS fresh
                    FROM products WHERE is_active = 1 GROUP BY store_id) f
              ON f.store_id = p.store_id
-            SET p.is_active = 0
+            SET p.is_active = 0, p.deactivated_at = NOW()
           WHERE p.is_active = 1
             AND p.last_seen_at < (f.fresh - INTERVAL {$days} DAY)"
     );

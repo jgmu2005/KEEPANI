@@ -75,6 +75,12 @@
     </div>
 
     <div class="card">
+      <h2>🩺 Salud de tiendas</h2>
+      <p style="color:var(--muted);font-size:.86rem;margin:-4px 0 10px">Última ingesta por tienda y entradas/salidas de productos. Las <b>atrasadas</b> (sin datos hace +48h) salen primero, en rojo.</p>
+      <div id="storesHealthBox"><div style="color:var(--muted)">Cargando…</div></div>
+    </div>
+
+    <div class="card">
       <h2>Ajustes del sitio</h2>
       <div id="setMsg" class="msg"></div>
       <label>Nombre del sitio</label><input id="site_name">
@@ -249,7 +255,7 @@ async function init(){
   if(me.user && me.user.is_admin){
     $('loginView').classList.add('hidden'); $('adminView').classList.remove('hidden');
     buildAdminNav();
-    loadStats(); loadSettings(); loadUsers(); loadDonations(); loadMatches(); loadMkStores(); loadComparatives(); setupNewGroup();
+    loadStats(); loadStoresHealth(); loadSettings(); loadUsers(); loadDonations(); loadMatches(); loadMkStores(); loadComparatives(); setupNewGroup();
   } else {
     $('adminView').classList.add('hidden'); $('loginView').classList.remove('hidden');
     if(me.user){ $('loginError').textContent = 'Esa cuenta no es administrador.'; $('loginError').style.display='block'; }
@@ -259,6 +265,7 @@ async function init(){
 // ---- Navegación por secciones (vista inicial + botones) ----
 const AD_SECTIONS = [
   {id:'stats',        icon:'📊', label:'Estadísticas', sub:'Métricas del sitio',           match:['Estadísticas']},
+  {id:'stores',       icon:'🩺', label:'Salud tiendas', sub:'Última ingesta, entradas/salidas', match:['Salud de tiendas']},
   {id:'config',       icon:'⚙️', label:'Configuración', sub:'Ajustes, SEO, correo',         match:['Ajustes del sitio','SEO / Google','Correo (SMTP']},
   {id:'donations',    icon:'☕', label:'Donaciones',    sub:'Ko-fi y aportes recibidos',    match:['Ko-fi']},
   {id:'users',        icon:'👥', label:'Usuarios',      sub:'Cuentas registradas',          match:['Usuarios']},
@@ -343,6 +350,34 @@ function setupNewGroup(){
     if(j.ok){ window.open(j.url, '_blank'); msg.className='msg ok'; msg.textContent='✅ Comparativo creado. Se abrió en otra pestaña.'; sel.clear(); renderSel(); $('ngQ').value=''; box.innerHTML=''; loadComparatives && loadComparatives(true); }
     else { msg.className='msg err'; msg.textContent = j.error || 'Error'; createBtn.disabled = false; }
   });
+}
+
+// Salud de tiendas
+async function loadStoresHealth(){
+  const box = $('storesHealthBox');
+  let j; try{ j = await api('admin/stores_health.php'); }catch(e){ box.innerHTML = '<div style="color:var(--muted)">Error al cargar.</div>'; return; }
+  if(!j.ok){ box.innerHTML = '<div style="color:var(--muted)">No disponible (¿falta la migración 047_product_deactivated_at?).</div>'; return; }
+  const num = n => n==null ? '—' : Number(n).toLocaleString('es-NI');
+  const ago = h => h==null ? 'nunca' : (h < 1 ? 'recién' : (h < 24 ? h+'h' : Math.floor(h/24)+'d '+(h%24)+'h'));
+  const stale = j.stores.filter(s => s.stale).length;
+  let html = stale
+    ? `<div class="msg err" style="margin-bottom:10px">⚠️ ${stale} tienda(s) sin datos hace +${j.stale_hours}h — revisá el crawler.</div>`
+    : `<div class="msg ok" style="margin-bottom:10px">✅ Todas las tiendas ingestaron en las últimas ${j.stale_hours}h.</div>`;
+  html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.85rem">
+    <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--line)">
+      <th style="padding:6px 8px">Tienda</th><th>Activos</th><th>Última ingesta</th>
+      <th title="hoy / 7 días">Entradas</th><th title="hoy / 7 días">Salidas</th></tr></thead><tbody>`;
+  for(const s of j.stores){
+    const dot = s.stale ? '#dc2626' : '#16a34a';
+    html += `<tr style="border-bottom:1px solid var(--line)${s.stale?';background:#fef2f2':''}">
+      <td style="padding:7px 8px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dot};margin-right:7px"></span><b>${esc(s.name)}</b> <span style="color:var(--muted);font-size:.72rem">${esc(s.platform||'')}</span></td>
+      <td>${num(s.active)}</td>
+      <td style="color:${s.stale?'#b91c1c':'inherit'};font-weight:${s.stale?'700':'400'}">${ago(s.hours_since)}</td>
+      <td style="color:#166534">+${num(s.in_today)} <span style="color:var(--muted)">/ ${num(s.in_7d)}</span></td>
+      <td style="color:#b91c1c">−${num(s.out_today)} <span style="color:var(--muted)">/ ${num(s.out_7d)}</span></td></tr>`;
+  }
+  html += `</tbody></table></div><div style="color:var(--muted);font-size:.72rem;margin-top:6px">Generado ${esc(j.generated)}. Entradas = nuevos (first_seen). Salidas = desactivados (delisted).</div>`;
+  box.innerHTML = html;
 }
 
 // Estadísticas
