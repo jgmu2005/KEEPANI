@@ -150,6 +150,12 @@ $ld = [
 if ($image)       { $ld['image'] = $image; }
 if ($g['brand'])  { $ld['brand'] = ['@type' => 'Brand', 'name' => $g['brand']]; }
 if ($priced) {
+    // validFrom = fecha de la última verificación del precio (recomendado por Google).
+    $vfDates = array_filter(array_map(
+        static fn($o) => !empty($o['last_date']) ? strtotime((string) $o['last_date']) : null,
+        $priced
+    ));
+    $aggVf = $vfDates ? max($vfDates) : time();
     $ld['offers'] = [
         '@type'         => 'AggregateOffer',
         'priceCurrency' => $cur === 'USD' ? 'USD' : 'NIO',
@@ -157,13 +163,16 @@ if ($priced) {
         'highPrice'     => $high,
         'offerCount'    => count($priced),
         'priceValidUntil' => date('Y-m-d', strtotime('+2 days')), // precios se refrescan a diario
+        'validFrom'     => date('Y-m-d', $aggVf),
         'offers'        => array_map(static function ($o) use ($cur) {
+            $vf = !empty($o['last_date']) ? strtotime((string) $o['last_date']) : false;
             return [
                 '@type'         => 'Offer',
                 'price'         => $o['price_final'],
                 'priceCurrency' => $cur === 'USD' ? 'USD' : 'NIO',
                 'availability'  => $o['in_stock'] ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
                 'itemCondition' => 'https://schema.org/NewCondition',
+                'validFrom'     => date('Y-m-d', $vf ?: time()),
                 'url'           => $o['url'],
                 'seller'        => ['@type' => 'Organization', 'name' => $o['store_name']],
             ];

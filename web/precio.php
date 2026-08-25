@@ -148,6 +148,10 @@ if ($current !== null) {
         'url'            => $p['url'],
         'seller'         => ['@type' => 'Organization', 'name' => $p['store_name']],
     ];
+    // validFrom = fecha en que verificamos por última vez este precio (recomendado por Google).
+    $vf = $lastLive['date'] ?? ($last['date'] ?? null);
+    $vfTs = $vf ? strtotime((string) $vf) : false;
+    if ($vfTs) { $ld['offers']['validFrom'] = date('Y-m-d', $vfTs); }
 }
 $ldBreadcrumb = [
     '@context' => 'https://schema.org',
