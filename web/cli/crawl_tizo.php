@@ -111,6 +111,7 @@ foreach ($catList as $cat) {
     if ($catSlug === '') { continue; }
     $catalogsResp = apiGet('/products/catalog/lists/' . rawurlencode($catSlug) . '/catalogs');
     $catalogs = $catalogsResp['data'] ?? [];
+    line('  · ' . $catSlug . ': ' . count($catalogs) . ' catálogos');
 
     foreach ($catalogs as $catalog) {
         $cSlug = (string) ($catalog['slug'] ?? '');
@@ -137,6 +138,7 @@ foreach ($catList as $cat) {
             if ($page >= max(1, $tp)) { break; }
             usleep(250000);
         }
+        line('    ' . $cSlug . ' · acumulado: ' . ($sent + count($batch)));
     }
     $flush();
 }
