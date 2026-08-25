@@ -25,6 +25,14 @@ final class PhoneModel
         'apple','samsung','xiaomi','honor','huawei','motorola','tecno',
         'infinix','oppo','realme','zte','nokia','itel','alcatel','google',
     ];
+    /** Submarca/línea → marca padre, para inferir la marca del título cuando la
+     *  tienda no la expone (ej. telcmax: "GALAXY A15" sin campo marca → samsung). */
+    private const HINT_BRAND = [
+        'iphone' => 'apple', 'galaxy' => 'samsung', 'redmi' => 'xiaomi', 'poco' => 'xiaomi',
+        'moto' => 'motorola', 'pixel' => 'google', 'magic' => 'honor', 'reno' => 'oppo',
+        'narzo' => 'realme', 'camon' => 'tecno', 'spark' => 'tecno', 'pova' => 'tecno',
+        'mate' => 'huawei', 'nova' => 'huawei',
+    ];
     /** Pistas de que es un celular (no una TV/refri de la misma marca). */
     private const HINTS = [
         'iphone','galaxy','redmi','poco','moto','pixel','mate','nova','magic',
@@ -36,7 +44,7 @@ final class PhoneModel
         'watch','reloj','buds',' band ',' fit ','parlante','bocina','soundbar',
         'cargador','funda','case','protector','refriger','lavadora','microonda',
         'cocina','aire ','monitor','impresora','mouse','teclado','cable',
-        'adaptador','power bank',
+        'adaptador','power bank','router','modem','scooter','xpad',
     ];
 
     /** Palabra-línea: un número suelto que la sigue es parte del modelo. */
@@ -67,8 +75,29 @@ final class PhoneModel
         'bundle','mas','ram','rom','gb','tb','mah','mp','hz','cm','mm','ghz','w',
     ];
 
+    /**
+     * Marca efectiva: la dada si es conocida; si no, la infiere del título
+     * (primer token que sea una marca, o una submarca → marca padre). Así los
+     * celulares de tiendas que NO exponen marca (telcmax) igual se agrupan.
+     */
+    public static function resolveBrand(?string $brandNorm, ?string $modelNorm): ?string
+    {
+        if ($brandNorm !== null && in_array($brandNorm, self::BRANDS, true)) {
+            return $brandNorm;
+        }
+        $toks = explode(' ', (string) $modelNorm);
+        foreach ($toks as $t) {
+            if ($t !== '' && in_array($t, self::BRANDS, true)) { return $t; }
+        }
+        foreach ($toks as $t) {
+            if (isset(self::HINT_BRAND[$t])) { return self::HINT_BRAND[$t]; }
+        }
+        return $brandNorm;
+    }
+
     public static function isPhone(?string $brandNorm, ?string $modelNorm): bool
     {
+        $brandNorm = self::resolveBrand($brandNorm, $modelNorm);
         $b = (string) $brandNorm;
         $m = ' ' . (string) $modelNorm . ' ';
         if ($modelNorm === null || $modelNorm === '' || !in_array($b, self::BRANDS, true)) {
@@ -77,6 +106,9 @@ final class PhoneModel
         foreach (self::NOT_PHONE as $x) {
             if (str_contains($m, $x)) { return false; }
         }
+        // "dual sim" / "esim" es señal fuerte de celular aunque el título no traiga
+        // una submarca conocida (ej. "HONOR X5d DUAL SIM 4GB RAM 128GB").
+        if (str_contains($m, ' sim ') || str_contains($m, ' esim ')) { return true; }
         foreach (self::HINTS as $h) {
             if (str_contains($m, $h)) { return true; }
         }
@@ -86,6 +118,7 @@ final class PhoneModel
     /** Firma "marca|modelo" o null si no es celular / no hay modelo. */
     public static function signature(?string $brandNorm, ?string $modelNorm): ?string
     {
+        $brandNorm = self::resolveBrand($brandNorm, $modelNorm);
         if (!self::isPhone($brandNorm, $modelNorm)) {
             return null;
         }
@@ -99,6 +132,9 @@ final class PhoneModel
             if (in_array($t, self::BOUNDARY, true)) { break; }
             if (preg_match('/^\d+(gb|tb|mah|mp|hz|w|mm|cm|in|ghz)$/', $t)) { break; } // 128gb, 6000mah…
             if (preg_match('/^(?=.*\d)[a-z0-9]{7,}$/', $t)) { continue; }            // SKU interno (mzb0jsyus…)
+            // Código de fábrica (x6887, a276b, x6895b) — pero NO el nombre comercial
+            // (a27, x5d, g200): 4+ dígitos, o 3 dígitos con letra final.
+            if (preg_match('/^[a-z](\d{4,}[a-z]?|\d{3}[a-z])$/', $t)) { continue; }
 
             if (preg_match('/^\d+$/', $t)) {
                 if (!$prevLine) { break; }        // número suelto sin línea previa = dimensión → corta
