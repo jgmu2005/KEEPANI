@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ojo al Precio",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Historial de precios, comparación entre tiendas y alertas de baja, en la página del producto de tiendas de Nicaragua.",
   "content_scripts": [
     {
@@ -23,7 +23,27 @@
         "https://almacenestropigas.com/*",
         "https://*.almacenestropigas.com/*",
         "https://pricesmart.com/*",
-        "https://*.pricesmart.com/*"
+        "https://*.pricesmart.com/*",
+        "https://gcm.com.ni/*",
+        "https://*.gcm.com.ni/*",
+        "https://casadelaslamparas.com.ni/*",
+        "https://*.casadelaslamparas.com.ni/*",
+        "https://fogel.com.ni/*",
+        "https://*.fogel.com.ni/*",
+        "https://telcmax.com/*",
+        "https://*.telcmax.com/*",
+        "https://fetesa.com.ni/*",
+        "https://*.fetesa.com.ni/*",
+        "https://fitshop.com.ni/*",
+        "https://*.fitshop.com.ni/*",
+        "https://etech.com.ni/*",
+        "https://*.etech.com.ni/*",
+        "https://pcsystemni.com/*",
+        "https://*.pcsystemni.com/*",
+        "https://cubitt.com.ni/*",
+        "https://*.cubitt.com.ni/*",
+        "https://simpletechnic.com/*",
+        "https://*.simpletechnic.com/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"],

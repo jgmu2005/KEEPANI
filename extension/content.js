@@ -10,6 +10,10 @@
   const host = location.hostname.replace(/^www\./, '');
   const MAGENTO = { platform: 'magento', anchor: '.product-info-main .price-box' };
   const VTEX    = { platform: 'vtex',    anchor: '[class*="sellingPriceValue"]' }; // cubre v1 y v3 del componente
+  // WooCommerce y Shopify: el precio vive en clases distintas según el TEMA, así que
+  // el anchor es una lista de selectores que se prueban EN ORDEN (ver getAnchor).
+  const WOO     = { platform: 'woocommerce', anchor: ['.summary .price', 'p.price'] };
+  const SHOPIFY = { platform: 'shopify',     anchor: ['.product-info__price', '.price--large', '.price'] };
   const CONF = {
     'sinsa.com.ni':           VTEX,
     'ni.siman.com':           VTEX,
@@ -20,6 +24,18 @@
     'radioshackla.com':       MAGENTO,
     'almacenestropigas.com':  MAGENTO,
     'pricesmart.com':         { platform: 'pricesmart', anchor: '.sf-price' },
+    // Tiendas WooCommerce (backend ya resuelve la URL vía parseUrl).
+    'gcm.com.ni':               WOO,
+    'casadelaslamparas.com.ni': WOO,
+    'fogel.com.ni':             WOO,
+    'telcmax.com':              WOO,
+    'fetesa.com.ni':            WOO,
+    'fitshop.com.ni':           WOO,
+    'etech.com.ni':             WOO,
+    'pcsystemni.com':           WOO,
+    // Tiendas Shopify.
+    'cubitt.com.ni':            SHOPIFY,
+    'simpletechnic.com':        SHOPIFY,
   }[host];
   if (!CONF) return;
   console.log('[Ojo al Precio] extensión activa en', host);
@@ -35,6 +51,8 @@
       case 'magento':    return /-\d+(\/p)?(\/|\?|#|$)/.test(p);         // Gallo .../slug-{id} · Unicomer .../slug-{id}/p
       case 'copasa':     return /\/Product\/Detail\//i.test(p);
       case 'pricesmart': return /\/producto\/.+\/\d+/.test(p);          // /es-ni/producto/{slug}/{pid}
+      case 'woocommerce':return /\/(?:producto|productos|product)\/[^/]+/.test(p); // .../producto|productos|product/{slug}
+      case 'shopify':    return /\/products\/[^/]+/.test(p);            // .../products/{handle}
       default:           return false;
     }
   }
@@ -136,7 +154,13 @@
   // Ancla del precio. En VTEX preferimos el precio PRINCIPAL (no el de un shelf
   // de "productos relacionados" que puede renderizar antes durante la hidratación).
   function getAnchor() {
-    if (CONF.platform !== 'vtex') return document.querySelector(CONF.anchor);
+    if (CONF.platform !== 'vtex') {
+      // anchor puede ser un solo selector o una LISTA que se prueba en orden
+      // (WooCommerce/Shopify varían el markup del precio según el tema).
+      const sels = Array.isArray(CONF.anchor) ? CONF.anchor : [CONF.anchor];
+      for (const s of sels) { const el = document.querySelector(s); if (el) return el; }
+      return null;
+    }
     const all = [...document.querySelectorAll('[class*="sellingPriceValue"]')];
     return all.find(el => !el.closest('[class*="productSummary"], [class*="product-summary"], [class*="shelf"], [class*="Shelf"]'))
         || all[0] || null;
