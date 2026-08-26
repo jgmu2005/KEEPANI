@@ -100,10 +100,12 @@ foreach ($targets as $slug) {
         if ($uid === null) { line("  ⚠ categoría '$path' sin uid; salto."); continue; }
         line("  · $path (uid=$uid)");
 
-        // 2) productos paginados
+        // 2) productos paginados. OJO: NO pedir page_info junto con los campos
+        //    completos (price_range/small_image) → el GraphQL de Samsung tira
+        //    "Internal server error". Paginamos hasta que una página venga incompleta.
         for ($page = 1; $page <= MAX_PAGES; $page++) {
             $q = '{products(filter:{category_uid:{eq:"' . $uid . '"}},pageSize:' . PAGE . ',currentPage:' . $page . ')'
-               . '{total_count page_info{total_pages} items{' . MagentoAdapter::FIELDS . '}}}';
+               . '{total_count items{' . MagentoAdapter::FIELDS . '}}}';
             $r     = gql($endpoint, $q, $cfg['store_code']);
             $items = $r['data']['products']['items'] ?? [];
             if (!$items) { break; }
@@ -122,9 +124,9 @@ foreach ($targets as $slug) {
                 $sent += count($recs);
             }
 
-            $totalPages = (int) ($r['data']['products']['page_info']['total_pages'] ?? 1);
-            line("    ...página $page/$totalPages · " . count($items) . ' items · ' . $sent . ' enviados');
-            if ($page >= max(1, $totalPages)) { break; }
+            $total = (int) ($r['data']['products']['total_count'] ?? 0);
+            line("    ...página $page · " . count($items) . " items (de $total) · $sent enviados");
+            if (count($items) < PAGE) { break; } // última página
             usleep(400000);
         }
     }
