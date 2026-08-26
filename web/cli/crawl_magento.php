@@ -59,10 +59,17 @@ function gql(string $endpoint, string $query, string $storeCode, int $retries = 
 
         if ($body !== false && $code >= 200 && $code < 300) {
             $j = json_decode((string) $body, true);
-            if (is_array($j) && empty($j['errors'])) { return $j; }
-            if (is_array($j) && !empty($j['errors'])) {
-                fwrite(STDERR, "  [gql] error: " . ($j['errors'][0]['message'] ?? '?') . "\n");
-                return null;
+            if (is_array($j)) {
+                // GraphQL puede devolver `errors` JUNTO con `data` válida (error
+                // PARCIAL). Samsung: algún producto con price_range roto → ese item
+                // viene null y el resto OK. Avisamos, pero NO tiramos la data buena.
+                if (!empty($j['errors'])) {
+                    $e = $j['errors'][0];
+                    fwrite(STDERR, "  [gql] warning: " . ($e['message'] ?? '?')
+                        . ' @ ' . implode('.', array_map('strval', (array) ($e['path'] ?? []))) . "\n");
+                }
+                if (isset($j['data'])) { return $j; }   // hay data → la usamos
+                return null;                            // solo errores, sin data → fallo real
             }
         }
         if ($code === 429 || $code >= 500 || $body === false) { usleep(1000000 * ($a + 1)); continue; }
@@ -112,6 +119,7 @@ foreach ($targets as $slug) {
 
             $recs = [];
             foreach ($items as $it) {
+                if (!is_array($it)) { continue; } // item null por error parcial del GraphQL
                 $key = (string) ($it['url_key'] ?? '');
                 if ($key === '' || isset($seen[$key])) { continue; }
                 $seen[$key] = true;
