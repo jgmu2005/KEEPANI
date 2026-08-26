@@ -56,6 +56,23 @@ $usd  = static function (?float $v) use ($usdRate): string {
     if ($v === null || $usdRate <= 0) return '';
     return '≈ US$' . number_format($v / $usdRate, 2);
 };
+// Convierte cualquier precio a NIO / a USD según la moneda de origen de la oferta.
+// Comparamos y mostramos TODO en córdobas por defecto (las tiendas en USD, como
+// Samsung, se convierten con el usd_rate); un toggle deja verlo todo en dólares.
+$toNio = static function (?float $v, ?string $c) use ($usdRate): ?float {
+    if ($v === null) return null;
+    return (($c ?? 'NIO') === 'USD' && $usdRate > 0) ? $v * $usdRate : $v;
+};
+$toUsd = static function (?float $v, ?string $c) use ($usdRate): ?float {
+    if ($v === null) return null;
+    if (($c ?? 'NIO') === 'USD') return $v;
+    return $usdRate > 0 ? $v / $usdRate : null;
+};
+// Renderiza un precio en las DOS monedas (el toggle muestra una u otra por CSS).
+$dual = static function (?float $nioV, ?float $usdV) use ($fmt): string {
+    return '<span class="v-nio">' . $fmt($nioV, 'NIO') . '</span>'
+         . '<span class="v-usd">' . $fmt($usdV, 'USD') . '</span>';
+};
 
 if (!$data || !$data['offers']) {
     http_response_code(404);
@@ -80,12 +97,26 @@ if (!$priced) {
     $priced  = array_values(array_filter($offers, static fn($o) => $o['price_final'] !== null));
     $soldOut = [];
 }
-$low     = $priced ? min(array_map(static fn($o) => $o['price_final'], $priced)) : null;
-$high    = $priced ? max(array_map(static fn($o) => $o['price_final'], $priced)) : null;
-$cur     = $priced[0]['currency'] ?? ($offers[0]['currency'] ?? 'NIO');
+// Anotar cada oferta con su precio comparable en NIO y su equivalente en USD, y
+// ORDENAR por NIO (no por el valor crudo: US$175 NO es más barato que C$5,399).
+foreach ($priced as &$o) {
+    $o['nio']     = $toNio($o['price_final'], $o['currency']);
+    $o['usdv']    = $toUsd($o['price_final'], $o['currency']);
+    $o['listNio'] = $toNio($o['list_price'] ?? null, $o['currency']);
+    $o['listUsd'] = $toUsd($o['list_price'] ?? null, $o['currency']);
+}
+unset($o);
+usort($priced, static fn($a, $b) => ($a['nio'] ?? INF) <=> ($b['nio'] ?? INF));
+
+$cheapest = $priced[0] ?? null;
+$priciest = $priced ? $priced[count($priced) - 1] : null;
+$low     = $cheapest['nio'] ?? null;   // comparado y mostrado en NIO
+$high    = $priciest['nio'] ?? null;
+$lowUsd  = $cheapest['usdv'] ?? null;
+$highUsd = $priciest['usdv'] ?? null;
+$cur     = 'NIO'; // todo en córdobas por defecto
 $title   = \OjoAlPrecio\Web\Normalizer::cleanDisplayTitle($g['canonical_title']) ?: 'Producto';
 $image   = $g['image_url'] ?: ($offers[0]['image_url'] ?? '');
-$cheapest = $priced[0] ?? null; // ya vienen ordenadas por precio asc
 $trackId  = (int) ($cheapest['id'] ?? ($offers[0]['id'] ?? 0)); // para deep-link a la ficha
 // # de tiendas con stock (distintas) — no el conteo bruto del grupo.
 $storeCount = count(array_unique(array_map(static fn($o) => $o['store'], $priced)));
@@ -108,13 +139,15 @@ $allPts = [];
 foreach ($priced as $o) {
     $s = $seriesById[$o['id']] ?? [];
     if ($s) {
-        $seriesByStore[$o['store_name']] = $s;
-        foreach ($s as $pt) { $allPts[] = (float) $pt['p']; }
+        // La serie viene en la moneda de la tienda → convertir cada punto a NIO.
+        $sNio = array_map(static fn($pt) => ['d' => $pt['d'], 'p' => $toNio((float) $pt['p'], $o['currency'])], $s);
+        $seriesByStore[$o['store_name']] = $sNio;
+        foreach ($sNio as $pt) { if ($pt['p'] !== null) { $allPts[] = (float) $pt['p']; } }
     }
 }
 $histMin  = $allPts ? min($allPts) : $low;
 $histMax  = $allPts ? max($allPts) : $high;
-$chartSvg = PriceChart::svg($seriesByStore, $cur);
+$chartSvg = PriceChart::svg($seriesByStore, 'NIO');
 
 $savingTxt = ($low !== null && $high !== null && $high > $low)
     ? ' Ahorrás hasta ' . $fmt($high - $low, $cur) . '.'
@@ -125,8 +158,7 @@ $desc = 'Compará el precio de "' . $title . '" en ' . $storeCount . ' tienda'
       . ' Historial y ofertas en ' . $siteName . '.';
 
 // Frase "answer-shaped": resumen factual citable por AI y Google ("¿dónde está
-// más barato X en Nicaragua?").
-$priciest = $priced ? $priced[count($priced) - 1] : null;
+// más barato X en Nicaragua?"). low/high ya están en NIO ($priciest arriba).
 $diffPct  = ($low !== null && $high !== null && $low > 0 && $high > $low) ? (int) round(($high - $low) / $low * 100) : 0;
 $answer = ($low !== null && $cheapest)
     ? ('En Nicaragua, ' . $title . ' se consigue desde ' . $fmt($low, $cur) . ' en ' . $cheapest['store_name']
@@ -192,12 +224,12 @@ if ($priced) {
         'offerCount'    => count($priced),
         'priceValidUntil' => date('Y-m-d', strtotime('+2 days')), // precios se refrescan a diario
         'validFrom'     => date('Y-m-d', $aggVf),
-        'offers'        => array_map(static function ($o) use ($cur) {
+        'offers'        => array_map(static function ($o) {
             $vf = !empty($o['last_date']) ? strtotime((string) $o['last_date']) : false;
             return [
                 '@type'         => 'Offer',
-                'price'         => $o['price_final'],
-                'priceCurrency' => $cur === 'USD' ? 'USD' : 'NIO',
+                'price'         => $o['nio'] !== null ? round((float) $o['nio'], 2) : null, // todo el schema en NIO
+                'priceCurrency' => 'NIO',
                 'availability'  => $o['in_stock'] ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
                 'itemCondition' => 'https://schema.org/NewCondition',
                 'validFrom'     => date('Y-m-d', $vf ?: time()),
@@ -311,7 +343,16 @@ if ($priced) {
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
   .nodata{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;text-align:center;color:var(--muted)}
-  @media(max-width:560px){.usd,th.h-usd,td.c-usd{display:none}.stats-strip{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.stats-strip{grid-template-columns:repeat(2,1fr)}}
+  /* Toggle de moneda (C$ por defecto; muestra US$ al elegirlo) */
+  .curtoggle{display:flex;align-items:center;gap:8px;margin:0 0 12px;flex-wrap:wrap}
+  .curtoggle .ct-lbl{font-size:.8rem;color:var(--muted);font-weight:600}
+  .ct-btn{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--muted);font-weight:700;font-size:.82rem;padding:6px 12px;border-radius:999px}
+  .ct-btn.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .v-usd,.a-nio{display:none}
+  .usd-mode .v-nio{display:none}.usd-mode .v-usd{display:inline}
+  .usd-mode .a-usd{display:none}.usd-mode .a-nio{display:inline}
+  .altcur{display:block;color:var(--muted);font-size:.72rem;font-weight:600;margin-top:2px}
 </style>
 </head>
 <body>
@@ -330,7 +371,7 @@ if ($priced) {
       <?php if ($g['brand']): ?><div class="brand"><?= $h($g['brand']) ?></div><?php endif; ?>
       <h1><?= $h($title) ?></h1>
       <?php if ($low !== null): ?>
-        <div class="best">Desde <b><?= $fmt($low, $cur) ?></b>
+        <div class="best">Desde <b><?= $dual($low, $lowUsd) ?></b>
           <?php if ($cheapest): ?>en <?= $h($cheapest['store_name']) ?><?php endif; ?>
           · en <?= (int) $storeCount ?> tienda<?= $storeCount === 1 ? '' : 's' ?>
         </div>
@@ -347,6 +388,11 @@ if ($priced) {
   <?php if ($answer !== ''): ?><p class="answer"><?= $h($answer) ?></p><?php endif; ?>
 
   <h2>Comparación de precios</h2>
+  <div class="curtoggle" role="group" aria-label="Moneda a mostrar">
+    <span class="ct-lbl">Ver en:</span>
+    <button type="button" class="ct-btn ct-nio on" data-cur="nio">C$ Córdobas</button>
+    <button type="button" class="ct-btn ct-usd" data-cur="usd">US$ Dólares</button>
+  </div>
   <?php if ($sameChain): ?>
     <div class="samechain">
       ⚠️ <b>Es la misma empresa.</b> Almacenes Tropigas, El Gallo más Gallo, RadioShack y La Curacao son la <b>misma cadena (Unicomer)</b>: el mismo producto con precio distinto según la tienda. Comprá en la más barata 👇
@@ -354,17 +400,16 @@ if ($priced) {
   <?php endif; ?>
   <table>
     <thead><tr>
-      <th>Tienda</th><th>Precio</th><th class="h-usd c-usd">USD</th><th>Estado</th><th></th>
+      <th>Tienda</th><th>Precio</th><th>Estado</th><th></th>
     </tr></thead>
     <tbody>
     <?php foreach ($priced as $i => $o):
-        $isCheap = $cheapest && $o['price_final'] !== null && $o['price_final'] === $cheapest['price_final'];
-        $hasDisc = $o['list_price'] !== null && $o['price_final'] !== null && $o['list_price'] > $o['price_final'];
+        $isCheap = ($i === 0); // $priced ya está ordenado por precio en NIO
+        $hasDisc = ($o['listNio'] ?? null) !== null && $o['nio'] !== null && $o['listNio'] > $o['nio'];
     ?>
       <tr class="<?= $isCheap ? 'cheap' : '' ?>">
         <td><b><?= $h($o['store_name']) ?></b><?= $isCheap ? '<span class="tag">💚 más barato</span>' : '' ?><?php if (!empty($o['seller'])): ?><br><small class="seller">🏬 vendido por <?= $h($o['seller']) ?></small><?php endif; ?></td>
-        <td class="price"><?= $fmt($o['price_final'], $o['currency']) ?><?php if ($hasDisc): ?><span class="old"><?= $fmt($o['list_price'], $o['currency']) ?></span><?php endif; ?><?php if (!empty($o['tax_added'])): ?><small class="taxest">IVA estimado incluido</small><?php endif; ?></td>
-        <td class="usd c-usd"><?= $h($usd($o['price_final'])) ?></td>
+        <td class="price"><?= $dual($o['nio'], $o['usdv']) ?><?php if ($hasDisc): ?><span class="old"><?= $dual($o['listNio'], $o['listUsd']) ?></span><?php endif; ?><?php if (!empty($o['tax_added'])): ?><small class="taxest">IVA estimado incluido</small><?php endif; ?><small class="altcur"><span class="a-usd">≈ US$<?= number_format((float) $o['usdv'], 2) ?></span><span class="a-nio">≈ C$<?= number_format((float) $o['nio'], 2) ?></span></small></td>
         <td><span class="st in">● En stock</span></td>
         <td><a class="go" href="<?= $h($o['url']) ?>" target="_blank" rel="noopener">Ver ↗</a></td>
       </tr>
@@ -379,9 +424,9 @@ if ($priced) {
   <?php endif; ?>
 
   <div class="stats-strip">
-    <div class="s"><div class="k">Más barato ahora</div><div class="v lo"><?= $fmt($low, $cur) ?></div></div>
-    <div class="s"><div class="k">Mínimo histórico</div><div class="v"><?= $fmt($histMin, $cur) ?></div></div>
-    <div class="s"><div class="k">Máximo histórico</div><div class="v hi"><?= $fmt($histMax, $cur) ?></div></div>
+    <div class="s"><div class="k">Más barato ahora</div><div class="v lo"><?= $dual($low, $lowUsd) ?></div></div>
+    <div class="s"><div class="k">Mínimo histórico</div><div class="v"><?= $dual($histMin, $toUsd($histMin, 'NIO')) ?></div></div>
+    <div class="s"><div class="k">Máximo histórico</div><div class="v hi"><?= $dual($histMax, $toUsd($histMax, 'NIO')) ?></div></div>
     <div class="s"><div class="k">Tiendas</div><div class="v"><?= (int) $storeCount ?></div></div>
   </div>
 
@@ -511,5 +556,21 @@ if ($priced) {
   <svg width="22" height="22" viewBox="0 0 32 32" fill="#fff" aria-hidden="true"><path d="M16 .4C7.4.4.5 7.3.5 15.9c0 2.8.7 5.4 2 7.8L.4 31.6l8.1-2.1c2.3 1.2 4.8 1.9 7.5 1.9 8.6 0 15.5-6.9 15.5-15.5S24.6.4 16 .4zm0 28.3c-2.4 0-4.7-.6-6.7-1.8l-.5-.3-4.8 1.3 1.3-4.7-.3-.5c-1.3-2.1-2-4.5-2-7 0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.8 12.9zm7.1-9.6c-.4-.2-2.3-1.1-2.6-1.3-.4-.1-.6-.2-.9.2-.3.4-1 1.3-1.2 1.5-.2.2-.4.3-.8.1-.4-.2-1.6-.6-3.1-1.9-1.1-1-1.9-2.3-2.2-2.7-.2-.4 0-.6.2-.8.2-.2.4-.4.5-.7.2-.2.2-.4.4-.6.1-.3 0-.5 0-.7-.1-.2-.9-2.1-1.2-2.9-.3-.8-.6-.7-.9-.7h-.7c-.2 0-.6.1-1 .5-.3.4-1.3 1.3-1.3 3.1s1.3 3.6 1.5 3.9c.2.2 2.6 4 6.4 5.6.9.4 1.6.6 2.1.8.9.3 1.7.2 2.3.1.7-.1 2.3-.9 2.6-1.8.3-.9.3-1.7.2-1.8-.1-.2-.3-.3-.7-.5z"/></svg>
   <span style="white-space:nowrap">Ofertas por WhatsApp</span>
 </a>
+<script>
+// Toggle de moneda: córdobas por defecto; el usuario puede pasar todo a dólares.
+(function(){
+  var wrap = document.querySelector('.wrap');
+  var btns = document.querySelectorAll('.curtoggle .ct-btn');
+  if(!wrap || !btns.length) return;
+  function apply(cur){
+    wrap.classList.toggle('usd-mode', cur === 'usd');
+    btns.forEach(function(b){ b.classList.toggle('on', b.dataset.cur === cur); });
+    try{ localStorage.setItem('oap_cur', cur); }catch(e){}
+  }
+  btns.forEach(function(b){ b.addEventListener('click', function(){ apply(b.dataset.cur); }); });
+  var saved='nio'; try{ saved = localStorage.getItem('oap_cur') || 'nio'; }catch(e){}
+  apply(saved);
+})();
+</script>
 </body>
 </html>
