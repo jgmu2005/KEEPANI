@@ -9,8 +9,9 @@ on:
         description: 'Tienda (samsung o all)'
         required: true
         default: 'all'
-  schedule:
-    - cron: '55 8 * * *'   # diario ~08:55 UTC
+  # Sin schedule: Samsung (Akamai) puede bloquear IPs de datacenter. Se crawlea
+  # LOCAL desde crawl_local.ps1 (IP residencial). Este workflow queda solo para
+  # disparo manual / pruebas.
 
 jobs:
   crawl:

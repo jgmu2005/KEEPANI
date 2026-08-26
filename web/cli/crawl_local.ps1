@@ -1,6 +1,7 @@
 # ============================================================================
-#  Crawl LOCAL — tiendas que bloquean IPs de datacenter (telcmax, tizo) y solo se
-#  pueden bajar desde una IP RESIDENCIAL (tu casa). Pensado para correr al
+#  Crawl LOCAL — tiendas que bloquean (o pueden bloquear) IPs de datacenter
+#  (telcmax, tizo, samsung) y solo se bajan bien desde una IP RESIDENCIAL (tu
+#  casa). Pensado para correr al
 #  encender la PC / iniciar sesion (Task Scheduler, ver instrucciones abajo).
 #
 #  Requiere DOS variables de entorno (configuralas UNA sola vez, ver README):
@@ -51,6 +52,16 @@ try {
     Log $out.Trim()
 } catch {
     Log "ERROR en 'tizo': $($_.Exception.Message)"
+}
+
+#     Samsung (shop.samsung.com, Magento GraphQL): puede bloquear IPs de datacenter
+#     (Akamai), asi que lo corremos local por las dudas.
+Log "crawl 'samsung' ..."
+try {
+    $out = & php web/cli/crawl_magento.php samsung 2>&1 | Out-String
+    Log $out.Trim()
+} catch {
+    Log "ERROR en 'samsung': $($_.Exception.Message)"
 }
 
 Log "listo."
