@@ -1,0 +1,33 @@
+name: Crawl Magento (Samsung)
+
+# Baja el catálogo de tiendas Magento vía GraphQL (categoría → productos).
+# Cada corrida agrega un punto de precio por producto.
+on:
+  workflow_dispatch:
+    inputs:
+      store:
+        description: 'Tienda (samsung o all)'
+        required: true
+        default: 'all'
+  schedule:
+    - cron: '55 8 * * *'   # diario ~08:55 UTC
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: Crawl Magento
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/crawl_magento.php "${{ github.event.inputs.store || 'all' }}"

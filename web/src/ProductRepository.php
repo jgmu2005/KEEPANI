@@ -225,6 +225,9 @@ final class ProductRepository
             'woocommerce' => (preg_match('~/(?:products?|productos?)/([^/?#]+)~', $url, $m) ? rawurldecode($m[1]) : null),
             // Tizo: .../home/product/{productId}/option/{opt} → el id es el sku.
             'tizo' => (preg_match('~/home/product/(\d+)~', $url, $m) ? $m[1] : null),
+            // Magento (Samsung): .../latin/{cc}/{url_key}.html → el url_key es el sku
+            // (excluye las de categoría .../shop/... que llevan una barra extra).
+            'magento' => (preg_match('~/latin/[a-z]{2}/([^/?#]+)\.html(?:[?#]|$)~i', $url, $m) ? rawurldecode($m[1]) : null),
             default   => null,
         };
 

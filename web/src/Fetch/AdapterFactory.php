@@ -43,6 +43,10 @@ final class AdapterFactory
                 http: $http, slug: $slug, baseUrl: $baseUrl,
                 currency: $currency, taxIncluded: $taxIncluded, taxRate: $taxRate,
             ),
+            'magento' => new MagentoAdapter(
+                http: $http, slug: $slug, baseUrl: $baseUrl,
+                currency: $currency, taxIncluded: $taxIncluded, taxRate: $taxRate,
+            ),
             default => throw new \InvalidArgumentException(
                 "Plataforma sin adaptador implementado: {$store['platform']} ({$slug})"
             ),
