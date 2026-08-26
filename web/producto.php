@@ -135,6 +135,34 @@ $answer = ($low !== null && $cheapest)
         . ($sameChain ? ' Varias de estas tiendas son de la misma empresa (Unicomer): el mismo producto a distinto precio según la tienda.' : ''))
     : '';
 
+// Preguntas frecuentes — mismo contenido visible (comparación entre tiendas). Se
+// muestran en la página Y como FAQPage schema, para que AI/Google extraigan la respuesta.
+$faq = [];
+if ($low !== null && $cheapest) {
+    $faq[] = ['¿Dónde está más barato ' . $title . ' en Nicaragua?', $answer];
+    $faq[] = ['¿Cuánto cuesta ' . $title . ' en Nicaragua?',
+        ($high !== null && $high > $low
+            ? 'Entre ' . $fmt($low, $cur) . ' y ' . $fmt($high, $cur) . ' según la tienda'
+            : 'Alrededor de ' . $fmt($low, $cur))
+        . ' (comparado en ' . $storeCount . ' tienda' . ($storeCount === 1 ? '' : 's') . '). '
+        . 'Precios de referencia con IVA; verificá en la tienda antes de comprar.'];
+    if ($diffPct > 0 && $priciest) {
+        $faq[] = ['¿Cuánto se puede ahorrar comparando ' . $title . '?',
+            'Hasta ' . $fmt($high - $low, $cur) . ' (' . $diffPct . '% más caro en '
+            . $priciest['store_name'] . ' que en ' . $cheapest['store_name'] . ').'
+            . ($sameChain ? ' Ojo: varias de estas tiendas son la misma empresa (Unicomer).' : '')];
+    }
+}
+$ldFaq = $faq ? [
+    '@context'   => 'https://schema.org',
+    '@type'      => 'FAQPage',
+    'mainEntity' => array_map(static fn($x) => [
+        '@type'          => 'Question',
+        'name'           => $x[0],
+        'acceptedAnswer' => ['@type' => 'Answer', 'text' => $x[1]],
+    ], $faq),
+] : null;
+
 // WhatsApp
 $waText = '💰 ' . $title . ($low !== null ? ' — desde ' . $fmt($low, $cur) : '')
         . ' en ' . $storeCount . ' tiendas. Compará acá: ' . $pageUrl;
@@ -195,8 +223,17 @@ if ($priced) {
 <meta name="twitter:card" content="summary_large_image">
 <?= Seo::head($settings, true) ?>
 <script type="application/ld+json"><?= json_encode($ld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
+<?php if ($ldFaq): ?><script type="application/ld+json"><?= json_encode($ldFaq, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) ?></script><?php endif; ?>
 <style>
   :root{--brand:#0ea5e9;--brand-dk:#0369a1;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--ok:#16a34a;--bad:#dc2626;--card:#fff}
+  .faq{margin-top:28px}
+  .faq h2{font-size:1.05rem;margin:0 0 10px}
+  .faq details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:0 14px;margin-bottom:8px}
+  .faq summary{cursor:pointer;font-weight:700;padding:13px 0;font-size:.95rem;list-style:none}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::before{content:"＋ ";color:var(--brand);font-weight:800}
+  .faq details[open] summary::before{content:"− "}
+  .faq details p{margin:0 0 13px;color:var(--ink);line-height:1.55;font-size:.92rem}
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#f1f5f9;line-height:1.5}
   a{color:var(--brand-dk);text-decoration:none}
@@ -353,6 +390,18 @@ if ($priced) {
     <?= $chartSvg ?>
   <?php else: ?>
     <div class="nodata">📅 Necesitamos algunos días más de datos para dibujar la tendencia. Volvé pronto.</div>
+  <?php endif; ?>
+
+  <?php if ($faq): ?>
+  <section class="faq">
+    <h2>Preguntas frecuentes</h2>
+    <?php foreach ($faq as $i => $qa): ?>
+    <details<?= $i === 0 ? ' open' : '' ?>>
+      <summary><?= $h($qa[0]) ?></summary>
+      <p><?= $h($qa[1]) ?></p>
+    </details>
+    <?php endforeach; ?>
+  </section>
   <?php endif; ?>
 
   <?php if ($isAdmin): ?>

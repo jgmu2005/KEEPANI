@@ -98,6 +98,28 @@ $answer = $current !== null
         . 'Precio actual: ' . $fmt($current) . ' en ' . $p['store_name'] . '. ' . $verdictTxt)
     : '';
 
+// Preguntas frecuentes — construidas del MISMO contenido visible (precio, mín/máx,
+// veredicto). Se muestran en la página Y como FAQPage schema, para que las AI y
+// Google extraigan la respuesta directo.
+$faq = [];
+if ($current !== null) {
+    $faq[] = ['¿Cuál es el precio más bajo de ' . $title . ' en Nicaragua?', $answer];
+    $faq[] = ['¿Es buen momento para comprar ' . $title . '?', $verdictTxt];
+    $faq[] = ['¿Cuánto cuesta ' . $title . ' en ' . $p['store_name'] . '?',
+        'Actualmente ' . $fmt($current) . ' en ' . $p['store_name'] . ' (Nicaragua)'
+        . ($inStock ? ', disponible' : ', sin stock por ahora') . '. '
+        . 'Precio de referencia con IVA; verificá en la tienda antes de comprar.'];
+}
+$ldFaq = $faq ? [
+    '@context'   => 'https://schema.org',
+    '@type'      => 'FAQPage',
+    'mainEntity' => array_map(static fn($x) => [
+        '@type'          => 'Question',
+        'name'           => $x[0],
+        'acceptedAnswer' => ['@type' => 'Answer', 'text' => $x[1]],
+    ], $faq),
+] : null;
+
 // URL canónica bonita.
 $slug     = $slugify($title);
 $prettyRel = '/precio/' . $id . ($slug !== '' ? '/' . $slug : '');
@@ -178,6 +200,7 @@ $ldBreadcrumb = [
 <?= Seo::head($settings, $indexable) ?>
 <script type="application/ld+json"><?= json_encode($ld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
 <script type="application/ld+json"><?= json_encode($ldBreadcrumb, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
+<?php if ($ldFaq): ?><script type="application/ld+json"><?= json_encode($ldFaq, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) ?></script><?php endif; ?>
 <style>
   :root{--brand:#0ea5e9;--brand-dk:#0369a1;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--ok:#16a34a;--bad:#dc2626;--card:#fff}
   *{box-sizing:border-box}
@@ -213,6 +236,13 @@ $ldBreadcrumb = [
   .nodata{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;text-align:center;color:var(--muted)}
   .cmp{display:block;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-top:16px;font-weight:700;color:var(--brand-dk)}
   .answer{background:#f0f9ff;border:1px solid #bae6fd;border-left:4px solid var(--brand);border-radius:10px;padding:14px 16px;margin:18px 0 0;font-size:.95rem;line-height:1.55;color:var(--ink)}
+  .faq{margin-top:28px}
+  .faq details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:0 14px;margin-bottom:8px}
+  .faq summary{cursor:pointer;font-weight:700;padding:13px 0;font-size:.95rem;list-style:none}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::before{content:"＋ ";color:var(--brand);font-weight:800}
+  .faq details[open] summary::before{content:"− "}
+  .faq details p{margin:0 0 13px;color:var(--ink);line-height:1.55;font-size:.92rem}
   .taxnote{margin-top:12px;font-size:.8rem;color:var(--muted);background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
   .site{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff}
   .site .in{max-width:820px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -275,6 +305,18 @@ $ldBreadcrumb = [
     <?= $chartSvg ?>
   <?php else: ?>
     <div class="nodata">📅 Necesitamos algunos días más de datos para dibujar la tendencia de <?= $h($title) ?>. Volvé pronto.</div>
+  <?php endif; ?>
+
+  <?php if ($faq): ?>
+  <section class="faq">
+    <h2>Preguntas frecuentes</h2>
+    <?php foreach ($faq as $i => $qa): ?>
+    <details<?= $i === 0 ? ' open' : '' ?>>
+      <summary><?= $h($qa[0]) ?></summary>
+      <p><?= $h($qa[1]) ?></p>
+    </details>
+    <?php endforeach; ?>
+  </section>
   <?php endif; ?>
 
   <footer class="site-foot">

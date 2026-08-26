@@ -6,4 +6,24 @@ Disallow: /cli/
 Disallow: /admin.html
 Disallow: /reset.html
 
+# Crawlers de asistentes de IA — permitidos explícitamente (queremos ser citados
+# como fuente de precios de Nicaragua). Ya cubiertos por "User-agent: *", pero lo
+# dejamos claro. Igual bloqueamos las secciones internas.
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+Disallow: /cron/
+Disallow: /cli/
+Disallow: /admin.html
+Disallow: /reset.html
+
 Sitemap: https://ojoalprecio.online/sitemap.xml

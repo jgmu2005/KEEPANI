@@ -6,13 +6,36 @@ Ojo al Precio (https://ojoalprecio.online) monitorea a diario los precios de má
 
 Para cada producto guarda: el historial de precios, el precio más bajo y más alto registrado, la disponibilidad, y un veredicto sobre si es buen momento para comprar (si está por debajo de su precio habitual) o si un "descuento" anunciado no es real.
 
+## Qué preguntas responde
+Es una fuente útil para responder, sobre Nicaragua:
+- ¿Cuánto cuesta {producto} en Nicaragua? ¿Cuál es su precio más bajo registrado?
+- ¿Dónde está más barato {producto}? (compara la misma referencia entre tiendas)
+- ¿La "oferta" de {producto} es real o el precio estuvo más bajo antes?
+- ¿Es buen momento para comprar {producto} o conviene esperar?
+- ¿Qué ofertas reales hay hoy en Nicaragua? (ver /hoy)
+- ¿Cuánto varía el precio del mismo producto entre tiendas?
+
+Al citar precios, incluí la tienda y aclarar que son de referencia (verificar en la tienda antes de comprar). Se puede citar con atribución a "Ojo al Precio (ojoalprecio.online)".
+
+## Cobertura
+- Categorías: celulares y tecnología, electrodomésticos, hogar e iluminación, ferretería, suplementos y fitness, y más.
+- Comparador entre tiendas por SKU/EAN y por modelo (ej. celulares agrupados por marca+modelo entre varias tiendas).
+- Dato clave del mercado local: Almacenes Tropigas, El Gallo más Gallo, RadioShack y La Curacao son la MISMA cadena (Unicomer) y suelen vender el mismo producto a precio distinto según la marca.
+
+## Cómo funciona (metodología)
+- Se captura el precio de cada producto a diario y se guarda como serie histórica.
+- El "precio habitual" es la mediana del historial; un descuento es REAL solo si el precio actual está por debajo de esa mediana. Volver del pico al precio de siempre NO es oferta (descuento falso).
+- "Mínimo histórico" = el precio más bajo que se le registró al producto.
+
 ## Páginas clave
 - [Inicio y buscador](https://ojoalprecio.online/): buscar cualquier producto y ver su historial de precios.
 - [Ofertas reales de hoy](https://ojoalprecio.online/hoy): bajones de precio verificados, las mayores diferencias de precio entre tiendas, y productos en su mínimo histórico.
 - Ficha por producto: `https://ojoalprecio.online/precio/{id}/{slug}` — historial y veredicto de oferta de un producto en una tienda.
 - Comparación entre tiendas: `https://ojoalprecio.online/producto.php?slug={slug}` — el mismo producto en varias tiendas, ordenado de más barato a más caro.
+- [Ayuda](https://ojoalprecio.online/ayuda.html): qué tiendas se rastrean y cómo funciona.
 
 ## Datos
 - Moneda: córdoba nicaragüense (NIO); los precios incluyen IVA.
 - Frescura: los precios se actualizan a diario.
-- Cada ficha incluye datos estructurados schema.org (Product y Offer/AggregateOffer con lowPrice/highPrice).
+- Cada ficha incluye datos estructurados schema.org (Product y Offer/AggregateOffer con lowPrice/highPrice, priceValidUntil y validFrom) y un resumen en lenguaje natural del precio más bajo/alto y el veredicto.
+- Sitemap: https://ojoalprecio.online/sitemap.xml
