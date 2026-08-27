@@ -76,7 +76,7 @@
 
     <div class="card">
       <h2>🩺 Salud de tiendas</h2>
-      <p style="color:var(--muted);font-size:.86rem;margin:-4px 0 10px">Última ingesta por tienda y entradas/salidas de productos. Las <b>atrasadas</b> (sin datos hace +48h) salen primero, en rojo.</p>
+      <p style="color:var(--muted);font-size:.86rem;margin:-4px 0 10px">Última ingesta por tienda y entradas/salidas de productos. Ordenadas de <b>más a menos desactualizada</b>. 🟡 atrasada un día (+24h) · 🔴 sin datos (+48h, probablemente rota).</p>
       <div id="storesHealthBox"><div style="color:var(--muted)">Cargando…</div></div>
     </div>
 
@@ -359,20 +359,26 @@ async function loadStoresHealth(){
   if(!j.ok){ box.innerHTML = '<div class="msg err">'+esc(j.error||'No disponible (¿falta la migración 047_product_deactivated_at?).')+'</div>'; return; }
   const num = n => n==null ? '—' : Number(n).toLocaleString('es-NI');
   const ago = h => h==null ? 'nunca' : (h < 1 ? 'recién' : (h < 24 ? h+'h' : Math.floor(h/24)+'d '+(h%24)+'h'));
+  const warnH = j.warn_hours || 24;
   const stale = j.stores.filter(s => s.stale).length;
-  let html = stale
-    ? `<div class="msg err" style="margin-bottom:10px">⚠️ ${stale} tienda(s) sin datos hace +${j.stale_hours}h — revisá el crawler.</div>`
-    : `<div class="msg ok" style="margin-bottom:10px">✅ Todas las tiendas ingestaron en las últimas ${j.stale_hours}h.</div>`;
+  const warn  = j.stores.filter(s => s.warn).length;
+  let html = '';
+  if(stale) html += `<div class="msg err" style="margin-bottom:8px">⚠️ ${stale} tienda(s) sin datos hace +${j.stale_hours}h — probablemente rota, revisá el crawler.</div>`;
+  if(warn)  html += `<div style="margin-bottom:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:9px 12px;font-size:.85rem">🟡 ${warn} tienda(s) atrasada(s) un día (+${warnH}h) — el cron de GitHub Actions pudo saltarse la corrida.</div>`;
+  if(!stale && !warn) html += `<div class="msg ok" style="margin-bottom:8px">✅ Todas las tiendas ingestaron en las últimas ${warnH}h.</div>`;
   html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.85rem">
     <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--line)">
       <th style="padding:6px 8px">Tienda</th><th>Activos</th><th>Última ingesta</th>
       <th title="hoy / 7 días">Entradas</th><th title="hoy / 7 días">Salidas</th></tr></thead><tbody>`;
   for(const s of j.stores){
-    const dot = s.stale ? '#dc2626' : '#16a34a';
-    html += `<tr style="border-bottom:1px solid var(--line)${s.stale?';background:#fef2f2':''}">
+    const dot  = s.stale ? '#dc2626' : (s.warn ? '#d97706' : '#16a34a');
+    const bg   = s.stale ? ';background:#fef2f2' : (s.warn ? ';background:#fffbeb' : '');
+    const tcol = s.stale ? '#b91c1c' : (s.warn ? '#92400e' : 'inherit');
+    const bold = (s.stale || s.warn) ? '700' : '400';
+    html += `<tr style="border-bottom:1px solid var(--line)${bg}">
       <td style="padding:7px 8px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dot};margin-right:7px"></span><b>${esc(s.name)}</b> <span style="color:var(--muted);font-size:.72rem">${esc(s.platform||'')}</span></td>
       <td>${num(s.active)}</td>
-      <td style="color:${s.stale?'#b91c1c':'inherit'};font-weight:${s.stale?'700':'400'}">${ago(s.hours_since)}</td>
+      <td style="color:${tcol};font-weight:${bold}">${ago(s.hours_since)}</td>
       <td style="color:#166534">+${num(s.in_today)} <span style="color:var(--muted)">/ ${num(s.in_7d)}</span></td>
       <td style="color:#b91c1c">−${num(s.out_today)} <span style="color:var(--muted)">/ ${num(s.out_7d)}</span></td></tr>`;
   }

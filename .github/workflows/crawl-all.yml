@@ -1,0 +1,46 @@
+name: 🚀 Master — disparar todos los crawls
+
+# Un solo punto de entrada CONFIABLE. El cron de GitHub Actions es best-effort
+# (retrasa/saltea corridas), así que el disparo real lo hace cron-job.org llamando
+# a este workflow por la API (workflow_dispatch). Este master, a su vez, dispara
+# cada workflow de crawl (que conserva sus shards/timeouts ya afinados).
+#
+# Requiere el secreto ACTIONS_PAT: un token de GitHub con permiso "actions: write"
+# sobre este repo (el GITHUB_TOKEN interno NO puede disparar otros workflows).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 8 * * *'   # respaldo diario (por si cron-job.org falla); best-effort
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar cada workflow de crawl
+        env:
+          GH_TOKEN: ${{ secrets.ACTIONS_PAT }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Falta el secreto ACTIONS_PAT (token con actions:write)."
+            exit 1
+          fi
+          WORKFLOWS="crawl.yml woocommerce.yml shopify.yml pricesmart.yml copasa.yml comtech.yml techstore.yml claro.yml sitemap.yml walmart_watch.yml marketplace.yml"
+          FAIL=0
+          for wf in $WORKFLOWS; do
+            echo "▶ Disparando $wf ..."
+            if gh workflow run "$wf" --repo "$REPO"; then
+              echo "  ✔ ok"
+            else
+              echo "  ✖ falló (sigo con el resto)"; FAIL=1
+            fi
+            sleep 2
+          done
+          # Soporte (procesan lo ya crawleado): agrupación de imágenes + matcher.
+          for wf in hash.yml match.yml; do
+            echo "▶ Disparando $wf ..."
+            gh workflow run "$wf" --repo "$REPO" || echo "  ✖ falló $wf"
+            sleep 2
+          done
+          exit $FAIL

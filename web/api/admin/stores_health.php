@@ -28,8 +28,10 @@ $rows = static function (string $sql) use ($db): array {
     try { return $db->query($sql)->fetchAll(); } catch (\Throwable $e) { return []; }
 };
 
-// Umbral de frescura (horas) para marcar una tienda como "atrasada".
+// Umbrales de frescura (horas): a las 24h "atrasada un día" (amarillo), a las 48h
+// "sin datos" (rojo, probablemente rota).
 $STALE_HOURS = 48;
+$WARN_HOURS  = 24;
 
 // 1) Activos + última ingesta por tienda (LEFT JOIN → incluye tiendas sin activos).
 $base = [];
@@ -86,18 +88,21 @@ foreach ($base as $b) {
     $hours = $ts ? (int) floor(($now - $ts) / 3600) : null;
     $b['hours_since'] = $hours;
     $b['stale']       = $hours === null ? true : ($hours >= $STALE_HOURS);
+    $b['warn']        = $hours !== null && $hours >= $WARN_HOURS && $hours < $STALE_HOURS;
     $out[] = $b;
 }
 
-// Orden: primero las atrasadas (para que salten a la vista), luego por activos.
+// Orden: de MÁS desactualizada a menos (las "nunca" primero, luego por horas desc).
 usort($out, static function ($a, $b) {
-    if ($a['stale'] !== $b['stale']) { return $a['stale'] ? -1 : 1; }
-    return $b['active'] <=> $a['active'];
+    $ha = $a['hours_since'] === null ? PHP_INT_MAX : $a['hours_since'];
+    $hb = $b['hours_since'] === null ? PHP_INT_MAX : $b['hours_since'];
+    return $hb <=> $ha;
 });
 
 out(200, [
     'ok'          => true,
     'stale_hours' => $STALE_HOURS,
+    'warn_hours'  => $WARN_HOURS,
     'generated'   => date('Y-m-d H:i'),
     'stores'      => $out,
 ]);
