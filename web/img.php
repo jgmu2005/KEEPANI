@@ -10,6 +10,7 @@ declare(strict_types=1);
  *
  *   /img.php?id=123     (producto)
  *   /img.php?group=slug (grupo/comparativo)
+ *   /img.php?wm=123     (producto de Walmart-watch / liquidaciones)
  */
 
 require __DIR__ . '/bootstrap.php';
@@ -18,12 +19,17 @@ use OjoAlPrecio\Web\Db;
 
 $db    = Db::conn();
 $id    = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$wm    = isset($_GET['wm']) ? (int) $_GET['wm'] : 0;
 $group = isset($_GET['group']) ? trim((string) $_GET['group']) : '';
 
 $src = null;
 if ($id > 0) {
     $st = $db->prepare('SELECT image_url FROM products WHERE id = ? LIMIT 1');
     $st->execute([$id]);
+    $src = $st->fetchColumn() ?: null;
+} elseif ($wm > 0) {
+    $st = $db->prepare('SELECT image_url FROM wm_products WHERE id = ? LIMIT 1');
+    $st->execute([$wm]);
     $src = $st->fetchColumn() ?: null;
 } elseif ($group !== '') {
     $st = $db->prepare(

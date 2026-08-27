@@ -48,6 +48,7 @@ $mkUrl = static function (array $o = []) use ($base, $sort): string {
 <meta property="og:description" content="Bajas de precio ≥30% en el catálogo de Walmart NI, actualizadas a diario.">
 <meta property="og:url" content="<?= $h($pageUrl) ?>">
 <?= Seo::head($settings, true) ?>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
   :root{--brand:#0ea5e9;--brand-dk:#0369a1;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--ok:#16a34a;--bad:#dc2626;--card:#fff}
   *{box-sizing:border-box}
@@ -76,6 +77,10 @@ $mkUrl = static function (array $o = []) use ($base, $sort): string {
   .was{color:var(--muted);text-decoration:line-through;font-size:.85rem}
   .when{font-size:.7rem;color:var(--muted)}
   .go{display:block;text-align:center;background:var(--brand);color:#fff;font-weight:700;padding:9px;border-radius:8px;margin-top:8px;font-size:.85rem}
+  .actions{display:flex;gap:6px;margin-top:8px}
+  .actions .go{flex:1;margin-top:0;padding:8px 6px}
+  .imgbtn{flex:none;width:40px;border:0;background:#7c3aed;color:#fff;font-size:1rem;border-radius:8px;cursor:pointer;line-height:1}
+  .imgbtn:disabled{opacity:.6}
   .empty{background:#fff;border:1px solid var(--line);border-radius:14px;padding:40px 20px;text-align:center;color:var(--muted)}
   .pager{display:flex;gap:12px;justify-content:center;align-items:center;margin-top:26px}
   .pager a{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-weight:600}
@@ -117,7 +122,16 @@ $mkUrl = static function (array $o = []) use ($base, $sort): string {
               <span class="was"><?= $fmt($it['ref_price'] > $it['new_price'] ? $it['ref_price'] : $it['old_price'], $c) ?></span>
             </div>
             <div class="when"><?= $h(date('d/m/Y', strtotime($it['detected_at']))) ?></div>
-            <?php if ($it['url']): ?><a class="go" href="<?= $h($it['url']) ?>" target="_blank" rel="noopener">Ver en Walmart ↗</a><?php endif; ?>
+            <?php $wasP = $it['ref_price'] > $it['new_price'] ? $it['ref_price'] : $it['old_price']; ?>
+            <div class="actions">
+              <?php if ($it['url']): ?><a class="go" href="<?= $h($it['url']) ?>" target="_blank" rel="noopener">Ver en Walmart ↗</a><?php endif; ?>
+              <button class="imgbtn" title="Generar imagen para compartir"
+                data-imgsrc="img.php?wm=<?= (int) $it['id'] ?>"
+                data-title="<?= $h($it['title'] ?: 'Producto') ?>"
+                data-price="<?= $h($fmt($it['new_price'], $c)) ?>"
+                data-note="antes <?= $h($fmt($wasP, $c)) ?> · Walmart Nicaragua"
+                data-tag="-<?= (int) round($it['pct']) ?>% en Walmart">🖼️</button>
+            </div>
           </div>
         </div>
       <?php endforeach; ?>
@@ -136,5 +150,52 @@ $mkUrl = static function (array $o = []) use ($base, $sort): string {
     <a href="https://chromewebstore.google.com/detail/ojo-al-precio/moeikollgpcleldjkjogmeeeoglmncac" target="_blank" rel="noopener">🧩 Extensión de Chrome</a> · <a href="<?= $h($base) ?>/index.html">Inicio</a> · <a href="<?= $h($base) ?>/ayuda.html">Ayuda</a> · <?= $h($siteName) ?> 🇳🇮
   </footer>
 </div>
+
+<!-- Plantilla oculta para generar la imagen compartible (html2canvas) -->
+<div id="cardTpl" style="display:none;position:fixed;left:-9999px;top:0;width:600px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;overflow:hidden">
+  <div style="padding:22px 26px 4px;display:flex;align-items:center;justify-content:space-between">
+    <div style="font-weight:900;font-size:22px">🔎 Ojo al Precio</div>
+    <div style="font-size:13px;color:#7dd3fc;font-weight:700">liquidaciones · Nicaragua</div>
+  </div>
+  <div style="background:#fff;margin:14px 26px 0;border-radius:16px;padding:18px;text-align:center">
+    <img class="ct-img" src="" alt="" style="max-width:100%;height:250px;object-fit:contain">
+  </div>
+  <div style="padding:18px 26px 6px">
+    <div class="ct-tag" style="display:none;background:#fecaca;color:#7f1d1d;font-weight:900;font-size:16px;padding:6px 14px;border-radius:999px;margin-bottom:12px"></div>
+    <div class="ct-title" style="font-weight:800;font-size:23px;line-height:1.25;margin-bottom:12px"></div>
+    <div class="ct-price" style="font-weight:900;font-size:36px;color:#4ade80;line-height:1.1"></div>
+    <div class="ct-note" style="font-size:17px;color:#cbd5e1;margin-top:6px"></div>
+  </div>
+  <div style="padding:18px 26px 24px;margin-top:16px;border-top:1px solid #334155">
+    <div style="background:linear-gradient(90deg,#f97316,#fb923c);color:#fff;font-weight:900;font-size:27px;text-align:center;padding:15px;border-radius:12px;letter-spacing:.3px;box-shadow:0 4px 18px rgba(249,115,22,.45)">OjoAlPrecio.online</div>
+    <div style="text-align:center;font-size:14px;color:#94a3b8;margin-top:12px;font-weight:600">🔥 Liquidaciones de Walmart · actualizado a diario</div>
+  </div>
+</div>
+
+<script>
+async function makeCard(ds){
+  var t = document.getElementById('cardTpl');
+  t.querySelector('.ct-title').textContent = ds.title || '';
+  t.querySelector('.ct-price').textContent = ds.price || '';
+  t.querySelector('.ct-note').textContent  = ds.note || '';
+  var tag = t.querySelector('.ct-tag');
+  tag.textContent = ds.tag || ''; tag.style.display = ds.tag ? 'inline-block' : 'none';
+  var im = t.querySelector('.ct-img'); im.src = ds.imgsrc || '';
+  await new Promise(function(res){ if(!ds.imgsrc || im.complete){ res(); } else { im.onload = res; im.onerror = res; } });
+  t.style.display = 'block';
+  var canvas = await html2canvas(t, {scale: 2, backgroundColor: null, logging: false, useCORS: true});
+  t.style.display = 'none';
+  var a = document.createElement('a');
+  a.download = 'ojoalprecio-liquidacion.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+document.addEventListener('click', function(e){
+  var b = e.target.closest('.imgbtn'); if(!b) return;
+  var prev = b.textContent; b.textContent = '⏳'; b.disabled = true;
+  makeCard(b.dataset).then(function(){ b.textContent = prev; b.disabled = false; })
+    .catch(function(){ b.textContent = '⚠️'; setTimeout(function(){ b.textContent = prev; b.disabled = false; }, 1500); });
+});
+</script>
 </body>
 </html>

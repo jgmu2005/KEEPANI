@@ -112,7 +112,7 @@ final class WalmartWatch
 
         $total = (int) $this->db->query('SELECT COUNT(*) ' . $base)->fetchColumn();
 
-        $sql = 'SELECT p.title, p.brand, p.url, p.image_url, p.currency,
+        $sql = 'SELECT p.id, p.title, p.brand, p.url, p.image_url, p.currency,
                        d.old_price, d.new_price, d.ref_price, d.pct, d.detected_at
                 ' . $base . '
                 ORDER BY ' . $order . '
@@ -120,6 +120,7 @@ final class WalmartWatch
 
         $items = array_map(static function (array $r): array {
             return [
+                'id'          => (int) $r['id'],
                 'title'       => $r['title'],
                 'brand'       => $r['brand'],
                 'url'         => $r['url'],
