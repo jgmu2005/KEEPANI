@@ -33,10 +33,14 @@ function line(string $s): void { fwrite(STDOUT, $s . "\n"); }
 function fail(string $s): never { fwrite(STDERR, "ERROR: $s\n"); exit(1); }
 
 /** GET con UA de navegador + Referer + reintentos (429/5xx con backoff). */
-function apiGet(string $url, string $referer, int $retries = 4): ?array
+function apiGet(string $url, string $referer, int $retries = 4, ?int &$total = null): ?array
 {
     $lastCode = 0;
     for ($a = 0; $a < $retries; $a++) {
+        // VTEX manda el total del listado en el header `resources`/`Content-Range`
+        // (ej. "products 0-49/830"). Lo capturamos para paginar por el total real
+        // y no cortar por adivinanza (una página con <50 NO significa "última").
+        $capturedTotal = null;
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
@@ -47,6 +51,12 @@ function apiGet(string $url, string $referer, int $retries = 4): ?array
             CURLOPT_ENCODING       => '',
             CURLOPT_USERAGENT      => UA,
             CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Referer: ' . $referer],
+            CURLOPT_HEADERFUNCTION => static function ($ch, string $line) use (&$capturedTotal): int {
+                if (preg_match('~^(?:resources|content-range)\s*:.*?/(\d+)\s*$~i', trim($line), $m)) {
+                    $capturedTotal = (int) $m[1];
+                }
+                return strlen($line);
+            },
         ]);
         $body = curl_exec($ch);
         $lastCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -55,6 +65,7 @@ function apiGet(string $url, string $referer, int $retries = 4): ?array
         if ($body !== false && $lastCode >= 200 && $lastCode < 300) {
             $j = json_decode((string) $body, true);
             if (is_array($j)) {
+                $total = $capturedTotal;
                 return $j;
             }
         }
@@ -93,14 +104,16 @@ function collectLeafPaths(array $nodes, array $prefix, array &$out): void
 function crawlCategory(array $path, array $ctx, array &$seen, string $extraFq = ''): array
 {
     $catPath = implode('/', $path);
-    $from = 0; $sent = 0; $ok = true; $capped = false;
+    $from = 0; $sent = 0; $ok = true; $capped = false; $total = null;
 
     while ($from <= MAX_OFFSET) {
         $to  = $from + PAGE - 1;
         $url = $ctx['base'] . '/api/catalog_system/pub/products/search?fq=C:/' . $catPath . '/' . $extraFq . '&_from=' . $from . '&_to=' . $to;
-        $data = apiGet($url, $ctx['referer']);
+        $pageTotal = null;
+        $data = apiGet($url, $ctx['referer'], 4, $pageTotal);
         if ($data === null) { $ok = false; break; }
-        if (count($data) === 0) { break; }
+        if ($pageTotal !== null) { $total = $pageTotal; }
+        if (count($data) === 0) { break; } // sin total conocido: paginamos hasta vacío
 
         $recs = [];
         foreach ($data as $p) {
@@ -123,9 +136,12 @@ function crawlCategory(array $path, array $ctx, array &$seen, string $extraFq = 
             $sent += count($recs);
         }
 
-        if (count($data) < PAGE) { break; }
         $from += PAGE;
-        if ($from > MAX_OFFSET) { $capped = true; }
+        if ($from > MAX_OFFSET) { $capped = true; break; }
+        // Terminación FIABLE por el total real de VTEX (header). Antes se cortaba
+        // por "count < PAGE", pero VTEX a veces devuelve <50 en una página que NO
+        // es la última (hipo / productos filtrados) → cortaba a medias (49 vs 830).
+        if ($total !== null && $from >= $total) { break; }
         usleep(400000);
     }
 
