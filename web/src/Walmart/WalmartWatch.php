@@ -94,12 +94,22 @@ final class WalmartWatch
      * Feed de liquidaciones recientes (últimos $days días, en stock).
      * @return array{total:int, items:array}
      */
-    public function feed(int $limit = 40, int $offset = 0, string $sort = 'recent', int $days = 21): array
+    public function feed(int $limit = 40, int $offset = 0, string $sort = 'recent', int $days = 21, string $estado = 'vigente'): array
     {
         $limit  = max(1, min($limit, 100));
         $offset = max(0, $offset);
         $days   = max(1, min($days, 90));
-        $order  = $sort === 'pct' ? 'd.pct DESC, d.detected_at DESC' : 'd.detected_at DESC, d.pct DESC';
+
+        // Descuento ACTUAL (precio de hoy vs referencia). Define la vigencia: si el
+        // producto ya recuperó precio, la liquidación es PASADA aunque quede el evento.
+        $discNow = '((p.price_ref - p.price_current) / NULLIF(p.price_ref, 0))';
+        $vig     = $discNow . ' >= ' . self::THRESHOLD;
+        $estadoWhere = $estado === 'vigente' ? ' AND ' . $vig
+                     : ($estado === 'pasada' ? ' AND NOT (' . $vig . ')' : '');
+
+        $order = $sort === 'pct'
+            ? $discNow . ' DESC, d.detected_at DESC'
+            : 'd.detected_at DESC, ' . $discNow . ' DESC';
 
         // Un evento (el más reciente) por producto dentro de la ventana.
         $base = 'FROM wm_drops d
@@ -108,29 +118,32 @@ final class WalmartWatch
                          FROM wm_drops
                         WHERE detected_at >= DATE_SUB(NOW(), INTERVAL ' . $days . ' DAY)
                         GROUP BY product_id) last ON last.mid = d.id
-                WHERE p.in_stock = 1';
+                WHERE p.in_stock = 1 AND p.price_ref > 0' . $estadoWhere;
 
         $total = (int) $this->db->query('SELECT COUNT(*) ' . $base)->fetchColumn();
 
         $sql = 'SELECT p.id, p.title, p.brand, p.url, p.image_url, p.currency,
-                       d.old_price, d.new_price, d.ref_price, d.pct, d.detected_at
+                       p.price_current, p.price_ref, d.new_price, d.detected_at,
+                       ' . $discNow . ' AS disc_now
                 ' . $base . '
                 ORDER BY ' . $order . '
                 LIMIT ' . $limit . ' OFFSET ' . $offset;
 
         $items = array_map(static function (array $r): array {
+            $disc = (float) $r['disc_now'];
             return [
-                'id'          => (int) $r['id'],
-                'title'       => $r['title'],
-                'brand'       => $r['brand'],
-                'url'         => $r['url'],
-                'image_url'   => $r['image_url'],
-                'currency'    => $r['currency'] ?? 'NIO',
-                'old_price'   => (float) $r['old_price'],
-                'new_price'   => (float) $r['new_price'],
-                'ref_price'   => (float) $r['ref_price'],
-                'pct'         => (float) $r['pct'],
-                'detected_at' => $r['detected_at'],
+                'id'            => (int) $r['id'],
+                'title'         => $r['title'],
+                'brand'         => $r['brand'],
+                'url'           => $r['url'],
+                'image_url'     => $r['image_url'],
+                'currency'      => $r['currency'] ?? 'NIO',
+                'price_current' => (float) $r['price_current'], // precio de HOY
+                'price_ref'     => (float) $r['price_ref'],     // precio normal
+                'drop_price'    => (float) $r['new_price'],     // precio al detectar la baja
+                'pct'           => round($disc * 100, 1),       // descuento ACTUAL
+                'vigente'       => $disc >= self::THRESHOLD,
+                'detected_at'   => $r['detected_at'],
             ];
         }, $this->db->query($sql)->fetchAll());
 

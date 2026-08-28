@@ -16,12 +16,14 @@ use OjoAlPrecio\Web\Seo;
 use OjoAlPrecio\Web\Walmart\WalmartWatch;
 
 $db   = Db::conn();
+try { $db->exec('SET SQL_BIG_SELECTS=1'); } catch (\Throwable $e) {}
 $repo = new WalmartWatch($db);
 
 $sort   = ($_GET['sort'] ?? '') === 'pct' ? 'pct' : 'recent';
+$estado = in_array($_GET['estado'] ?? '', ['vigente', 'pasada', 'todas'], true) ? (string) $_GET['estado'] : 'vigente';
 $page   = max(1, (int) ($_GET['page'] ?? 1));
 $per    = 48;
-$res    = $repo->feed($per, ($page - 1) * $per, $sort);
+$res    = $repo->feed($per, ($page - 1) * $per, $sort, 21, $estado);
 $pages  = max(1, (int) ceil($res['total'] / $per));
 
 $settings = Settings::all($db);
@@ -30,8 +32,9 @@ $base     = rtrim(Verification::baseUrl(), '/');
 $h    = static fn($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 $fmt  = static fn(float $v, string $c): string => ($c === 'USD' ? 'US$' : 'C$') . number_format($v, 2);
 $pageUrl = $base . '/liquidaciones';
-$mkUrl = static function (array $o = []) use ($base, $sort): string {
-    $so = $o['sort'] ?? $sort; $pg = $o['page'] ?? 1; $q = [];
+$mkUrl = static function (array $o = []) use ($base, $sort, $estado): string {
+    $so = $o['sort'] ?? $sort; $es = $o['estado'] ?? $estado; $pg = $o['page'] ?? 1; $q = [];
+    if ($es && $es !== 'vigente') { $q['estado'] = $es; }
     if ($so && $so !== 'recent') { $q['sort'] = $so; }
     if ($pg > 1) { $q['page'] = $pg; }
     return $base . '/liquidaciones' . ($q ? '?' . http_build_query($q) : '');
@@ -69,6 +72,10 @@ $mkUrl = static function (array $o = []) use ($base, $sort): string {
   .card .img{aspect-ratio:1;background:#f8fafc;display:grid;place-items:center;position:relative}
   .card .img img{width:100%;height:100%;object-fit:contain}
   .off{position:absolute;top:8px;left:8px;background:var(--bad);color:#fff;font-weight:800;font-size:.82rem;padding:3px 9px;border-radius:999px}
+  .expired{position:absolute;top:8px;left:8px;background:#64748b;color:#fff;font-weight:700;font-size:.72rem;padding:3px 9px;border-radius:999px}
+  .card.pasada{opacity:.72}
+  .card.pasada .now{color:var(--muted);font-weight:700}
+  .estados a.on{background:var(--ok);border-color:var(--ok);color:#fff}
   .card .body{padding:12px;display:flex;flex-direction:column;gap:4px;flex:1}
   .brand{font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--brand-dk)}
   .title{font-size:.86rem;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.3em}
@@ -99,38 +106,51 @@ $mkUrl = static function (array $o = []) use ($base, $sort): string {
   <p class="lead">Productos de Walmart Nicaragua con <b>bajas de precio ≥30%</b> — las típicas de remate por bajo inventario. Se revisa el catálogo completo a diario.</p>
   <p class="lead" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;color:#92400e">💎 Con la <a href="<?= $h($base) ?>/index.html#planes" style="color:#b45309;font-weight:700">suscripción mensual</a> te llegan estas liquidaciones <b>por email</b> apenas aparecen.</p>
 
+  <div class="sortbar estados">
+    <a href="<?= $h($mkUrl(['estado' => 'vigente', 'page' => 1])) ?>" class="<?= $estado === 'vigente' ? 'on' : '' ?>">✅ Vigentes</a>
+    <a href="<?= $h($mkUrl(['estado' => 'pasada', 'page' => 1])) ?>" class="<?= $estado === 'pasada' ? 'on' : '' ?>">⏳ Pasadas</a>
+    <a href="<?= $h($mkUrl(['estado' => 'todas', 'page' => 1])) ?>" class="<?= $estado === 'todas' ? 'on' : '' ?>">Todas</a>
+  </div>
   <div class="sortbar">
     <a href="<?= $h($mkUrl(['sort' => 'recent', 'page' => 1])) ?>" class="<?= $sort === 'recent' ? 'on' : '' ?>">🆕 Más recientes</a>
     <a href="<?= $h($mkUrl(['sort' => 'pct', 'page' => 1])) ?>" class="<?= $sort === 'pct' ? 'on' : '' ?>">⬇️ Mayor descuento</a>
   </div>
 
   <?php if (!$res['items']): ?>
-    <div class="empty">Todavía no detectamos liquidaciones. Se van sumando a medida que Walmart baja precios. 🔎</div>
+    <div class="empty">
+      <?php if ($estado === 'vigente'): ?>No hay liquidaciones <b>vigentes</b> ahora mismo. Mirá las <a href="<?= $h($mkUrl(['estado' => 'pasada', 'page' => 1])) ?>">⏳ pasadas</a> o volvé más tarde. 🔎
+      <?php else: ?>Todavía no detectamos liquidaciones en esta ventana. Se van sumando a medida que Walmart baja precios. 🔎<?php endif; ?>
+    </div>
   <?php else: ?>
     <div class="grid">
-      <?php foreach ($res['items'] as $it): $c = $it['currency']; ?>
-        <div class="card">
+      <?php foreach ($res['items'] as $it): $c = $it['currency']; $vig = !empty($it['vigente']); ?>
+        <div class="card<?= $vig ? '' : ' pasada' ?>">
           <div class="img">
-            <span class="off">-<?= (int) round($it['pct']) ?>%</span>
+            <?php if ($vig): ?><span class="off">-<?= (int) round($it['pct']) ?>%</span>
+            <?php else: ?><span class="expired">⏳ Ya no vigente</span><?php endif; ?>
             <?php if ($it['image_url']): ?><img src="<?= $h($it['image_url']) ?>" alt="<?= $h($it['title']) ?>" loading="lazy"><?php else: ?>📦<?php endif; ?>
           </div>
           <div class="body">
             <?php if ($it['brand']): ?><span class="brand"><?= $h($it['brand']) ?></span><?php endif; ?>
             <div class="title"><?= $h($it['title'] ?: 'Producto') ?></div>
             <div class="prices">
-              <span class="now"><?= $fmt($it['new_price'], $c) ?></span>
-              <span class="was"><?= $fmt($it['ref_price'] > $it['new_price'] ? $it['ref_price'] : $it['old_price'], $c) ?></span>
+              <span class="now"><?= $fmt($it['price_current'], $c) ?></span>
+              <?php if ($it['price_ref'] > $it['price_current']): ?><span class="was"><?= $fmt($it['price_ref'], $c) ?></span><?php endif; ?>
             </div>
-            <div class="when"><?= $h(date('d/m/Y', strtotime($it['detected_at']))) ?></div>
-            <?php $wasP = $it['ref_price'] > $it['new_price'] ? $it['ref_price'] : $it['old_price']; ?>
+            <div class="when">
+              <?php if ($vig): ?>en liquidación · desde el <?= $h(date('d/m/Y', strtotime($it['detected_at']))) ?>
+              <?php else: ?>fue liquidación (<?= $h(date('d/m/Y', strtotime($it['detected_at']))) ?>) · ya recuperó precio<?php endif; ?>
+            </div>
             <div class="actions">
               <?php if ($it['url']): ?><a class="go" href="<?= $h($it['url']) ?>" target="_blank" rel="noopener">Ver en Walmart ↗</a><?php endif; ?>
+              <?php if ($vig): ?>
               <button class="imgbtn" title="Generar imagen para compartir"
                 data-imgsrc="img.php?wm=<?= (int) $it['id'] ?>"
                 data-title="<?= $h($it['title'] ?: 'Producto') ?>"
-                data-price="<?= $h($fmt($it['new_price'], $c)) ?>"
-                data-note="antes <?= $h($fmt($wasP, $c)) ?> · Walmart Nicaragua"
+                data-price="<?= $h($fmt($it['price_current'], $c)) ?>"
+                data-note="antes <?= $h($fmt($it['price_ref'], $c)) ?> · Walmart Nicaragua"
                 data-tag="-<?= (int) round($it['pct']) ?>% en Walmart">🖼️</button>
+              <?php endif; ?>
             </div>
           </div>
         </div>
