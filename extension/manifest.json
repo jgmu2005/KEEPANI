@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ojo al Precio",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Historial de precios, comparación entre tiendas y alertas de baja, en la página del producto de tiendas de Nicaragua.",
   "content_scripts": [
     {

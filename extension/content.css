@@ -2,10 +2,23 @@
 #oap-widget {
   all: initial;
   display: block;
+  /* Robusto ante columnas angostas / padres flex (ej. la columna de precio de
+     VTEX/Siman): sin esto el widget es un flex-item con min-width:auto y NO
+     encoge → se desborda y se ve CORTADO. width/flex-basis 100% + min-width:0
+     lo hacen ocupar su propia fila y encoger al ancho disponible. */
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 1 1 100%;
+  clear: both;
+  box-sizing: border-box;
   margin: 14px 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 #oap-widget * { box-sizing: border-box; }
+/* La tarjeta no se estira de más en contenedores anchos, pero sí encoge en los
+   angostos (block → toma el ancho del padre, hasta 340px). */
+#oap-widget .oap-card { width: 100%; }
 
 #oap-widget .oap-card {
   max-width: 340px;
