@@ -134,11 +134,14 @@ foreach ($slugs as $slug) {
             break;
         }
         $products = json_decode((string) $body, true);
-        if (!is_array($products) || count($products) === 0) { $done = true; break; } // fin del catálogo
+        // Lista de productos esperada. Si viene un objeto de error o cualquier cosa
+        // que no sea lista, cortamos sin reventar (WooMapper::handle exige array).
+        if (!is_array($products) || !array_is_list($products) || count($products) === 0) { $done = true; break; }
         $pages++;
 
         $batch = [];
         foreach ($products as $p) {
+            if (!is_array($p)) { continue; }
             $h = WooMapper::handle($p);
             if ($h === '' || isset($seen[$h])) { continue; }
             $seen[$h] = true;

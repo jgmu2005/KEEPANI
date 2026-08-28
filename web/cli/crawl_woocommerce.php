@@ -99,13 +99,20 @@ foreach ($targets as $slug) {
     line("=== $slug ===");
 
     $sent = 0; $seen = [];
+  try {
     for ($page = 1; $page <= MAX_PAGES; $page++) {
         $products = apiGet($base . '/wp-json/wc/store/v1/products?per_page=' . PAGE . '&page=' . $page);
         if ($products === null) { line("  ⚠ página $page falló; corto acá."); break; }
+        // El Store API devuelve una LISTA de productos. Si viene un objeto (ej. un
+        // error {code,message,...}), NO es una lista → cortamos sin reventar.
+        if (!is_array($products) || !array_is_list($products)) {
+            line("  ⚠ respuesta inesperada (no es lista de productos); corto acá."); break;
+        }
         if (count($products) === 0) { break; }
 
         $recs = [];
         foreach ($products as $p) {
+            if (!is_array($p)) { continue; } // defensivo: saltar cualquier item no-objeto
             $handle = WooMapper::handle($p);
             if ($handle === '' || isset($seen[$handle])) { continue; }
             $seen[$handle] = true;
@@ -125,6 +132,10 @@ foreach ($targets as $slug) {
         if (count($products) < PAGE) { break; }
         usleep(400000);
     }
+  } catch (\Throwable $e) {
+    // Una tienda que rompe (respuesta rara, etc.) NO debe tumbar a las demás.
+    line('  ✖ error en ' . $slug . ': ' . $e->getMessage() . ' — sigo con la siguiente.');
+  }
 
     line("  ✔ $slug: $sent productos únicos");
     $grand += $sent;
