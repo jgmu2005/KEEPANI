@@ -16,9 +16,10 @@ declare(strict_types=1);
  * DISEÑADO PARA cron-job.org (que espera respuesta y falla si tarda): cada llamada
  * procesa un TRAMO chico (~8 páginas / ≤14s) y responde rápido, guardando un CURSOR
  * en la tabla `settings` (crawl_next_<slug>). El cron debe llamarse SEGUIDO (cada
- * ~10 min): el cursor avanza solo hasta completar una pasada del catálogo; al
- * terminar marca la fecha (crawl_done_<slug>) y las llamadas siguientes del día
- * hacen no-op instantáneo. fetesa (~46 páginas) se completa en ~6 llamadas.
+ * ~10-30 min): el cursor avanza solo hasta completar una pasada del catálogo; al
+ * terminar sella el timestamp (crawl_done_<slug>) y hace no-op hasta que pasen
+ * REFRESH_HOURS (~6h), cuando arranca otra pasada. fetesa (~46 páginas) se
+ * completa en ~6 llamadas. Así refresca varias veces al día, no una sola.
  */
 
 require dirname(__DIR__) . '/bootstrap.php';
@@ -76,7 +77,7 @@ $KV_set = static function (string $k, string $v) use ($db): void {
 // hasta completar una pasada; después no-op hasta el día siguiente.
 $PAGES_PER_CALL = 8;    // máx páginas (×100 prod) por llamada
 $TIME_BUDGET    = 14;   // seg tope por request (bien bajo el corte del hosting)
-$today          = date('Y-m-d');
+$REFRESH_HOURS  = 6;    // re-crawlear si la última pasada COMPLETA fue hace más de esto
 $t0             = time();
 
 foreach ($slugs as $slug) {
@@ -94,9 +95,13 @@ foreach ($slugs as $slug) {
     $startPage = max(1, (int) ($KV_get($nextKey) ?? '1'));
     $page      = $startPage;
 
-    // ¿Ya completó una pasada HOY? (cursor en 1 + marca de hoy) → no-op rápido.
-    if ($startPage <= 1 && $KV_get($doneKey) === $today) {
-        $results[] = ['store' => $slug, 'ok' => true, 'skipped' => 'ya actualizada hoy'];
+    // ¿Completó una pasada hace menos de REFRESH_HOURS? (cursor en 1 + marca de
+    // tiempo reciente) → no-op rápido. Así con un cron cada 30 min refresca cada
+    // ~6h en vez de una sola vez al día.
+    $doneTs = (int) ($KV_get($doneKey) ?? '0');
+    if ($startPage <= 1 && $doneTs > 0 && ($t0 - $doneTs) < $REFRESH_HOURS * 3600) {
+        $mins = (int) round(($t0 - $doneTs) / 60);
+        $results[] = ['store' => $slug, 'ok' => true, 'skipped' => "actualizada hace {$mins} min"];
         continue;
     }
 
@@ -145,10 +150,10 @@ foreach ($slugs as $slug) {
         usleep(200000);
     }
 
-    // Guardar cursor: si terminó la pasada → reinicia a 1 + marca hoy; si no,
-    // deja apuntando a la próxima página para la siguiente llamada del cron.
+    // Guardar cursor: si terminó la pasada → reinicia a 1 + sella el timestamp; si
+    // no, deja apuntando a la próxima página para la siguiente llamada del cron.
     if ($error === null) {
-        if ($done) { $KV_set($nextKey, '1'); $KV_set($doneKey, $today); }
+        if ($done) { $KV_set($nextKey, '1'); $KV_set($doneKey, (string) $t0); }
         else       { $KV_set($nextKey, (string) $page); }
     }
   } catch (\Throwable $e) {
