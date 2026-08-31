@@ -74,14 +74,27 @@ foreach ($targets as $slug) {
     if ($xml === null) {
         fail("No se pudo bajar el sitemap de $slug");
     }
-    preg_match_all('~<loc>\s*(https?://[^<\s]+?)\s*</loc>~', $xml, $m);
-    $urls = [];
-    foreach ($m[1] as $loc) {
-        if (preg_match('~-(\d+)(?:/p)?/?$~', $loc, $mm)) {
-            $urls[$loc] = $mm[1]; // solo URLs de producto (-id o -id/p); dedup por url
+    // Si es un ÍNDICE de sitemaps (los <loc> terminan en .xml), bajamos cada
+    // sub-sitemap y usamos sus URLs. Así resiste que la tienda parta el sitemap en
+    // índice + hijos (El Gallo lo hizo: -urls.xml / -images.xml → antes daba 0).
+    $docs = [$xml];
+    preg_match_all('~<loc>\s*(https?://[^<\s]+?)\s*</loc>~', $xml, $mi);
+    foreach ($mi[1] as $loc) {
+        if (preg_match('~\.xml(?:\.gz)?$~i', $loc)) {
+            $sub = $http->get($loc);
+            if ($sub !== null) { $docs[] = $sub; }
         }
     }
-    line('  productos en el sitemap: ' . count($urls));
+    $urls = [];
+    foreach ($docs as $doc) {
+        preg_match_all('~<loc>\s*(https?://[^<\s]+?)\s*</loc>~', $doc, $m);
+        foreach ($m[1] as $loc) {
+            if (preg_match('~-(\d+)(?:/p)?/?$~', $loc, $mm)) {
+                $urls[$loc] = $mm[1]; // solo URLs de producto (-id o -id/p); dedup por url
+            }
+        }
+    }
+    line('  productos en el sitemap: ' . count($urls) . (count($docs) > 1 ? ' (índice: ' . (count($docs) - 1) . ' sub-sitemaps)' : ''));
 
     // Si es una sola tienda y se pidió shard, procesamos sólo su porción.
     if ($of > 1 && $which !== 'all') {
