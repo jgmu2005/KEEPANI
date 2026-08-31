@@ -113,8 +113,16 @@ foreach ($targets as $slug) {
         for ($page = 1; $page <= MAX_PAGES; $page++) {
             $q = '{products(filter:{category_uid:{eq:"' . $uid . '"}},pageSize:' . PAGE . ',currentPage:' . $page . ')'
                . '{total_count items{' . MagentoAdapter::FIELDS . '}}}';
-            $r     = gql($endpoint, $q, $cfg['store_code']);
-            $items = $r['data']['products']['items'] ?? [];
+            // Reintento en la 1ª página: a veces el "Internal server error" de Samsung
+            // anula `products` entero (0 items) de forma TRANSITORIA. Vacío en página 1
+            // → reintentamos; en páginas siguientes, vacío = fin del catálogo.
+            $items = [];
+            for ($try = 0; $try < 3; $try++) {
+                $r     = gql($endpoint, $q, $cfg['store_code']);
+                $items = $r['data']['products']['items'] ?? [];
+                if ($items || $page > 1) { break; }
+                usleep(1500000 * ($try + 1));
+            }
             if (!$items) { break; }
 
             $recs = [];
