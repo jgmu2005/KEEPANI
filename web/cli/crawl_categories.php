@@ -19,11 +19,12 @@ use OjoAlPrecio\Web\Fetch\Http;
 use OjoAlPrecio\Web\Fetch\VtexMapper;
 
 const STORES = [
+    // Walmart PRIMERO: es chica (solo Electrónica, cat 13) y así queda crawleada aunque
+    // el run se corte/timeout durante Sinsa/Siman (que son enormes). 'paths' fija el
+    // subárbol en vez del árbol completo; el resto de Walmart queda a on-demand.
+    'walmart' => ['base_url' => 'https://www.walmart.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15, 'paths' => [[13]]],
     'sinsa' => ['base_url' => 'https://www.sinsa.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'siman' => ['base_url' => 'https://ni.siman.com',      'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
-    // Walmart: SOLO la sección Electrónica (categoría 13). 'paths' fija el subárbol
-    // a crawlear en vez del árbol completo. El resto de Walmart queda a on-demand.
-    'walmart' => ['base_url' => 'https://www.walmart.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15, 'paths' => [[13]]],
 ];
 const PAGE = 50;
 const MAX_OFFSET = 2450;

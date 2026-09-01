@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       store:
-        description: 'Tienda (sinsa, siman o all)'
+        description: 'Tienda (sinsa, siman, walmart o all)'
         required: true
-        default: 'sinsa'
+        default: 'all'
   schedule:
     - cron: '0 8 * * *'   # diario 08:00 UTC (~2:00 AM Managua) — refresco completo
 
