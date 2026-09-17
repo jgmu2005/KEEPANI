@@ -34,6 +34,14 @@ if ($ingestUrl === '' || $ingestKey === '') { fail('Faltan OJO_INGEST_URL y/o OJ
 
 $http = new Http(UA);
 $grand = 0;
+$st = ['sent' => 0, 'lost' => 0, 'consec' => 0]; // acumulador tolerante de ingesta
+
+$flush = function (array &$batch) use ($http, $ingestUrl, $ingestKey, &$st): void {
+    $r = oap_ingest_batch($http, $ingestUrl, $ingestKey, $batch, $st);
+    if ($r === 'auth') { fail('Ingesta rechazada (HTTP 401/403): revisá el secret OJO_INGEST_KEY.'); }
+    if ($r === 'down') { fail('Ingesta caída: 8 lotes seguidos fallaron. Reintentá el run.'); }
+    $batch = [];
+};
 
 foreach (CATS as $cat) {
     line("=== $cat ===");
@@ -44,27 +52,21 @@ foreach (CATS as $cat) {
     if (!is_array($data)) { fail("No se pudo leer la API de $cat"); }
     line('  productos en la API: ' . count($data));
 
-    $batch = []; $sent = 0; $skipped = 0;
+    $batch = []; $before = $st['sent']; $skipped = 0;
     foreach ($data as $p) {
         if (!is_array($p)) { continue; }
         $rec = ClaroMapper::map($p, 'claro', BASE, 'NIO', TAX_INCLUDED, TAX_RATE);
         if ($rec === null) { $skipped++; continue; }
         $batch[] = $rec->toArray();
 
-        if (count($batch) >= BATCH) {
-            $res = $http->postJson($ingestUrl, ['items' => $batch], ['X-Api-Key: ' . $ingestKey]);
-            if ($res['status'] !== 200) { fail("Ingesta HTTP {$res['status']}: " . $res['body']); }
-            $sent += count($batch); $batch = [];
-        }
+        if (count($batch) >= BATCH) { $flush($batch); }
     }
-    if ($batch) {
-        $res = $http->postJson($ingestUrl, ['items' => $batch], ['X-Api-Key: ' . $ingestKey]);
-        if ($res['status'] !== 200) { fail("Ingesta HTTP {$res['status']}: " . $res['body']); }
-        $sent += count($batch);
-    }
+    $flush($batch);
 
-    line("  ✔ $cat: $sent productos" . ($skipped ? " · $skipped sin precio" : ''));
-    $grand += $sent;
+    $catSent = $st['sent'] - $before;
+    line("  ✔ $cat: $catSent productos" . ($skipped ? " · $skipped sin precio" : ''));
+    $grand += $catSent;
 }
 
-line("TOTAL enviado: $grand productos");
+if ($grand === 0 && $st['lost'] > 0) { fail('No se ingestó ningún producto (el ingest no respondió 200).'); }
+line("TOTAL enviado: $grand productos" . ($st['lost'] ? " · {$st['lost']} perdidos en ingesta (se recuperan el próximo run)" : ''));

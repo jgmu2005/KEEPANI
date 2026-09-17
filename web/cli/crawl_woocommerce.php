@@ -98,7 +98,7 @@ foreach ($targets as $slug) {
     $base = rtrim($cfg['base_url'], '/');
     line("=== $slug ===");
 
-    $sent = 0; $seen = [];
+    $sent = 0; $seen = []; $st = ['sent' => 0, 'lost' => 0, 'consec' => 0];
   try {
     for ($page = 1; $page <= MAX_PAGES; $page++) {
         $products = apiGet($base . '/wp-json/wc/store/v1/products?per_page=' . PAGE . '&page=' . $page);
@@ -121,11 +121,10 @@ foreach ($targets as $slug) {
         }
 
         if ($recs) {
-            $res = $http->postJson($ingestUrl, ['items' => $recs], ['X-Api-Key: ' . $ingestKey]);
-            if ($res['status'] !== 200) {
-                fail("Ingesta falló (HTTP {$res['status']}): " . $res['body']);
-            }
-            $sent += count($recs);
+            $r2 = oap_ingest_batch($http, $ingestUrl, $ingestKey, $recs, $st);
+            if ($r2 === 'auth') { fail('Ingesta rechazada (HTTP 401/403): revisá el secret OJO_INGEST_KEY.'); }
+            if ($r2 === 'down') { fail('Ingesta caída: 8 lotes seguidos fallaron. Reintentá el run.'); }
+            $sent = $st['sent'];
         }
 
         line('  ...página ' . $page . ' · ' . count($products) . ' productos · ' . $sent . ' enviados');
@@ -137,7 +136,7 @@ foreach ($targets as $slug) {
     line('  ✖ error en ' . $slug . ': ' . $e->getMessage() . ' — sigo con la siguiente.');
   }
 
-    line("  ✔ $slug: $sent productos únicos");
+    line("  ✔ $slug: $sent productos únicos" . ($st['lost'] ? " · {$st['lost']} perdidos en ingesta (se recuperan el próximo run)" : ''));
     $grand += $sent;
 }
 

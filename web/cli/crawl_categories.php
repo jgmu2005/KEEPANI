@@ -105,6 +105,10 @@ function collectLeafPaths(array $nodes, array $prefix, array &$out): void
 function crawlCategory(array $path, array $ctx, array &$seen, string $extraFq = ''): array
 {
     $catPath = implode('/', $path);
+    // Acumulador tolerante COMPARTIDO entre todas las categorías (static): la racha
+    // de fallos consecutivos y las pérdidas se cuentan a nivel de la corrida entera.
+    static $st = ['sent' => 0, 'lost' => 0, 'consec' => 0];
+    $before = $st['sent'];
     $from = 0; $sent = 0; $ok = true; $capped = false; $total = null;
 
     while ($from <= MAX_OFFSET) {
@@ -130,11 +134,10 @@ function crawlCategory(array $path, array $ctx, array &$seen, string $extraFq = 
         }
 
         if ($recs) {
-            $res = $ctx['http']->postJson($ctx['ingestUrl'], ['items' => $recs], ['X-Api-Key: ' . $ctx['ingestKey']]);
-            if ($res['status'] !== 200) {
-                fail("Ingesta falló (HTTP {$res['status']}): " . $res['body']);
-            }
-            $sent += count($recs);
+            $r = oap_ingest_batch($ctx['http'], $ctx['ingestUrl'], $ctx['ingestKey'], $recs, $st);
+            if ($r === 'auth') { fail('Ingesta rechazada (HTTP 401/403): revisá el secret OJO_INGEST_KEY.'); }
+            if ($r === 'down') { fail('Ingesta caída: 8 lotes seguidos fallaron. Reintentá el run.'); }
+            $sent = $st['sent'] - $before;
         }
 
         $from += PAGE;

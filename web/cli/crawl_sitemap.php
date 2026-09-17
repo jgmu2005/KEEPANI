@@ -104,23 +104,15 @@ foreach ($targets as $slug) {
     }
 
     $adapter = new OgMetaAdapter($http, $slug, $cfg['base_url'], '', $cfg['currency'], $cfg['tax_included'], $cfg['tax_rate']);
-    $batch = []; $sent = 0; $fails = 0; $i = 0; $lost = 0; $consec = 0;
+    $batch = []; $fails = 0; $i = 0; $st = ['sent' => 0, 'lost' => 0, 'consec' => 0];
 
-    // Envía el lote actual. La ingesta es idempotente por día, así que un lote
-    // perdido por un blip de red se recupera en el próximo run (no aborta todo).
-    $flush = function () use (&$batch, &$sent, &$lost, &$consec, $http, $ingestUrl, $ingestKey) {
-        if (!$batch) { return; }
-        $res = $http->postJson($ingestUrl, ['items' => $batch], ['X-Api-Key: ' . $ingestKey]);
-        if ($res['status'] === 200) {
-            $sent += count($batch); $consec = 0;
-        } elseif ($res['status'] === 401 || $res['status'] === 403) {
-            fail("Ingesta rechazada (HTTP {$res['status']}): revisá el secret OJO_INGEST_KEY.");
-        } else {
-            $lost += count($batch); $consec++;
-            $why = $res['error'] !== '' ? $res['error'] : "HTTP {$res['status']}";
-            line("  ⚠ ingesta falló ($why) — lote de " . count($batch) . " descartado, sigo");
-            if ($consec >= 5) { fail("Ingesta caída: 5 lotes seguidos fallaron. Aborto (reintentá el run luego)."); }
-        }
+    // Envía el lote actual con el helper tolerante (reintenta 3× con backoff; un
+    // lote perdido se recupera el próximo run porque la ingesta es idempotente por
+    // día). Solo aborta si el secret está mal o si caen 8 lotes seguidos.
+    $flush = function () use (&$batch, &$st, $http, $ingestUrl, $ingestKey) {
+        $r = oap_ingest_batch($http, $ingestUrl, $ingestKey, $batch, $st);
+        if ($r === 'auth') { fail('Ingesta rechazada (HTTP 401/403): revisá el secret OJO_INGEST_KEY.'); }
+        if ($r === 'down') { fail('Ingesta caída: 8 lotes seguidos fallaron. Reintentá el run.'); }
         $batch = [];
     };
 
@@ -131,13 +123,13 @@ foreach ($targets as $slug) {
         else { $batch[] = $rec->toArray(); }
 
         if (count($batch) >= BATCH) { $flush(); }
-        if ($i % 50 === 0) { line("  ...$i/" . count($urls) . " · $sent enviados · $fails sin OG · $lost perdidos"); }
+        if ($i % 50 === 0) { line("  ...$i/" . count($urls) . " · {$st['sent']} enviados · $fails sin OG · {$st['lost']} perdidos"); }
         usleep(250000);
     }
     $flush();
 
-    line("  ✔ $slug: $sent productos" . ($fails ? " · $fails sin OG" : '') . ($lost ? " · $lost perdidos en ingesta" : ''));
-    $grand += $sent;
+    line("  ✔ $slug: {$st['sent']} productos" . ($fails ? " · $fails sin OG" : '') . ($st['lost'] ? " · {$st['lost']} perdidos en ingesta (se recuperan el próximo run)" : ''));
+    $grand += $st['sent'];
 }
 
 line("TOTAL enviado: $grand productos");

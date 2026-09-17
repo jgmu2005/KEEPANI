@@ -50,10 +50,11 @@ if ($ingestUrl === '' || $ingestKey === '') { fail('Faltan OJO_INGEST_URL y/o OJ
 
 $http = new Http(UA);
 $grand = 0;
+$st = ['sent' => 0, 'lost' => 0, 'consec' => 0]; // acumulador tolerante de ingesta
 
 foreach (CATS as $code => $catUrl) {
     line("=== $code ===");
-    $start = 0; $total = null; $sent = 0;
+    $start = 0; $total = null; $before = $st['sent'];
 
     while (true) {
         $payload = [[
@@ -77,9 +78,9 @@ foreach (CATS as $code => $catUrl) {
             if ($rec !== null) { $recs[] = $rec->toArray(); }
         }
         if ($recs) {
-            $ing = $http->postJson($ingestUrl, ['items' => $recs], ['X-Api-Key: ' . $ingestKey]);
-            if ($ing['status'] !== 200) { fail("Ingesta HTTP {$ing['status']}: " . $ing['body']); }
-            $sent += count($recs);
+            $r2 = oap_ingest_batch($http, $ingestUrl, $ingestKey, $recs, $st);
+            if ($r2 === 'auth') { fail('Ingesta rechazada (HTTP 401/403): revisá el secret OJO_INGEST_KEY.'); }
+            if ($r2 === 'down') { fail('Ingesta caída: 8 lotes seguidos fallaron. Reintentá el run.'); }
         }
 
         $start += PAGE;
@@ -87,8 +88,10 @@ foreach (CATS as $code => $catUrl) {
         usleep(400000);
     }
 
-    line("  ✔ $code: $sent productos (de $total)");
-    $grand += $sent;
+    $catSent = $st['sent'] - $before;
+    line("  ✔ $code: $catSent productos (de $total)");
+    $grand += $catSent;
 }
 
-line("TOTAL enviado: $grand productos");
+if ($grand === 0 && $st['lost'] > 0) { fail('No se ingestó ningún producto (el ingest no respondió 200).'); }
+line("TOTAL enviado: $grand productos" . ($st['lost'] ? " · {$st['lost']} perdidos en ingesta (se recuperan el próximo run)" : ''));

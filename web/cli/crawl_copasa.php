@@ -110,13 +110,11 @@ $skus = array_keys($skus);
 line('SKUs enumerados: ' . count($skus));
 
 // --- 2) Ficha por SKU → precio/stock/marca ---
-$batch = []; $sent = 0; $noPrice = 0; $fails = 0;
-$flush = function () use (&$batch, &$sent, $http, $ingestUrl, $ingestKey) {
-    if (!$batch) { return; }
-    $res = $http->postJson($ingestUrl, ['items' => $batch], ['X-Api-Key: ' . $ingestKey]);
-    if ($res['status'] === 200) { $sent += count($batch); }
-    elseif ($res['status'] === 401 || $res['status'] === 403) { fail("Ingesta rechazada (HTTP {$res['status']})."); }
-    else { fwrite(STDERR, "  ⚠ ingesta HTTP {$res['status']} — lote descartado\n"); }
+$batch = []; $noPrice = 0; $fails = 0; $st = ['sent' => 0, 'lost' => 0, 'consec' => 0];
+$flush = function () use (&$batch, &$st, $http, $ingestUrl, $ingestKey) {
+    $r = oap_ingest_batch($http, $ingestUrl, $ingestKey, $batch, $st);
+    if ($r === 'auth') { fail('Ingesta rechazada (HTTP 401/403): revisá el secret OJO_INGEST_KEY.'); }
+    if ($r === 'down') { fail('Ingesta caída: 8 lotes seguidos fallaron. Reintentá el run.'); }
     $batch = [];
 };
 
@@ -145,9 +143,10 @@ foreach ($skus as $i => $sku) {
         'in_stock'    => str_contains($avail, 'in stock') || str_contains($avail, 'instock') ? 1 : 0,
     ];
     if (count($batch) >= BATCH) { $flush(); }
-    if (($i + 1) % 50 === 0) { line('  ...' . ($i + 1) . '/' . count($skus) . " · $sent enviados · $noPrice sin precio · $fails fallos"); }
+    if (($i + 1) % 50 === 0) { line('  ...' . ($i + 1) . '/' . count($skus) . " · {$st['sent']} enviados · $noPrice sin precio · $fails fallos"); }
     usleep(300000);
 }
 $flush();
 
-line("TOTAL: $sent productos · $noPrice sin precio · $fails fallos de fetch");
+if (count($skus) > 0 && $st['sent'] === 0 && $st['lost'] > 0) { fail('No se ingestó ningún producto (el ingest no respondió 200).'); }
+line("TOTAL: {$st['sent']} productos · $noPrice sin precio · $fails fallos de fetch" . ($st['lost'] ? " · {$st['lost']} perdidos en ingesta (se recuperan el próximo run)" : ''));

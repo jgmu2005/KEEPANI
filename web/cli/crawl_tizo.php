@@ -92,12 +92,14 @@ if ($TOKEN === null) { fail('No se pudo generar el token de invitado de Tizo.');
 
 $http = new Http();
 $seen = []; $batch = []; $sent = 0;
+$st = ['sent' => 0, 'lost' => 0, 'consec' => 0];
 
-$flush = function () use (&$batch, &$sent, $http, $ingestUrl, $ingestKey): void {
+$flush = function () use (&$batch, &$sent, &$st, $http, $ingestUrl, $ingestKey): void {
     if (!$batch) { return; }
-    $res = $http->postJson($ingestUrl, ['items' => $batch], ['X-Api-Key: ' . $ingestKey]);
-    if ($res['status'] !== 200) { fail("Ingesta falló (HTTP {$res['status']}): " . $res['body']); }
-    $sent += count($batch);
+    $r = oap_ingest_batch($http, $ingestUrl, $ingestKey, $batch, $st);
+    if ($r === 'auth') { fail('Ingesta rechazada (HTTP 401/403): revisá el secret OJO_INGEST_KEY.'); }
+    if ($r === 'down') { fail('Ingesta caída: 8 lotes seguidos fallaron. Reintentá el run.'); }
+    $sent = $st['sent'];
     $batch = [];
 };
 
@@ -144,5 +146,6 @@ foreach ($catList as $cat) {
 }
 
 $flush();
-line('  ✔ tizo: ' . $sent . ' productos únicos');
+if ($seen && $sent === 0) { fail('No se ingestó ningún producto (el ingest no respondió 200).'); }
+line('  ✔ tizo: ' . $sent . ' productos únicos' . ($st['lost'] ? " · {$st['lost']} perdidos (se recuperan el próximo run)" : ''));
 line('TOTAL enviado: ' . $sent . ' productos');

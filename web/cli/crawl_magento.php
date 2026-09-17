@@ -99,7 +99,7 @@ foreach ($targets as $slug) {
     $endpoint = rtrim($cfg['base_url'], '/') . '/graphql';
     line("=== $slug ===");
 
-    $seen = []; $sent = 0;
+    $seen = []; $sent = 0; $st = ['sent' => 0, 'lost' => 0, 'consec' => 0];
     foreach ($cfg['categories'] as $path) {
         // 1) uid de la categoría por url_path
         $cr  = gql($endpoint, '{categoryList(filters:{url_path:{eq:"' . $path . '"}}){uid name}}', $cfg['store_code']);
@@ -135,9 +135,10 @@ foreach ($targets as $slug) {
                 if ($rec !== null) { $recs[] = $rec->toArray(); }
             }
             if ($recs) {
-                $res = $http->postJson($ingestUrl, ['items' => $recs], ['X-Api-Key: ' . $ingestKey]);
-                if ($res['status'] !== 200) { fail("Ingesta falló (HTTP {$res['status']}): " . $res['body']); }
-                $sent += count($recs);
+                $r2 = oap_ingest_batch($http, $ingestUrl, $ingestKey, $recs, $st);
+                if ($r2 === 'auth') { fail('Ingesta rechazada (HTTP 401/403): revisá el secret OJO_INGEST_KEY.'); }
+                if ($r2 === 'down') { fail('Ingesta caída: 8 lotes seguidos fallaron. Reintentá el run.'); }
+                $sent = $st['sent'];
             }
 
             $total = (int) ($r['data']['products']['total_count'] ?? 0);
@@ -147,7 +148,7 @@ foreach ($targets as $slug) {
         }
     }
 
-    line("  ✔ $slug: $sent productos únicos");
+    line("  ✔ $slug: $sent productos únicos" . ($st['lost'] ? " · {$st['lost']} perdidos en ingesta (se recuperan el próximo run)" : ''));
     $grand += $sent;
 }
 

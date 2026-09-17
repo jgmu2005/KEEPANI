@@ -127,13 +127,16 @@ foreach ($products as $p) {
     $batch[] = $rec->toArray();
 }
 
-if ($batch) {
-    $res = $http->postJson($ingestUrl, ['items' => $batch], ['X-Api-Key: ' . $ingestKey]);
-    if ($res['status'] !== 200) {
-        fail("Ingesta falló (HTTP {$res['status']}): " . $res['body']);
-    }
-    $sent = count($batch);
+$st = ['sent' => 0, 'lost' => 0, 'consec' => 0];
+// En lotes de 25 (antes iba TODO en un POST: un blip transitorio del hosting
+// tumbaba la corrida entera). Tolerante a fallos; si NADA entró, sí es error real.
+foreach (array_chunk($batch, 25) as $chunk) {
+    $r = oap_ingest_batch($http, $ingestUrl, $ingestKey, $chunk, $st);
+    if ($r === 'auth') { fail('Ingesta rechazada (HTTP 401/403): revisá el secret OJO_INGEST_KEY.'); }
+    if ($r === 'down') { fail('Ingesta caída: 8 lotes seguidos fallaron. Reintentá el run.'); }
 }
+$sent = $st['sent'];
+if ($batch && $sent === 0) { fail('No se ingestó ningún producto (el ingest no respondió 200).'); }
 
-line("  ✔ techstore: $sent productos enviados" . ($skip ? " · $skip omitidos" : ''));
+line("  ✔ techstore: $sent productos enviados" . ($skip ? " · $skip omitidos" : '') . ($st['lost'] ? " · {$st['lost']} perdidos (se recuperan el próximo run)" : ''));
 line("TOTAL enviado: $sent productos");

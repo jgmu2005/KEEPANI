@@ -94,11 +94,27 @@ function crawlCat(array $path, array $ctx, array &$seen, int &$sent, int &$drops
             if ($rec !== null) { $recs[] = $rec->toArray(); }
         }
         if ($recs) {
-            $res = $ctx['http']->postJson($ctx['wmUrl'], ['items' => $recs], ['X-Api-Key: ' . $ctx['key']]);
-            if ($res['status'] !== 200) { fail("wm_ingest falló (HTTP {$res['status']}): " . $res['body']); }
-            $j = json_decode($res['body'], true);
-            $sent  += (int) ($j['seen'] ?? count($recs));
-            $drops += (int) ($j['drops'] ?? 0);
+            // Tolerante a blips transitorios del hosting: reintenta 3× con backoff;
+            // si igual falla, pierde el lote y sigue (se recupera el próximo run).
+            // Solo aborta si el secret está mal o si caen 8 lotes seguidos.
+            $okPost = false; $res = ['status' => 0, 'body' => ''];
+            for ($t = 1; $t <= 3; $t++) {
+                $res = $ctx['http']->postJson($ctx['wmUrl'], ['items' => $recs], ['X-Api-Key: ' . $ctx['key']]);
+                if ($res['status'] === 200) { $okPost = true; break; }
+                if ($res['status'] === 401 || $res['status'] === 403) { fail("wm_ingest rechazado (HTTP {$res['status']}): revisá el secret."); }
+                if ($t < 3) { usleep(1500000 * $t); }
+            }
+            if ($okPost) {
+                $j = json_decode($res['body'], true);
+                $sent  += (int) ($j['seen'] ?? count($recs));
+                $drops += (int) ($j['drops'] ?? 0);
+                $GLOBALS['wm_consec'] = 0;
+            } else {
+                $GLOBALS['wm_lost']   = ($GLOBALS['wm_lost'] ?? 0) + count($recs);
+                $GLOBALS['wm_consec'] = ($GLOBALS['wm_consec'] ?? 0) + 1;
+                fwrite(STDERR, "  ⚠ wm_ingest falló (HTTP {$res['status']}) — lote de " . count($recs) . " descartado tras 3 intentos, sigo\n");
+                if ($GLOBALS['wm_consec'] >= 8) { fail('wm_ingest caído: 8 lotes seguidos fallaron. Reintentá el run.'); }
+            }
         }
         if (count($data) < PAGE) { break; }
         $from += PAGE;
@@ -122,4 +138,6 @@ if ($failed) {
     line('segunda pasada: ' . (count($failed) - count($still)) . ' recuperadas · ' . count($still) . ' siguen fallando');
 }
 
-line("TOTAL: $sent productos · $drops bajas ≥30% registradas · " . count($seen) . ' únicos');
+if ($seen && $sent === 0) { fail('No se ingestó ningún producto (wm_ingest no respondió 200).'); }
+line("TOTAL: $sent productos · $drops bajas ≥30% registradas · " . count($seen) . ' únicos'
+    . (!empty($GLOBALS['wm_lost']) ? ' · ' . $GLOBALS['wm_lost'] . ' perdidos (se recuperan el próximo run)' : ''));
