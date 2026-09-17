@@ -1,6 +1,7 @@
 name: Crawl Comtech (Online40)
 
-# Baja/refresca el catálogo completo de Comtech vía su Search API (una llamada).
+# Baja/refresca el catálogo completo de Comtech (Online40): busca por cada
+# categoría/marca en el índice fresco de la sucursal y rellena con el índice viejo.
 # Cada corrida agrega un punto de precio por producto.
 on:
   workflow_dispatch:
