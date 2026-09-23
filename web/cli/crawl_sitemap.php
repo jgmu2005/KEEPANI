@@ -45,6 +45,27 @@ const BATCH = 25;
 function line(string $s): void { fwrite(STDOUT, $s . "\n"); }
 function fail(string $s): never { fwrite(STDERR, "ERROR: $s\n"); exit(1); }
 
+/**
+ * Baja un sitemap con PACIENCIA. El de Tropigas pesa ~17.5MB y los 3 shards lo
+ * piden casi a la vez → el server puede tirar un 5xx/429 puntual y antes eso
+ * abortaba el shard entero a los ~7s ("No se pudo bajar el sitemap"). Reintentamos
+ * hasta 6 veces con backoff largo + jitter antes de rendirnos (además del retry
+ * corto interno de Http::get).
+ */
+function fetchSitemap(Http $http, string $url): ?string
+{
+    for ($try = 1; $try <= 6; $try++) {
+        $xml = $http->get($url);
+        if ($xml !== null && $xml !== '') { return $xml; }
+        if ($try < 6) {
+            $wait = min(30.0, 2 ** $try) + random_int(0, 3000) / 1000.0; // 2,4,8,16,30s + jitter
+            fwrite(STDERR, "  ⚠ sitemap no bajó (intento $try/6), reintento en " . round($wait, 1) . "s\n");
+            usleep((int) ($wait * 1000000));
+        }
+    }
+    return null;
+}
+
 $ingestUrl = getenv('OJO_INGEST_URL') ?: '';
 $ingestKey = getenv('OJO_INGEST_KEY') ?: '';
 if ($ingestUrl === '' || $ingestKey === '') {
@@ -61,6 +82,9 @@ $shard = max(1, (int) ($argv[2] ?? 1));
 $of    = max(1, (int) ($argv[3] ?? 1));
 
 $http = new Http(UA);
+// Http aparte para sitemaps: timeout largo (17.5MB de Tropigas) y sin retry interno
+// (el retry paciente lo maneja fetchSitemap).
+$smHttp = new Http(UA, 90, 0);
 $grand = 0;
 
 foreach ($targets as $slug) {
@@ -70,9 +94,13 @@ foreach ($targets as $slug) {
     $cfg = STORES[$slug];
     line("=== $slug ===");
 
-    $xml = $http->get($cfg['sitemap']);
+    // Jitter de arranque (0–5s): evita que shards que arrancan juntos pidan el
+    // mismo sitemap grande en el mismísimo instante (lo que gatillaba el 5xx).
+    usleep(random_int(0, 5000000));
+
+    $xml = fetchSitemap($smHttp, $cfg['sitemap']);
     if ($xml === null) {
-        fail("No se pudo bajar el sitemap de $slug");
+        fail("No se pudo bajar el sitemap de $slug (tras 6 intentos)");
     }
     // Si es un ÍNDICE de sitemaps (los <loc> terminan en .xml), bajamos cada
     // sub-sitemap y usamos sus URLs. Así resiste que la tienda parta el sitemap en
@@ -81,7 +109,7 @@ foreach ($targets as $slug) {
     preg_match_all('~<loc>\s*(https?://[^<\s]+?)\s*</loc>~', $xml, $mi);
     foreach ($mi[1] as $loc) {
         if (preg_match('~\.xml(?:\.gz)?$~i', $loc)) {
-            $sub = $http->get($loc);
+            $sub = fetchSitemap($smHttp, $loc);
             if ($sub !== null) { $docs[] = $sub; }
         }
     }
