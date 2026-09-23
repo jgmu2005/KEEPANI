@@ -50,7 +50,10 @@ function oap_ingest_batch(\OjoAlPrecio\Web\Fetch\Http $http, string $url, string
             return 'auth';
         }
         $last = ($res['error'] ?? '') !== '' ? $res['error'] : ('HTTP ' . $res['status']);
-        if ($try < 3) { usleep(1500000 * $try); } // 1.5s, luego 3s
+        // Backoff con JITTER: si varios crawlers reintentan a la vez (ej. los 6 jobs
+        // del sitemap contra FatCow), un backoff fijo los re-sincroniza y vuelven a
+        // chocar. El jitter (0–1s) los dispersa.
+        if ($try < 3) { usleep(1500000 * $try + random_int(0, 1000000)); }
     }
     $st['lost']   = ($st['lost'] ?? 0) + $n;
     $st['consec'] = ($st['consec'] ?? 0) + 1;

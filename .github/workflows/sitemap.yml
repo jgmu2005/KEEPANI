@@ -42,7 +42,11 @@ jobs:
     timeout-minutes: 350
     strategy:
       fail-fast: false
-      max-parallel: 6
+      # FatCow (hosting compartido) se satura con muchos ingest en paralelo: con 6
+      # jobs pegando a /api/ingest a la vez, los grandes (radioshack, tropigas 2/3)
+      # acumulaban lotes caídos hasta abortar. Con 2 a la vez la carga baja y siguen
+      # cabiendo de sobra en el timeout (6 jobs / 2 ≈ 3 tandas).
+      max-parallel: 2
       matrix:
         job: ${{ fromJson(needs.setup.outputs.jobs) }}
     steps:
