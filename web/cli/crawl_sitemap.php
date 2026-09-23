@@ -100,7 +100,14 @@ foreach ($targets as $slug) {
 
     $xml = fetchSitemap($smHttp, $cfg['sitemap']);
     if ($xml === null) {
-        fail("No se pudo bajar el sitemap de $slug (tras 6 intentos)");
+        // El CDN de Unicomer (Cloudflare) bloquea/estrangula INTERMITENTEMENTE las
+        // IPs de datacenter de GitHub Actions — la misma URL baja sin problema desde
+        // una IP residencial. NO es un bug del crawler, así que NO reventamos el job
+        // (evita el correo de fallo diario). En los runs buenos el sitemap sí baja.
+        // Si una tienda queda varios días sin bajar, el panel de salud la marca
+        // atrasada → señal para moverla a server-side (FatCow) o local.
+        line("  ⚠ SALTO $slug: no se pudo bajar el sitemap tras 6 intentos (el CDN bloqueó la IP de Actions). Sigo sin abortar.");
+        continue;
     }
     // Si es un ÍNDICE de sitemaps (los <loc> terminan en .xml), bajamos cada
     // sub-sitemap y usamos sus URLs. Así resiste que la tienda parta el sitemap en
