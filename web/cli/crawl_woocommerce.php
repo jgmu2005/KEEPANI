@@ -19,7 +19,9 @@ use OjoAlPrecio\Web\Fetch\Http;
 use OjoAlPrecio\Web\Fetch\WooMapper;
 
 const STORES = [
-    'etech'             => ['base_url' => 'https://etech.com.ni',            'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    // etech pasó a estar detrás de Cloudflare (challenge "Just a moment" 403,
+    // agresivo contra datacenter → 7 días roja en Actions). Va por IP residencial.
+    'etech'             => ['base_url' => 'https://etech.com.ni',            'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15, 'residential_only' => true],
     'pcsystemni'        => ['base_url' => 'https://pcsystemni.com',          'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'gcm'              => ['base_url' => 'https://gcm.com.ni',              'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'casadelaslamparas' => ['base_url' => 'https://casadelaslamparas.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
@@ -64,8 +66,12 @@ function apiGet(string $url, int $retries = 4): ?array
             $j = json_decode((string) $body, true);
             if (is_array($j)) { return $j; }
         }
-        if ($lastCode === 429 || $lastCode >= 500 || $body === false) {
-            usleep(1200000 * ($a + 1));
+        // 403 lo tratamos como TRANSITORIO: la Store API es pública, así que un 403
+        // suele ser el "Just a moment..." de Cloudflare (challenge intermitente, peor
+        // desde IPs de datacenter). Reintentamos con backoff + jitter; muchas veces
+        // el siguiente intento pasa (visto en etech: 403 y al toque 200).
+        if ($lastCode === 429 || $lastCode === 403 || $lastCode >= 500 || $body === false) {
+            usleep(1200000 * ($a + 1) + random_int(0, 800000));
             continue;
         }
         break;

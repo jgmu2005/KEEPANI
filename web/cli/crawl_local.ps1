@@ -16,7 +16,8 @@ $repo = 'C:\Users\fmxso\KEEPANI'
 $log  = Join-Path $env:TEMP 'ojo_crawl_local.log'
 
 # Tiendas residential_only a bajar (agrega mas si aparecen).
-$stores = @('telcmax')
+#   etech: pasó a Cloudflare (challenge 403 desde datacenter) → solo residencial.
+$stores = @('telcmax', 'etech')
 
 function Log($m) { "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $m" | Add-Content -Encoding utf8 $log }
 
