@@ -1,0 +1,51 @@
+name: Crawl E-Tech (Cloudflare, navegador headless)
+
+# etech.com.ni pasó a estar detrás de Cloudflare ("Just a moment", 403 al HTTP
+# plano). Un navegador REAL (Playwright) pasa el challenge JS; ya con la cookie,
+# paginamos su WooCommerce Store API y volcamos el JSON crudo, que luego mapea
+# PHP con WooMapper (misma lógica que el resto de tiendas Woo).
+#
+# Nota: si Cloudflare bloquea también al navegador headless desde el datacenter de
+# Actions (CAPTCHA duro), el paso node sale con código 2 → habría que moverlo a la
+# PC local (mismo script, con Node instalado).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '40 8 * * *'   # diario, después del resto
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar Playwright (chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install playwright@1.47.2
+          npx playwright install --with-deps chromium
+
+      - name: Preparar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: Bajar catálogo con navegador (pasa Cloudflare)
+        env:
+          STORE_URL: https://etech.com.ni
+          OUT: etech_raw.json
+        run: node .github/scripts/fetch_woo_cf.mjs
+
+      - name: Mapear e ingestar
+        env:
+          OJO_INGEST_URL: ${{ secrets.OJO_INGEST_URL }}
+          OJO_INGEST_KEY: ${{ secrets.OJO_INGEST_KEY }}
+        run: php web/cli/ingest_woo_json.php etech etech_raw.json

@@ -19,8 +19,10 @@ use OjoAlPrecio\Web\Fetch\Http;
 use OjoAlPrecio\Web\Fetch\WooMapper;
 
 const STORES = [
-    // etech pasó a estar detrás de Cloudflare (challenge "Just a moment" 403,
-    // agresivo contra datacenter → 7 días roja en Actions). Va por IP residencial.
+    // etech pasó a estar detrás de Cloudflare (challenge "Just a moment"): el HTTP
+    // plano da 403. residential_only la saca del 'all' de Actions; se crawlea con
+    // navegador headless (Playwright) en su propio workflow etech.yml, que pasa el
+    // challenge y baja el JSON crudo → lo mapea ingest_woo_json.php con WooMapper.
     'etech'             => ['base_url' => 'https://etech.com.ni',            'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15, 'residential_only' => true],
     'pcsystemni'        => ['base_url' => 'https://pcsystemni.com',          'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'gcm'              => ['base_url' => 'https://gcm.com.ni',              'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
