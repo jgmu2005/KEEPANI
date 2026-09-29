@@ -28,6 +28,7 @@ const STORES = [
     'gcm'              => ['base_url' => 'https://gcm.com.ni',              'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'casadelaslamparas' => ['base_url' => 'https://casadelaslamparas.com.ni', 'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     'fogel'             => ['base_url' => 'https://fogel.com.ni',            'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
+    'electrofrioni'     => ['base_url' => 'https://electrofrioni.com',       'currency' => 'NIO', 'tax_included' => true, 'tax_rate' => 0.15],
     // telcmax bloquea TODA IP de datacenter (Actions 403, FatCow timeout). Solo se
     // puede crawlear desde una IP RESIDENCIAL → 'residential_only' lo saca de 'all'
     // (Actions), pero se corre explícito desde tu máquina:
