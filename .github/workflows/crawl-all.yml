@@ -26,6 +26,13 @@ jobs:
             echo "::error::Falta el secreto ACTIONS_PAT (token con actions:write)."
             exit 1
           fi
+          # Validar el PAT ANTES del loop: uno EXPIRADO da un "401 Bad credentials"
+          # críptico por cada workflow. Los fine-grained caducan (máx 1 año) → hay
+          # que rotarlos. Este chequeo lo dice claro.
+          if ! gh api "repos/$REPO" -q .default_branch >/dev/null 2>&1; then
+            echo "::error::ACTIONS_PAT inválido o EXPIRADO (401 Bad credentials). Regeneralo en https://github.com/settings/personal-access-tokens (token 'Master Ojoalprecio' → Regenerate), y pegá el nuevo valor en el secret ACTIONS_PAT del repo Y en el header Authorization de cron-job.org."
+            exit 1
+          fi
           WORKFLOWS="crawl.yml woocommerce.yml shopify.yml pricesmart.yml copasa.yml comtech.yml techstore.yml claro.yml sitemap.yml walmart_watch.yml marketplace.yml"
           FAIL=0
           for wf in $WORKFLOWS; do
