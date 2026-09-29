@@ -5,14 +5,17 @@ name: Crawl E-Tech (Cloudflare, navegador headless)
 # paginamos su WooCommerce Store API y volcamos el JSON crudo, que luego mapea
 # PHP con WooMapper (misma lógica que el resto de tiendas Woo).
 #
-# Nota: si Cloudflare bloquea también al navegador headless desde el datacenter de
-# Actions (CAPTCHA duro), el paso node sale con código 2 → habría que moverlo a la
-# PC local (mismo script, con Node instalado).
+# RESULTADO (run #1): Cloudflare bloquea DURO al navegador headless desde el
+# datacenter de GitHub (12/12 status 403 → exit 2). Confirmado: etech solo se puede
+# bajar desde una IP RESIDENCIAL (el navegador de la PC del usuario SÍ pasa). Por
+# eso se crawlea LOCAL vía crawl_local.ps1 (Node/Playwright) y este workflow queda
+# SOLO manual (por si algún día aflojan Cloudflare); NO va en el master.
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '40 8 * * *'   # diario, después del resto
+  # schedule DESACTIVADO: en Actions (datacenter) Cloudflare no deja pasar.
+  # schedule:
+  #   - cron: '40 8 * * *'
 
 jobs:
   crawl:

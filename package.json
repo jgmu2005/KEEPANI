@@ -1,0 +1,9 @@
+{
+  "name": "ojoalprecio-crawlers",
+  "private": true,
+  "description": "Dependencias Node de los crawlers con navegador (Playwright) — etech (Cloudflare) y marketplace/treinta.",
+  "type": "module",
+  "dependencies": {
+    "playwright": "1.47.2"
+  }
+}

@@ -33,7 +33,7 @@ jobs:
             echo "::error::ACTIONS_PAT inválido o EXPIRADO (401 Bad credentials). Regeneralo en https://github.com/settings/personal-access-tokens (token 'Master Ojoalprecio' → Regenerate), y pegá el nuevo valor en el secret ACTIONS_PAT del repo Y en el header Authorization de cron-job.org."
             exit 1
           fi
-          WORKFLOWS="crawl.yml woocommerce.yml shopify.yml pricesmart.yml copasa.yml comtech.yml techstore.yml claro.yml sitemap.yml walmart_watch.yml marketplace.yml etech.yml"
+          WORKFLOWS="crawl.yml woocommerce.yml shopify.yml pricesmart.yml copasa.yml comtech.yml techstore.yml claro.yml sitemap.yml walmart_watch.yml marketplace.yml"
           FAIL=0
           for wf in $WORKFLOWS; do
             echo "▶ Disparando $wf ..."

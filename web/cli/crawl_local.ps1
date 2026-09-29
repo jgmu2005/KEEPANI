@@ -66,4 +66,33 @@ try {
     Log "ERROR en 'samsung': $($_.Exception.Message)"
 }
 
+# --- 5) etech (WooCommerce detrás de Cloudflare): un navegador REAL pasa el
+#     challenge JS. Actions (datacenter) NO puede; una IP residencial SÍ. Bajamos
+#     el JSON crudo con Node/Playwright y lo mapeamos/ingestamos con PHP (WooMapper).
+#     Requiere Node + Playwright instalados una vez (ver README / instrucciones):
+#         npm install playwright   &&   npx playwright install chromium
+$node = Get-Command node -ErrorAction SilentlyContinue
+if ($node) {
+    Log "crawl 'etech' (navegador) ..."
+    try {
+        $raw = Join-Path $env:TEMP 'oap_etech_raw.json'
+        if (Test-Path $raw) { Remove-Item $raw -Force -ErrorAction SilentlyContinue }
+        $env:STORE_URL = 'https://etech.com.ni'
+        $env:OUT = $raw
+        $fetch = & node .github/scripts/fetch_woo_cf.mjs 2>&1 | Out-String
+        Log $fetch.Trim()
+        if (Test-Path $raw) {
+            $out = & php web/cli/ingest_woo_json.php etech $raw 2>&1 | Out-String
+            Log $out.Trim()
+            Remove-Item $raw -Force -ErrorAction SilentlyContinue
+        } else {
+            Log "etech: el fetch con navegador no dejó archivo (Cloudflare no dejó pasar en esta corrida)."
+        }
+    } catch {
+        Log "ERROR en 'etech': $($_.Exception.Message)"
+    }
+} else {
+    Log "etech: SALTADO — falta Node. Instalalo una vez y luego 'npm install playwright' + 'npx playwright install chromium' en $repo."
+}
+
 Log "listo."

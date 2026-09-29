@@ -13,3 +13,5 @@ Thumbs.db
 # Artefactos de build de la extension
 ojo-al-precio-extension.zip
 extension/ojo-al-precio-extension.zip
+node_modules
+package-lock.json
