@@ -63,6 +63,13 @@ try {
 
     $product = $repo->product($id);
     $history = $repo->history($id);
+    $stats   = $repo->stats($history);
+
+    // Tiendas en USD (electrofrioni, Samsung) → convertir todo a C$ para el cliente
+    // (sitio + extensión). Se hace ANTES del deal para que el veredicto y el
+    // "habitual" queden también en córdobas.
+    $usdRate = (float) (\OjoAlPrecio\Web\Settings::get(Db::conn(), 'usd_rate') ?? 0);
+    oap_response_to_nio($product, $stats, $history, $usdRate);
 
     $last = end($history) ?: null;
     $deal = DealAnalyzer::analyze(
@@ -74,7 +81,7 @@ try {
     out(200, [
         'ok'      => true,
         'product' => $product,
-        'stats'   => $repo->stats($history),
+        'stats'   => $stats,
         'history' => $history,
         'deal'    => $deal,
     ]);

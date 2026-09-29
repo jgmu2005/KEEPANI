@@ -60,3 +60,37 @@ function oap_ingest_batch(\OjoAlPrecio\Web\Fetch\Http $http, string $url, string
     fwrite(STDERR, "  ⚠ ingesta falló ($last) — lote de $n descartado tras 3 intentos, sigo\n");
     return ($st['consec'] >= 8) ? 'down' : '';
 }
+
+/**
+ * Convierte a NIO (córdobas) la respuesta de track.php/history.php cuando el
+ * producto es de una tienda en USD (electrofrioni, Samsung). Los clientes (el
+ * sitio index.html y la extensión) muestran la moneda de `stats.currency` tal
+ * cual; sin esto, un aire de US$776 se veía "US$776" en el widget en vez de
+ * convertirlo a C$ como hacen producto.php/precio.php. Deja `usd_rate` y
+ * `currency_native` por si el cliente quiere mostrar el equivalente ≈US$.
+ */
+function oap_response_to_nio(?array &$product, array &$stats, array &$history, float $usdRate): void
+{
+    $native = strtoupper((string) ($stats['currency'] ?? ($product['currency'] ?? 'NIO')));
+    if ($native !== 'USD' || $usdRate <= 0) { return; } // ya en NIO o sin tasa
+
+    foreach (['current', 'min', 'max', 'max_raw'] as $k) {
+        if (isset($stats[$k]) && $stats[$k] !== null) { $stats[$k] = (float) $stats[$k] * $usdRate; }
+    }
+    $stats['currency']        = 'NIO';
+    $stats['currency_native'] = $native;
+    $stats['usd_rate']        = $usdRate;
+
+    foreach ($history as &$__r) {
+        foreach (['price_final', 'price_native', 'list_price'] as $k) {
+            if (isset($__r[$k]) && $__r[$k] !== null) { $__r[$k] = (float) $__r[$k] * $usdRate; }
+        }
+        if (isset($__r['currency'])) { $__r['currency'] = 'NIO'; }
+    }
+    unset($__r);
+
+    if ($product !== null) {
+        $product['currency_native'] = $native;
+        $product['currency']        = 'NIO';
+    }
+}

@@ -48,10 +48,24 @@ if (!$p) {
     exit;
 }
 
-$cur     = $p['currency'] ?: 'NIO';
+$nativeCur = $p['currency'] ?: 'NIO';
+// Mostramos y analizamos TODO en córdobas por defecto; las tiendas en USD
+// (electrofrioni, Samsung) se convierten con el usd_rate — igual que producto.php.
+// Si no hay tasa, caemos a la moneda nativa (mejor que un número sin convertir).
+$rate = ($nativeCur === 'USD' && $usdRate > 0) ? $usdRate : 1.0;
+$cur  = ($nativeCur === 'USD' && $usdRate <= 0) ? 'USD' : 'NIO';
 $title   = $p['title'] ?: 'Producto';
 $image   = $p['image_url'] ?: '';
 $history = $repo->history($id);
+// Convertir el histórico a NIO UNA sola vez → todo lo derivado (mín/máx/actual/
+// chart/deal/schema) queda en córdobas sin tener que tocar cada cálculo.
+if ($rate !== 1.0) {
+    foreach ($history as &$__r) {
+        if (($__r['price_final'] ?? null) !== null) { $__r['price_final'] = (float) $__r['price_final'] * $rate; }
+        if (($__r['list_price'] ?? null) !== null)  { $__r['list_price']  = (float) $__r['list_price'] * $rate; }
+    }
+    unset($__r);
+}
 
 $fmt = static function (?float $v) use ($cur): string {
     if ($v === null) return '—';

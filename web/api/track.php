@@ -78,11 +78,16 @@ try {
     }
 
     $history = $repo->history($id);
+    $product = $repo->product($id);
+    $stats   = $repo->stats($history);
+    // Tiendas en USD (electrofrioni, Samsung) → convertir todo a C$ para el cliente.
+    $usdRate = (float) (\OjoAlPrecio\Web\Settings::get($db, 'usd_rate') ?? 0);
+    oap_response_to_nio($product, $stats, $history, $usdRate);
     out(200, [
         'ok'      => true,
         'added'   => $added,
-        'product' => $repo->product($id),
-        'stats'   => $repo->stats($history),
+        'product' => $product,
+        'stats'   => $stats,
         'history' => $history,
     ]);
 } catch (\Throwable $e) {
