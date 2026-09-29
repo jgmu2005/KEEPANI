@@ -46,6 +46,13 @@ final class WooMapper
             return null;
         }
 
+        // La moneda REAL la dice la propia API (currency_code); el $currency del
+        // config es solo fallback. Evita el bug de electrofrioni (WooCommerce en USD
+        // etiquetado como NIO → un aire de US$636 se veía como C$636).
+        $cur = (!empty($prices['currency_code']) && is_string($prices['currency_code']))
+            ? strtoupper(trim((string) $prices['currency_code']))
+            : $currency;
+
         $minor = isset($prices['currency_minor_unit']) ? (int) $prices['currency_minor_unit'] : 2;
         $div   = 10 ** max(0, $minor);
         $toNum = static fn($v) => ($v === null || $v === '') ? null : (float) $v / $div;
@@ -80,7 +87,7 @@ final class WooMapper
             brand:       $brand,
             imageUrl:    $image,
             priceNative: $price,
-            currency:    $currency,
+            currency:    $cur,
             inStock:     !empty($p['is_in_stock']),
             taxIncluded: $taxIncluded,
             taxRate:     $taxRate,
