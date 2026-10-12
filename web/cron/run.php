@@ -74,7 +74,17 @@ try {
     $records = [];
     $failed  = [];
 
+    // Presupuesto de tiempo: cada fetch es EN VIVO (lento) y FatCow mata los
+    // requests largos. Procesamos hasta ~12s y respondemos con lo juntado; como el
+    // orden es "más desactualizado primero", cada corrida avanza sobre los más
+    // atrasados. Pensado para llamarse SEGUIDO (cron-job.org cada ~10 min) con un
+    // limit alto; el budget corta antes de que FatCow aborte (y así SÍ persiste).
+    $t0 = microtime(true);
+    $budget = (float) ($_GET['budget'] ?? 12);
+    $stopped = false;
+
     foreach ($products as $p) {
+        if (microtime(true) - $t0 > $budget) { $stopped = true; break; }
         $store = $stores[(int) $p['store_id']] ?? null;
         if (!$store) {
             continue;
@@ -93,8 +103,9 @@ try {
     }
 
     $result = (new IngestService($db))->ingest($records);
-    $result['scanned']      = count($products);
+    $result['scanned']      = count($records) + count($failed);
     $result['fetch_failed'] = count($failed);
+    $result['stopped_by_budget'] = $stopped; // true = quedaron más por refrescar
     $result['failures']     = $failed;
 
     out(200, $result);
