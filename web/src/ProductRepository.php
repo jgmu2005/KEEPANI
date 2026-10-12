@@ -66,6 +66,17 @@ final class ProductRepository
                     }
                 }
             }
+            // 4) VTEX sin id en la URL (Walmart: .../{linkText}/p, productId <6 díg.)
+            //    → resolver el productId por linkText contra la API (match exacto).
+            if ($slug) {
+                $pidLt = $this->vtexProductIdByLinkText($slug, $url);
+                if ($pidLt !== null) {
+                    $byLt = $this->bySlugSku($slug, $pidLt);
+                    if ($byLt !== null) {
+                        return $byLt;
+                    }
+                }
+            }
         }
 
         return null;
@@ -94,6 +105,14 @@ final class ProductRepository
             [$slug, $extractedSku] = $this->parseUrl($url);
             if ($slug && $extractedSku) {
                 return ['slug' => $slug, 'sku' => $extractedSku];
+            }
+            // VTEX sin id en la URL (Walmart: .../{linkText}/p) → resolver el
+            // productId por linkText contra la API (en vivo).
+            if ($slug) {
+                $pidLt = $this->vtexProductIdByLinkText($slug, $url);
+                if ($pidLt !== null) {
+                    return ['slug' => $slug, 'sku' => $pidLt];
+                }
             }
         }
         return null;
@@ -180,6 +199,48 @@ final class ProductRepository
         return (string) $j[0]['productId'];
     }
 
+    /**
+     * VTEX: resuelve el productId por el LINKTEXT (el slug de la URL), para tiendas
+     * cuya URL NO trae el id en el path (Walmart: .../{linkText}/p, y su productId
+     * puede tener <6 dígitos → el parser no lo saca). VTEX expone el producto por su
+     * linkText en /api/catalog_system/pub/products/search/{linkText}/p — match EXACTO,
+     * sin riesgo de colisión. Fallback en vivo (timeout corto), sólo cuando la
+     * resolución local ya falló.
+     */
+    private function vtexProductIdByLinkText(string $slug, string $url): ?string
+    {
+        $store = $this->storeBySlug($slug);
+        if (!$store || (($store['platform'] ?? '') !== 'vtex')) {
+            return null;
+        }
+        if (!preg_match('~/([^/?#]+)/p(?:[?#].*)?$~', $url, $m)) {
+            return null; // no es una URL de producto VTEX (.../{linkText}/p)
+        }
+        $base = rtrim((string) $store['base_url'], '/');
+        $api  = $base . '/api/catalog_system/pub/products/search/' . $m[1] . '/p';
+
+        $ch = curl_init($api);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 3,
+            CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_TIMEOUT        => 6,
+            CURLOPT_ENCODING       => '',
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; OjoAlPrecio/1.0)',
+            CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+        ]);
+        $body = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($body === false || $code < 200 || $code >= 300) {
+            return null;
+        }
+        $j = json_decode((string) $body, true);
+        return (is_array($j) && isset($j[0]['productId'])) ? (string) $j[0]['productId'] : null;
+    }
+
     /** De una URL de producto deduce [slug_tienda, sku] según la plataforma. */
     private function parseUrl(string $url): array
     {
@@ -207,8 +268,9 @@ final class ProductRepository
         $sku = match ($store['platform']) {
             // VTEX: .../slug-del-producto-{ref-o-productId}/p — el id debe tener ≥6
             // dígitos (los de Sinsa/Siman tienen 9). Walmart usa URLs SOLO-slug sin id
-            // canónico, así que un token corto (…-163cm-7/p → "7") NO cuenta: devuelve
-            // null y el producto no rastreado se muestra como tal (evita colisiones).
+            // en el path (y su productId puede tener <6 díg.), así que un token corto
+            // (…-163cm-7/p → "7") NO cuenta acá (evita colisiones): esos se resuelven
+            // por linkText vía vtexProductIdByLinkText() en resolve()/locate().
             'vtex'    => (preg_match('~-(\d{6,})(?:/p)?/?(?:[?#].*)?$~', $url, $m) ? $m[1] : null),
             // OG: Copasa (.../Product/Detail/{sku}), Gallo (.../slug-{id}) o Unicomer (.../slug-{id}/p)
             'og_meta' => (
