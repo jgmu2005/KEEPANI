@@ -49,8 +49,45 @@ try {
         if ($h >= $hours) { $stale[] = ['name' => $r['name'], 'hours' => $h, 'last' => $r['last_ingest']]; }
     }
 
-    if (!$stale) {
-        out(200, ['ok' => true, 'stale' => 0, 'sent' => false]);
+    // Bajada de conteo: tiendas que HOY refrescaron bastante menos que su mediana
+    // habitual (14d) → posible corrida truncada (ingestó, pero trajo de menos).
+    $low = [];
+    try {
+        $todayCnt = [];
+        foreach ($db->query(
+            "SELECT store_id, COUNT(*) c FROM products
+              WHERE is_active = 1 AND last_date = CURDATE() GROUP BY store_id"
+        ) as $r) { $todayCnt[(int) $r['store_id']] = (int) $r['c']; }
+
+        $hist = []; $names = [];
+        foreach ($db->query(
+            "SELECT cc.store_id, cc.updated, s.name
+               FROM crawl_counts cc JOIN stores s ON s.id = cc.store_id
+              WHERE cc.day >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND cc.day < CURDATE()"
+        )->fetchAll() as $r) {
+            $hist[(int) $r['store_id']][] = (int) $r['updated'];
+            $names[(int) $r['store_id']]  = $r['name'];
+        }
+        $median = static function (array $xs): ?float {
+            if (!$xs) { return null; }
+            sort($xs); $n = count($xs); $m = intdiv($n, 2);
+            return $n % 2 ? (float) $xs[$m] : ($xs[$m - 1] + $xs[$m]) / 2;
+        };
+        foreach ($hist as $sid => $days) {
+            if (count($days) < 4) { continue; }
+            $med = $median($days);
+            if ($med !== null && $med >= 20) {
+                $t = $todayCnt[$sid] ?? 0;
+                if ($t < 0.70 * $med) {
+                    $low[] = ['name' => $names[$sid] ?? ('#' . $sid), 'today' => $t, 'baseline' => (int) round($med)];
+                }
+            }
+        }
+        usort($low, static fn($a, $b) => ($a['today'] / max(1, $a['baseline'])) <=> ($b['today'] / max(1, $b['baseline'])));
+    } catch (\Throwable $e) { /* crawl_counts aún no migrada: sin alerta de bajada */ }
+
+    if (!$stale && !$low) {
+        out(200, ['ok' => true, 'stale' => 0, 'low' => 0, 'sent' => false]);
     }
 
     usort($stale, static fn($a, $b) => $b['hours'] <=> $a['hours']);
@@ -62,28 +99,47 @@ try {
         out(200, ['ok' => true, 'stale' => count($stale), 'sent' => false, 'note' => 'SMTP no configurado; no se envió correo', 'stores' => $stale]);
     }
 
-    $li = '';
-    foreach ($stale as $s) {
-        $d = intdiv($s['hours'], 24); $rem = $s['hours'] % 24;
-        $ago = $d > 0 ? "{$d}d {$rem}h" : "{$s['hours']}h";
-        $li .= '<li><b>' . htmlspecialchars($s['name']) . '</b> — sin datos hace ' . $ago
-             . ' <span style="color:#64748b">(última: ' . htmlspecialchars((string) $s['last']) . ')</span></li>';
+    $html = '<div style="font-family:system-ui,sans-serif;max-width:560px">';
+    if ($stale) {
+        $li = '';
+        foreach ($stale as $s) {
+            $d = intdiv($s['hours'], 24); $rem = $s['hours'] % 24;
+            $ago = $d > 0 ? "{$d}d {$rem}h" : "{$s['hours']}h";
+            $li .= '<li><b>' . htmlspecialchars($s['name']) . '</b> — sin datos hace ' . $ago
+                 . ' <span style="color:#64748b">(última: ' . htmlspecialchars((string) $s['last']) . ')</span></li>';
+        }
+        $html .= '<h2 style="color:#b91c1c">⚠️ Crawl atrasado</h2>'
+            . '<p>Estas tiendas llevan más de ' . $hours . 'h sin ingestar productos:</p><ul>' . $li . '</ul>';
     }
-    $html = '<div style="font-family:system-ui,sans-serif;max-width:520px">'
-        . '<h2 style="color:#b91c1c">⚠️ Crawl atrasado</h2>'
-        . '<p>Estas tiendas llevan más de ' . $hours . 'h sin ingestar productos en <b>Ojo al Precio</b>:</p>'
-        . '<ul>' . $li . '</ul>'
-        . '<p style="color:#64748b;font-size:.9rem">Revisá el crawler de esas tiendas (Actions, cron server-side o la PC local para telcmax).</p></div>';
+    if ($low) {
+        $li2 = '';
+        foreach ($low as $s) {
+            $pct = $s['baseline'] > 0 ? (int) round(100 * $s['today'] / $s['baseline']) : 0;
+            $li2 .= '<li><b>' . htmlspecialchars($s['name']) . '</b> — refrescó <b>' . number_format($s['today'])
+                  . '</b> hoy vs ~' . number_format($s['baseline']) . ' habitual '
+                  . '<span style="color:#9a3412">(' . $pct . '%)</span></li>';
+        }
+        $html .= '<h2 style="color:#9a3412">📉 Refrescaron de menos</h2>'
+            . '<p>Estas tiendas ingestaron, pero trajeron bastante MENOS productos que lo habitual '
+            . '(posible corrida truncada — el panel saldría verde igual):</p><ul>' . $li2 . '</ul>';
+    }
+    $html .= '<p style="color:#64748b;font-size:.9rem">Revisá el crawler de esas tiendas '
+        . '(Actions, cron server-side o la PC local).</p></div>';
 
-    $res = $mailer->send($to, '⚠️ Ojo al Precio — ' . count($stale) . ' tienda(s) sin datos', $html);
+    $parts = [];
+    if ($stale) { $parts[] = count($stale) . ' sin datos'; }
+    if ($low)   { $parts[] = count($low) . ' de menos'; }
+    $res = $mailer->send($to, '⚠️ Ojo al Precio — ' . implode(' · ', $parts), $html);
 
     out(200, [
-        'ok'     => true,
-        'stale'  => count($stale),
-        'sent'   => (bool) ($res['ok'] ?? false),
-        'to'     => $to,
-        'stores' => $stale,
-        'error'  => $res['ok'] ?? false ? null : ($res['error'] ?? 'error al enviar'),
+        'ok'           => true,
+        'stale'        => count($stale),
+        'low'          => count($low),
+        'sent'         => (bool) ($res['ok'] ?? false),
+        'to'           => $to,
+        'stores_stale' => $stale,
+        'stores_low'   => $low,
+        'error'        => ($res['ok'] ?? false) ? null : ($res['error'] ?? 'error al enviar'),
     ]);
 } catch (\Throwable $e) {
     out(500, ['ok' => false, 'error' => $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine()]);

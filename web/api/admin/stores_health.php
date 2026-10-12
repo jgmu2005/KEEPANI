@@ -80,15 +80,51 @@ foreach ($rows(
     if (isset($base[$id])) { $base[$id]['out_today'] = (int) $r['today']; $base[$id]['out_7d'] = (int) $r['week']; }
 }
 
+// 4) Refrescados HOY por tienda (productos con last_date = hoy). Usa idx_last_date.
+$updatedToday = [];
+foreach ($rows(
+    "SELECT store_id, COUNT(*) AS c
+       FROM products
+      WHERE is_active = 1 AND last_date = CURDATE()
+      GROUP BY store_id"
+) as $r) {
+    $updatedToday[(int) $r['store_id']] = (int) $r['c'];
+}
+
+// 5) Baseline: histórico de conteos (crawl_counts) de los últimos 14 días SIN hoy.
+//    Con la mediana detectamos una corrida que trajo bastante MENOS que lo habitual.
+$hist = [];
+foreach ($rows(
+    "SELECT store_id, updated
+       FROM crawl_counts
+      WHERE day >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND day < CURDATE()"
+) as $r) {
+    $hist[(int) $r['store_id']][] = (int) $r['updated'];
+}
+$median = static function (array $xs): ?float {
+    if (!$xs) { return null; }
+    sort($xs); $n = count($xs); $m = intdiv($n, 2);
+    return $n % 2 ? (float) $xs[$m] : ($xs[$m - 1] + $xs[$m]) / 2;
+};
+$DROP_RATIO = 0.70; // < 70% de lo habitual → bandera "low" (corrida posiblemente truncada)
+
 // Frescura en PHP (horas desde la última ingesta) + bandera de atraso.
 $now = time();
 $out = [];
-foreach ($base as $b) {
+foreach ($base as $sid => $b) {
     $ts    = $b['last_ingest'] ? strtotime((string) $b['last_ingest']) : null;
     $hours = $ts ? (int) floor(($now - $ts) / 3600) : null;
     $b['hours_since'] = $hours;
     $b['stale']       = $hours === null ? true : ($hours >= $STALE_HOURS);
     $b['warn']        = $hours !== null && $hours >= $WARN_HOURS && $hours < $STALE_HOURS;
+
+    // Conteo de refrescados hoy + baseline (mediana de >=4 días previos).
+    $b['updated_today'] = $updatedToday[$sid] ?? 0;
+    $med = (isset($hist[$sid]) && count($hist[$sid]) >= 4) ? $median($hist[$sid]) : null;
+    $b['baseline'] = $med !== null ? (int) round($med) : null;
+    // "low": refrescó bastante menos que lo habitual (y no es una tienda chica/vacía).
+    $b['low'] = $med !== null && $med >= 20 && $b['updated_today'] < $DROP_RATIO * $med;
+
     $out[] = $b;
 }
 
@@ -103,6 +139,7 @@ out(200, [
     'ok'          => true,
     'stale_hours' => $STALE_HOURS,
     'warn_hours'  => $WARN_HOURS,
+    'drop_ratio'  => $DROP_RATIO,
     'generated'   => date('Y-m-d H:i'),
     'stores'      => $out,
 ]);

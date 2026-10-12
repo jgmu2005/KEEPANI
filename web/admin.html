@@ -362,27 +362,34 @@ async function loadStoresHealth(){
   const warnH = j.warn_hours || 24;
   const stale = j.stores.filter(s => s.stale).length;
   const warn  = j.stores.filter(s => s.warn).length;
+  const low   = j.stores.filter(s => s.low).length;
+  const dropPct = Math.round((j.drop_ratio || 0.70) * 100);
   let html = '';
   if(stale) html += `<div class="msg err" style="margin-bottom:8px">⚠️ ${stale} tienda(s) sin datos hace +${j.stale_hours}h — probablemente rota, revisá el crawler.</div>`;
   if(warn)  html += `<div style="margin-bottom:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:9px 12px;font-size:.85rem">🟡 ${warn} tienda(s) atrasada(s) un día (+${warnH}h) — el cron de GitHub Actions pudo saltarse la corrida.</div>`;
-  if(!stale && !warn) html += `<div class="msg ok" style="margin-bottom:8px">✅ Todas las tiendas ingestaron en las últimas ${warnH}h.</div>`;
+  if(low)   html += `<div style="margin-bottom:8px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:9px 12px;font-size:.85rem">📉 ${low} tienda(s) refrescaron HOY menos del ${dropPct}% de lo habitual — posible corrida truncada (trajo de menos aunque "ingestó").</div>`;
+  if(!stale && !warn && !low) html += `<div class="msg ok" style="margin-bottom:8px">✅ Todas las tiendas ingestaron en las últimas ${warnH}h, con conteos normales.</div>`;
   html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.85rem">
     <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--line)">
       <th style="padding:6px 8px">Tienda</th><th>Activos</th><th>Última ingesta</th>
+      <th title="productos con precio refrescado hoy / mediana habitual (14d)">Refrescados hoy</th>
       <th title="hoy / 7 días">Entradas</th><th title="hoy / 7 días">Salidas</th></tr></thead><tbody>`;
   for(const s of j.stores){
     const dot  = s.stale ? '#dc2626' : (s.warn ? '#d97706' : '#16a34a');
-    const bg   = s.stale ? ';background:#fef2f2' : (s.warn ? ';background:#fffbeb' : '');
+    const bg   = s.stale ? ';background:#fef2f2' : (s.warn ? ';background:#fffbeb' : (s.low ? ';background:#fff7ed' : ''));
     const tcol = s.stale ? '#b91c1c' : (s.warn ? '#92400e' : 'inherit');
     const bold = (s.stale || s.warn) ? '700' : '400';
+    const upStyle = s.low ? 'color:#9a3412;font-weight:700' : 'color:inherit';
+    const baseTxt = s.baseline!=null ? ` <span style="color:var(--muted)">/ ~${num(s.baseline)}</span>` : '';
     html += `<tr style="border-bottom:1px solid var(--line)${bg}">
       <td style="padding:7px 8px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dot};margin-right:7px"></span><b>${esc(s.name)}</b> <span style="color:var(--muted);font-size:.72rem">${esc(s.platform||'')}</span></td>
       <td>${num(s.active)}</td>
       <td style="color:${tcol};font-weight:${bold}">${ago(s.hours_since)}</td>
+      <td style="${upStyle}">${num(s.updated_today)}${baseTxt}${s.low ? ' 📉' : ''}</td>
       <td style="color:#166534">+${num(s.in_today)} <span style="color:var(--muted)">/ ${num(s.in_7d)}</span></td>
       <td style="color:#b91c1c">−${num(s.out_today)} <span style="color:var(--muted)">/ ${num(s.out_7d)}</span></td></tr>`;
   }
-  html += `</tbody></table></div><div style="color:var(--muted);font-size:.72rem;margin-top:6px">Generado ${esc(j.generated)}. Entradas = nuevos (first_seen). Salidas = desactivados (delisted).</div>`;
+  html += `</tbody></table></div><div style="color:var(--muted);font-size:.72rem;margin-top:6px">Generado ${esc(j.generated)}. Refrescados hoy = productos con precio actualizado hoy / mediana de 14d. Entradas = nuevos. Salidas = delistados.</div>`;
   box.innerHTML = html;
 }
 
