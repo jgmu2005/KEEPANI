@@ -178,7 +178,10 @@ foreach ($byCode as $code => $p) {
     $rec = new NormalizedProduct(
         storeSlug:   SLUG,
         sku:         (string) $code,
-        url:         BASE . '/product/' . rawurlencode((string) $code),
+        // La ruta pública de Comtech es CASE-SENSITIVE y usa el code en MINÚSCULAS
+        // (/product/vx242c1); con mayúsculas da 404. El external_sku (sku: arriba)
+        // sigue siendo el ProductCode original (p.ej. VX242C1).
+        url:         BASE . '/product/' . rawurlencode(strtolower((string) $code)),
         title:       $name,
         brand:       (!empty($p['Brand']) && $p['Brand'] !== '.') ? (string) $p['Brand'] : null,
         imageUrl:    $img,

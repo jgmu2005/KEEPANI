@@ -83,6 +83,31 @@ try {
             out(500, ['ok' => false, 'error' => 'No se pudo guardar el producto.']);
         }
         $added = true;
+    } else {
+        // Ya rastreado: si está INACTIVO o el último punto NO es de hoy, lo
+        // refrescamos EN VIVO. El usuario pegó el link → quiere el precio actual; y
+        // así resucitamos productos que el crawl de categorías dejó de ver pero
+        // siguen vivos en la tienda (ej. recategorizados), que si no quedan
+        // delistados (is_active=0) y fuera del catálogo. Best-effort: si el fetch
+        // falla o la tienda ya no lo trae, mostramos lo que haya.
+        try {
+            $chk = $db->prepare('SELECT is_active, last_date FROM products WHERE id = ?');
+            $chk->execute([$id]);
+            $row = $chk->fetch();
+            $stale = $row && ((int) $row['is_active'] === 0
+                || (string) ($row['last_date'] ?? '') !== date('Y-m-d'));
+            if ($stale) {
+                $meta     = $repo->product($id);
+                $storeRow = $meta ? $repo->storeBySlug((string) $meta['store']) : null;
+                if ($storeRow) {
+                    $adapter = AdapterFactory::fromStore($storeRow, new Http());
+                    $rec = $adapter->fetchByUrl((string) $meta['url'], (string) $meta['sku']);
+                    if ($rec !== null) {
+                        (new IngestService($db))->ingest([$rec->toArray()]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) { /* refresh best-effort */ }
     }
 
     $history = $repo->history($id);
