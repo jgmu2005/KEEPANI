@@ -59,14 +59,15 @@ try {
     }
 
     // Productos activos, los más desactualizados primero (NULL = nunca capturado).
+    // Usamos la columna DESNORMALIZADA products.last_date (poblada en cada ingesta)
+    // en vez de un GROUP BY sobre todo price_history: ese join era carísimo en FatCow
+    // (tabla enorme) y podía colgar el request solo, antes de empezar a refrescar.
+    // NULL (nunca capturado) va primero en ASC, luego del más viejo al más nuevo:
+    // justo la prioridad que queremos, y así usa el índice idx_last_date (sin filesort).
     $sql = 'SELECT p.id, p.store_id, p.external_sku, p.url
               FROM products p
-              LEFT JOIN (
-                    SELECT product_id, MAX(captured_at) AS last_at
-                      FROM price_history GROUP BY product_id
-              ) ph ON ph.product_id = p.id
              WHERE p.is_active = 1
-             ORDER BY (ph.last_at IS NULL) DESC, ph.last_at ASC
+             ORDER BY p.last_date ASC
              LIMIT ' . $limit;
     $products = $db->query($sql)->fetchAll();
 
