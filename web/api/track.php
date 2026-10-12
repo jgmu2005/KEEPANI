@@ -22,6 +22,14 @@ use OjoAlPrecio\Web\IngestService;
 use OjoAlPrecio\Web\Fetch\Http;
 use OjoAlPrecio\Web\Fetch\AdapterFactory;
 
+// FatCow cachea con OPcache (varios workers, no revalida por mtime) → tras subir un
+// fix por SFTP a veces sigue corriendo el código viejo. Invalidamos la clase de
+// resolución para que el código nuevo se tome tras el deploy (ej. el soporte de URLs
+// de Walmart sin id). Barato: track.php es de baja frecuencia (sólo al pegar un link).
+if (function_exists('opcache_invalidate')) {
+    @opcache_invalidate(dirname(__DIR__) . '/src/ProductRepository.php', true);
+}
+
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
