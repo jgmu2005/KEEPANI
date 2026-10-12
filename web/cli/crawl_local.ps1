@@ -96,3 +96,8 @@ if ($node) {
 }
 
 Log "listo."
+# Salida limpia explícita: node/php escriben a stderr (progreso), y PowerShell los
+# envuelve como NativeCommandError → sin esto la Tarea Programada reportaba
+# LastTaskResult=1 aunque la ingesta fuera OK. Si el script llegó hasta acá, corrió
+# completo (los fallos por tienda ya se capturan con try/catch arriba).
+exit 0
