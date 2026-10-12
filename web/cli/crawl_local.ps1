@@ -1,5 +1,5 @@
 # ============================================================================
-#  Crawl LOCAL — tiendas que bloquean (o pueden bloquear) IPs de datacenter
+#  Crawl LOCAL - tiendas que bloquean (o pueden bloquear) IPs de datacenter
 #  (telcmax, tizo, samsung) y solo se bajan bien desde una IP RESIDENCIAL (tu
 #  casa). Pensado para correr al
 #  encender la PC / iniciar sesion (Task Scheduler, ver instrucciones abajo).
@@ -92,7 +92,7 @@ if ($node) {
         Log "ERROR en 'etech': $($_.Exception.Message)"
     }
 } else {
-    Log "etech: SALTADO — falta Node. Instalalo una vez y luego 'npm install playwright' + 'npx playwright install chromium' en $repo."
+    Log "etech: SALTADO - falta Node. Instalalo una vez y luego 'npm install playwright' + 'npx playwright install chromium' en $repo."
 }
 
 Log "listo."
