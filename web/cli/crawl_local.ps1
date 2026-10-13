@@ -29,8 +29,18 @@ if ([string]::IsNullOrWhiteSpace($env:OJO_INGEST_URL) -or [string]::IsNullOrWhit
 }
 
 # --- 2) Esperar a que haya red (hasta ~2 min tras encender la PC) ---
+# Usamos una conexión TCP real (puerto 53 de 8.8.8.8), NO ping: muchos firewalls/
+# redes bloquean ICMP → Test-Connection tiraba "Generic failure" y spameaba errores.
+# Tolerante: si nunca conecta, seguimos igual (los crawlers tienen sus reintentos).
 for ($i = 0; $i -lt 24; $i++) {
-    if (Test-Connection -Quiet -Count 1 -ComputerName 8.8.8.8) { break }
+    $net = $false
+    try {
+        $c = New-Object System.Net.Sockets.TcpClient
+        $iar = $c.BeginConnect('8.8.8.8', 53, $null, $null)
+        $net = $iar.AsyncWaitHandle.WaitOne(2000) -and $c.Connected
+        $c.Close()
+    } catch { $net = $false }
+    if ($net) { break }
     Start-Sleep -Seconds 5
 }
 
