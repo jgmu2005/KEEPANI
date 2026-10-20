@@ -76,6 +76,17 @@ try {
     Log "ERROR en 'samsung': $($_.Exception.Message)"
 }
 
+#     Shopify (Simple Technic, Cubitt): Shopify empezo a bloquear /products.json
+#     desde el datacenter de GitHub (403) -> se atrasaban. Desde IP residencial
+#     responden 200, asi que se crawlean aca.
+Log "crawl 'shopify (simpletechnic, cubitt)' ..."
+try {
+    $out = & php web/cli/crawl_shopify.php all 2>&1 | Out-String
+    Log $out.Trim()
+} catch {
+    Log "ERROR en 'shopify': $($_.Exception.Message)"
+}
+
 # --- 5) etech (WooCommerce detrás de Cloudflare): un navegador REAL pasa el
 #     challenge JS. Actions (datacenter) NO puede; una IP residencial SÍ. Bajamos
 #     el JSON crudo con Node/Playwright y lo mapeamos/ingestamos con PHP (WooMapper).
