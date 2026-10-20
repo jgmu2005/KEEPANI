@@ -43,7 +43,14 @@ function apiGet(string $url, int $retries = 4): ?array
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_ENCODING       => '',
             CURLOPT_USERAGENT      => UA,
-            CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+            // Headers de NAVEGADOR: el Cloudflare delante de estas Shopify empezó
+            // (oct 2026) a tirar 403 a los requests que sólo mandaban
+            // "Accept: application/json" (firma de bot). Con un Accept amplio +
+            // Accept-Language pasa. Probado: sin esto 403, con esto 200.
+            CURLOPT_HTTPHEADER     => [
+                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
+                'Accept-Language: es-NI,es;q=0.9,en;q=0.8',
+            ],
         ]);
         $body = curl_exec($ch);
         $lastCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -53,7 +60,8 @@ function apiGet(string $url, int $retries = 4): ?array
             $j = json_decode((string) $body, true);
             if (is_array($j)) { return $j; }
         }
-        if ($lastCode === 429 || $lastCode >= 500 || $body === false) {
+        // 403 = casi siempre challenge de Cloudflare → reintentamos (transitorio).
+        if ($lastCode === 429 || $lastCode === 403 || $lastCode >= 500 || $body === false) {
             usleep(1200000 * ($a + 1));
             continue;
         }

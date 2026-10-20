@@ -9,11 +9,8 @@ on:
         description: 'Tienda (simpletechnic o all)'
         required: true
         default: 'all'
-  # schedule DESACTIVADO (oct 2026): Shopify empezó a bloquear /products.json desde
-  # el datacenter de GitHub (403) → simpletechnic/cubitt se atrasaban. Ahora se
-  # crawlean LOCAL (residencial) vía crawl_local.ps1; este workflow queda sólo manual.
-  # schedule:
-  #   - cron: '30 8 * * *'
+  schedule:
+    - cron: '30 8 * * *'   # diario ~08:30 UTC (después del crawl principal)
 
 jobs:
   crawl:
